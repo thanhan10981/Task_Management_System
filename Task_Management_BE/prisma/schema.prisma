@@ -1,0 +1,401 @@
+// Task Management System Database Schema
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETED
+
+  @@map("project_status")
+}
+
+enum ProjectMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+
+  @@map("project_member_role")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@map("task_priority")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  VOICE
+  SYSTEM
+
+  @@map("message_type")
+}
+
+enum MessageScope {
+  PROJECT
+  DIRECT
+
+  @@map("message_scope")
+}
+
+enum ThemeMode {
+  LIGHT
+  DARK
+  SYSTEM
+
+  @@map("theme_mode")
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_COMMENTED
+  MESSAGE_RECEIVED
+  FILE_SHARED
+  SYSTEM
+
+  @@map("notification_type")
+}
+
+enum ActivityType {
+  TASK
+  MESSAGE
+  FILE
+  PROJECT
+  USER
+  SYSTEM
+
+  @@map("activity_type")
+}
+
+// ============================================
+// Models
+// ============================================
+
+model User {
+  id            String   @id @default(uuid())
+  fullName      String   @db.VarChar(150)
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String?  @db.Text
+  avatarUrl     String?  @db.Text
+  coverUrl      String?  @db.Text
+  jobTitle      String?  @db.VarChar(120)
+  phone         String?  @db.VarChar(30)
+  bio           String?  @db.Text
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  userSettings      UserSettings?
+  projectsCreated   Project[]     @relation("createdBy")
+  projectMembers    ProjectMember[]
+  tasksCreated      Task[]        @relation("createdBy")
+  tasksUpdated      Task[]        @relation("updatedBy")
+  taskAssignees     TaskAssignee[]
+  comments          Comment[]
+  taskHistory       TaskHistory[]
+  messagesSent      Message[]     @relation("sender")
+  messagesReceived  Message[]     @relation("receiver")
+  filesUploaded     File[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  projectMemberAddedBy ProjectMember[] @relation("addedBy")
+  taskAssigneeAssignedBy TaskAssignee[] @relation("assignedBy")
+
+  @@map("users")
+}
+
+model UserSettings {
+  userId                String    @id
+  language              String?   @db.VarChar(20)
+  timezone              String?   @db.VarChar(100)
+  notificationSettings  Json?
+  privacySettings       Json?
+  preferences           Json?
+  theme                 ThemeMode @default(SYSTEM)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("user_settings")
+}
+
+model Project {
+  id          String         @id @default(uuid())
+  name        String         @db.VarChar(180)
+  description String?        @db.Text
+  status      ProjectStatus  @default(ACTIVE)
+  color       String?        @db.VarChar(20)
+  icon        String?        @db.VarChar(50)
+  startDate   DateTime?      @db.Date
+  endDate     DateTime?      @db.Date
+  createdBy   String
+  createdAt   DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  creator         User              @relation("createdBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  members         ProjectMember[]
+  tasks           Task[]
+  taskStatuses    TaskStatus[]
+  messages        Message[]
+  files           File[]
+  notifications   Notification[]
+  activityLogs    ActivityLog[]
+
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String              @id @default(uuid())
+  projectId String             
+  userId    String             
+  role      ProjectMemberRole   @default(MEMBER)
+  joinedAt  DateTime            @default(now()) @db.Timestamptz(6)
+  addedBy   String?            
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedByUser User? @relation("addedBy", fields: [addedBy], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model TaskStatus {
+  id        String    @id @default(uuid())
+  projectId String   
+  name      String    @db.VarChar(100)
+  color     String?   @db.VarChar(20)
+  position  Int
+  isDefault Boolean   @default(false)
+  isDone    Boolean   @default(false)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@unique([projectId, name])
+  @@unique([projectId, position])
+  @@map("task_statuses")
+}
+
+model Task {
+  id             String        @id @default(uuid())
+  projectId      String       
+  parentTaskId   String?      
+  title          String        @db.VarChar(255)
+  description    String?       @db.Text
+  statusId       String       
+  priority       TaskPriority  @default(MEDIUM)
+  progress       Decimal       @default(0) @db.Decimal(5, 2)
+  startDate      DateTime?     @db.Timestamptz(6)
+  dueDate        DateTime?     @db.Timestamptz(6)
+  tags           Json?
+  checklist      Json?
+  coverFileId    String?      
+  createdBy      String       
+  updatedBy      String?      
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTask     Task?         @relation("parentSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks       Task[]        @relation("parentSubtasks")
+  status         TaskStatus    @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  createdByUser  User          @relation("createdBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  updatedByUser  User?         @relation("updatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+  assignees      TaskAssignee[]
+  comments       Comment[]
+  history        TaskHistory[]
+  files          File[]
+
+  @@index([projectId])
+  @@index([statusId])
+  @@index([createdBy])
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  id         String   @id @default(uuid())
+  taskId     String  
+  userId     String  
+  assignedBy String? 
+  assignedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  task             Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user             User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedByUser   User? @relation("assignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@unique([taskId, userId])
+  @@map("task_assignees")
+}
+
+model Comment {
+  id              String   @id @default(uuid())
+  taskId          String  
+  userId          String  
+  parentCommentId String? 
+  content         String   @db.Text
+  attachments     Json?
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentComment   Comment?  @relation("parentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         Comment[] @relation("parentReplies")
+  files           File[]
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("comments")
+}
+
+model TaskHistory {
+  id        String   @id @default(uuid())
+  taskId    String  
+  userId    String? 
+  action    String   @db.VarChar(100)
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@map("task_history")
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  projectId       String?     
+  senderId        String      
+  receiverId      String?     
+  scope           MessageScope @default(PROJECT)
+  replyToMessageId String?    
+  type            MessageType  @default(TEXT)
+  content         String?      @db.Text
+  attachments     Json?
+  reactions       Json?
+  isEdited        Boolean      @default(false)
+  editedAt        DateTime?    @db.Timestamptz(6)
+  deletedAt       DateTime?    @db.Timestamptz(6)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sender          User     @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver        User?    @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  replyToMessage  Message? @relation("messageReplies", fields: [replyToMessageId], references: [id], onDelete: Cascade)
+  replies         Message[] @relation("messageReplies")
+  files           File[]
+
+  @@index([projectId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("messages")
+}
+
+model File {
+  id              String   @id @default(uuid())
+  projectId       String? 
+  uploadedBy      String? 
+  fileName        String   @db.VarChar(255)
+  fileType        String?  @db.VarChar(100)
+  fileCategory    String?  @db.VarChar(50)
+  fileUrl         String   @db.Text
+  thumbnailUrl    String?  @db.Text
+  sizeBytes       BigInt?
+  durationSeconds Int?
+  storageProvider String   @default("cloudinary") @db.VarChar(50)
+  storageKey      String?  @db.Text
+  folderPath      String?  @db.VarChar(255)
+  sharedWith      Json?
+  taskId          String? 
+  messageId       String? 
+  commentId       String? 
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  project Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  uploader User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  task    Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  message Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  comment Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([messageId])
+  @@map("files")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String          
+  projectId String?         
+  type      NotificationType
+  title     String?          @db.VarChar(255)
+  content   String?          @db.Text
+  data      Json?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?        @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id          String       @id @default(uuid())
+  userId      String?     
+  projectId   String?     
+  entityType  ActivityType?
+  entityId    String?     
+  action      String       @db.VarChar(100)
+  description String?      @db.Text
+  metadata    Json?
+  createdAt   DateTime     @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("activity_logs")
+}

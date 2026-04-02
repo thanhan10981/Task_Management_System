@@ -1,15 +1,19 @@
 import { Controller, Post, Body, Get, UseGuards, Request, Response, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../service/auth.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a new user account' })
+  @ApiBody({ type: RegisterDto })
   async register(@Body() registerDto: RegisterDto, @Response() res: any) {
     const data = await this.authService.register(registerDto);
     
@@ -36,6 +40,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login and receive auth cookies' })
+  @ApiBody({ type: LoginDto })
   async login(@Body() loginDto: LoginDto, @Response() res: any) {
     const data = await this.authService.login(loginDto);
 
@@ -62,6 +68,8 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token using refreshToken cookie' })
+  @ApiCookieAuth('accessToken')
   async refresh(@Request() req: any, @Response() res: any) {
     const refreshToken = req.cookies?.refreshToken;
     
@@ -87,6 +95,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout current user and clear cookies' })
+  @ApiCookieAuth('accessToken')
   async logout(@Request() req: any, @Response() res: any) {
     await this.authService.logout(req.user.id);
     
@@ -101,6 +111,8 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @ApiOperation({ summary: 'Get current authenticated user profile' })
+  @ApiCookieAuth('accessToken')
   getProfile(@Request() req: any) {
     return {
       data: req.user,

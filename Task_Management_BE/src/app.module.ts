@@ -5,15 +5,22 @@ import { AppService } from './app.service';
 import { DatabaseModule } from './config/database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { UserModule } from './modules/user/user.module';
+
+import configuration from './config/configuration';
+import { validate } from './config/validateion.schema';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [configuration],
+      validate,
     }),
     DatabaseModule,
     AuthModule,
     TasksModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import * as cookieParser from 'cookie-parser';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './core/error-handler/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -8,6 +9,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const port = Number(process.env.PORT) || 3001;
 
   const allowedOrigins = [
     process.env.CLIENT_URL,
@@ -37,6 +39,16 @@ async function bootstrap() {
   app.useGlobalInterceptors(new LoggingInterceptor(), new ResponseInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  await app.listen(process.env.PORT ?? 3000);
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Task Management API')
+    .setDescription('API documentation for Task Management System')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument);
+
+  await app.listen(port);
+  console.log(`Swagger docs at http://localhost:${port}/api/docs`);
 }
 bootstrap();

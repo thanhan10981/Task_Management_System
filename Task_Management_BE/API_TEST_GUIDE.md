@@ -24,7 +24,7 @@ npm run prisma:migrate
 npm run start:dev
 ```
 
-Server sẽ chạy tại: `http://localhost:3000`
+Server sẽ chạy tại: `http://localhost:3001`
 
 ---
 

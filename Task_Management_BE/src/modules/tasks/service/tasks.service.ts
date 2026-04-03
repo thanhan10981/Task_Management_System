@@ -70,6 +70,47 @@ export class TasksService {
     return createPaginatedResponse(mappedTasks, total, queryDto);
   }
 
+  async findByParentTask(userId: string, parentTaskId: string, queryDto: TaskQueryDto) {
+    const { skip, take } = createPaginationOptions(queryDto);
+
+    const where: any = {
+      createdBy: userId,
+      parentTaskId,
+    };
+
+    if (queryDto.status) {
+      where.status = {
+        name: queryDto.status,
+      };
+    }
+
+    if (queryDto.priority) {
+      where.priority = queryDto.priority;
+    }
+
+    if (queryDto.search) {
+      where.OR = [
+        { title: { contains: queryDto.search, mode: 'insensitive' } },
+        { description: { contains: queryDto.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [tasks, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        include: { createdByUser: true, status: true, project: true },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    const mappedTasks = tasks.map((task) => this.mapTaskResponse(task));
+
+    return createPaginatedResponse(mappedTasks, total, queryDto);
+  }
+
   async findOne(userId: string, id: string) {
     const task = await this.prisma.task.findUnique({
       where: { id },

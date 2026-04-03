@@ -25,7 +25,6 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a user' })
   @ApiBody({ type: CreateUserDto })
   create(@Body() createUserDto: CreateUserDto) {

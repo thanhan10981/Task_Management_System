@@ -26,7 +26,6 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new task' })
   @ApiBody({ type: CreateTaskDto })
   create(@Request() req, @Body() createTaskDto: CreateTaskDto) {

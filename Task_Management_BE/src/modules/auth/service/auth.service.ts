@@ -6,6 +6,12 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 
+type JwtPayload = {
+  sub: string;
+  email: string;
+  exp?: number;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -68,24 +74,30 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('jwt.refreshSecret'),
-      });
+    const payload = this.verifyRefreshToken(refreshToken);
+    const remainingLifetime = this.getRemainingLifetime(payload.exp);
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-      });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
 
-      if (!user) {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
-
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      return this.generateTokens(userWithoutPassword);
-    } catch (error) {
+    if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    const tokenPayload = { sub: userWithoutPassword.id, email: userWithoutPassword.email };
+
+    const [accessToken, newRefreshToken] = await Promise.all([
+      this.generateAccessToken(tokenPayload),
+      this.generateRefreshTokenWithRemainingLifetime(tokenPayload, remainingLifetime),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      user: userWithoutPassword,
+    };
   }
 
   async logout(userId: string) {
@@ -94,20 +106,9 @@ export class AuthService {
 
   private async generateTokens(user: Omit<any, 'passwordHash'>) {
     const payload = { sub: user.id, email: user.email };
-    const accessSecret = this.configService.get<string>('jwt.secret');
-    const accessExpiresIn = this.configService.get<string>('jwt.expiresIn');
-    const refreshSecret = this.configService.get<string>('jwt.refreshSecret');
-    const refreshExpiresIn = this.configService.get<string>('jwt.refreshExpiresIn');
-
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: accessSecret,
-        expiresIn: accessExpiresIn,
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: refreshSecret,
-        expiresIn: refreshExpiresIn,
-      }),
+      this.generateAccessToken(payload),
+      this.generateRefreshToken(payload),
     ]);
 
     return {
@@ -115,5 +116,56 @@ export class AuthService {
       refreshToken,
       user,
     };
+  }
+
+  private verifyRefreshToken(refreshToken: string): JwtPayload {
+    try {
+      return this.jwtService.verify<JwtPayload>(refreshToken, {
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
+  private getRemainingLifetime(exp?: number): number {
+    if (!exp) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+    const remainingLifetime = exp - currentTimeInSeconds;
+
+    if (remainingLifetime <= 0) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    return remainingLifetime;
+  }
+
+  private generateAccessToken(payload: { sub: string; email: string }) {
+    return this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('jwt.secret'),
+      expiresIn: this.configService.get<string>('jwt.expiresIn'),
+    });
+  }
+
+  private generateRefreshToken(payload: { sub: string; email: string }) {
+    return this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('jwt.refreshSecret'),
+      expiresIn: this.configService.get<string>('jwt.refreshExpiresIn'),
+    });
+  }
+
+  private generateRefreshTokenWithRemainingLifetime(
+    payload: { sub: string; email: string },
+    remainingLifetime: number,
+  ) {
+    // Keep the original refresh token expiry boundary to prevent infinite sliding sessions.
+    // We only mint a new refresh token for the exact time that remains.
+    return this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('jwt.refreshSecret'),
+      expiresIn: remainingLifetime,
+    });
   }
 }

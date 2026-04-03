@@ -23,7 +23,6 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CreateUserDto, UpdateUserDto, UserQueryDto } from '../dto/user.dto';
 import { UserService } from '../service/user.service';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Users')
 @ApiBearerAuth('accessToken')

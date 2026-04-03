@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Get, UseGuards, Request, Response, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../service/auth.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
@@ -11,9 +11,10 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user account' })
   @ApiBody({ type: RegisterDto })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'User created successfully' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data' })
   async register(@Body() registerDto: RegisterDto, @Response() res: any) {
     const data = await this.authService.register(registerDto);
     
@@ -42,6 +43,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login and receive auth cookies' })
   @ApiBody({ type: LoginDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Login successful' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto, @Response() res: any) {
     const data = await this.authService.login(loginDto);
 
@@ -70,6 +73,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token using refreshToken cookie' })
   @ApiCookieAuth('accessToken')
+  @ApiResponse({ status: HttpStatus.OK, description: 'Token refreshed successfully' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid refresh token' })
   async refresh(@Request() req: any, @Response() res: any) {
     const refreshToken = req.cookies?.refreshToken;
     
@@ -97,6 +102,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout current user and clear cookies' })
   @ApiCookieAuth('accessToken')
+  @ApiResponse({ status: HttpStatus.OK, description: 'Logout successful' })
   async logout(@Request() req: any, @Response() res: any) {
     await this.authService.logout(req.user.id);
     
@@ -113,6 +119,7 @@ export class AuthController {
   @Get('me')
   @ApiOperation({ summary: 'Get current authenticated user profile' })
   @ApiCookieAuth('accessToken')
+  @ApiResponse({ status: HttpStatus.OK, description: 'User profile retrieved successfully' })
   getProfile(@Request() req: any) {
     return {
       data: req.user,

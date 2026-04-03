@@ -24,7 +24,6 @@ import {
 import { TasksService } from '../service/tasks.service';
 import { CreateTaskDto, UpdateTaskDto, TaskQueryDto } from '../dto/task.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Tasks')
 @ApiBearerAuth('accessToken')
@@ -34,7 +33,6 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new task' })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Task created successfully' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data' })
@@ -54,6 +52,30 @@ export class TasksController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   findAll(@Request() req, @Query() queryDto: TaskQueryDto) {
     return this.tasksService.findAll(req.user.id, queryDto);
+  }
+
+  @Get('parent/:parentTaskId')
+  @ApiOperation({ summary: 'Get tasks by parent task ID' })
+  @ApiParam({
+    name: 'parentTaskId',
+    type: String,
+    format: 'uuid',
+    description: 'Parent task ID',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({ name: 'status', required: false, type: String, example: 'TODO' })
+  @ApiQuery({ name: 'priority', required: false, type: String, example: 'HIGH' })
+  @ApiQuery({ name: 'search', required: false, type: String, example: 'api integration' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Child tasks retrieved successfully' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid parent task id' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  findByParentTask(
+    @Request() req,
+    @Param('parentTaskId', new ParseUUIDPipe()) parentTaskId: string,
+    @Query() queryDto: TaskQueryDto,
+  ) {
+    return this.tasksService.findByParentTask(req.user.id, parentTaskId, queryDto);
   }
 
   @Get(':id')

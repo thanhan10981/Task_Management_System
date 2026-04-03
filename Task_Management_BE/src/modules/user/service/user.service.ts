@@ -167,6 +167,43 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
+    const [
+      createdProjects,
+      projectMemberships,
+      createdTasks,
+      assignedTasks,
+      comments,
+      uploadedFiles,
+      createdSprints,
+    ] = await this.prisma.$transaction([
+      this.prisma.project.count({ where: { createdBy: id } }),
+      this.prisma.projectMember.count({ where: { userId: id } }),
+      this.prisma.task.count({ where: { createdBy: id } }),
+      this.prisma.taskAssignee.count({ where: { userId: id } }),
+      this.prisma.comment.count({ where: { userId: id } }),
+      this.prisma.file.count({ where: { uploadedBy: id } }),
+      this.prisma.sprint.count({ where: { createdBy: id } }),
+    ]);
+
+    const relationUsage = {
+      projectsCreated: createdProjects,
+      projectMemberships,
+      tasksCreated: createdTasks,
+      taskAssignments: assignedTasks,
+      comments,
+      filesUploaded: uploadedFiles,
+      sprintsCreated: createdSprints,
+    };
+
+    const hasRelatedData = Object.values(relationUsage).some((count) => count > 0);
+
+    if (hasRelatedData) {
+      throw new ConflictException({
+        message: 'Cannot delete user with related data',
+        relations: relationUsage,
+      });
+    }
+
     await this.prisma.user.delete({
       where: { id },
     });

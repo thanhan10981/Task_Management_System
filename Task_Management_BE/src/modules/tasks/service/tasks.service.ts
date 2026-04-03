@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateTaskDto, UpdateTaskDto, TaskQueryDto } from '../dto/task.dto';
 import { createPaginationOptions, createPaginatedResponse } from '../../../common/helpers/pagination.helper';
@@ -30,6 +35,47 @@ export class TasksService {
 
     const where: any = {
       createdBy: userId,
+    };
+
+    if (queryDto.status) {
+      where.status = {
+        name: queryDto.status,
+      };
+    }
+
+    if (queryDto.priority) {
+      where.priority = queryDto.priority;
+    }
+
+    if (queryDto.search) {
+      where.OR = [
+        { title: { contains: queryDto.search, mode: 'insensitive' } },
+        { description: { contains: queryDto.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [tasks, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        include: { createdByUser: true, status: true, project: true },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    const mappedTasks = tasks.map((task) => this.mapTaskResponse(task));
+
+    return createPaginatedResponse(mappedTasks, total, queryDto);
+  }
+
+  async findByParentTask(userId: string, parentTaskId: string, queryDto: TaskQueryDto) {
+    const { skip, take } = createPaginationOptions(queryDto);
+
+    const where: any = {
+      createdBy: userId,
+      parentTaskId,
     };
 
     if (queryDto.status) {
@@ -123,6 +169,31 @@ export class TasksService {
 
     if (task.createdBy !== userId) {
       throw new ForbiddenException('Only the task owner can delete this task');
+    }
+
+    const [subtasks, assignees, comments, history, files] = await this.prisma.$transaction([
+      this.prisma.task.count({ where: { parentTaskId: id } }),
+      this.prisma.taskAssignee.count({ where: { taskId: id } }),
+      this.prisma.comment.count({ where: { taskId: id } }),
+      this.prisma.taskHistory.count({ where: { taskId: id } }),
+      this.prisma.file.count({ where: { taskId: id } }),
+    ]);
+
+    const relationUsage = {
+      subtasks,
+      assignees,
+      comments,
+      history,
+      files,
+    };
+
+    const hasRelatedData = Object.values(relationUsage).some((count) => count > 0);
+
+    if (hasRelatedData) {
+      throw new ConflictException({
+        message: 'Cannot delete task with related data',
+        relations: relationUsage,
+      });
     }
 
     await this.prisma.task.delete({

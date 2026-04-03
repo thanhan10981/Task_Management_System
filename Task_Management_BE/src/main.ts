@@ -43,12 +43,12 @@ async function bootstrap() {
     .setTitle('Task Management API')
     .setDescription('API documentation for Task Management System')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addCookieAuth('accessToken')
     .build();
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, swaggerDocument);
+  SwaggerModule.setup('api', app, swaggerDocument);
 
   await app.listen(port);
-  console.log(`Swagger docs at http://localhost:${port}/api/docs`);
+  console.log(`Swagger docs at http://localhost:${port}/api`);
 }
 bootstrap();

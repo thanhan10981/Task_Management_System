@@ -70,7 +70,7 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: this.configService.get<string>('jwt.refreshSecret'),
       });
 
       const user = await this.prisma.user.findUnique({
@@ -89,7 +89,6 @@ export class AuthService {
   }
 
   async logout(userId: string) {
-    // JWT pattern không cần logout xử lý ở backend
     return { success: true };
   }
 

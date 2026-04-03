@@ -5,6 +5,7 @@ import { PrismaModule } from '../../common/prisma/prisma.module';
 import { AuthService } from './service/auth.service';
 import { AuthController } from './controller/auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -15,13 +16,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN'),// thời gian hết hạn của token
+          expiresIn: configService.get<string>('jwt.expiresIn'),
         },
       }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy,JwtAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

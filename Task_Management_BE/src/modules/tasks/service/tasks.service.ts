@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateTaskDto, UpdateTaskDto, TaskQueryDto } from '../dto/task.dto';
 import { createPaginationOptions, createPaginatedResponse } from '../../../common/helpers/pagination.helper';
@@ -123,6 +128,31 @@ export class TasksService {
 
     if (task.createdBy !== userId) {
       throw new ForbiddenException('Only the task owner can delete this task');
+    }
+
+    const [subtasks, assignees, comments, history, files] = await this.prisma.$transaction([
+      this.prisma.task.count({ where: { parentTaskId: id } }),
+      this.prisma.taskAssignee.count({ where: { taskId: id } }),
+      this.prisma.comment.count({ where: { taskId: id } }),
+      this.prisma.taskHistory.count({ where: { taskId: id } }),
+      this.prisma.file.count({ where: { taskId: id } }),
+    ]);
+
+    const relationUsage = {
+      subtasks,
+      assignees,
+      comments,
+      history,
+      files,
+    };
+
+    const hasRelatedData = Object.values(relationUsage).some((count) => count > 0);
+
+    if (hasRelatedData) {
+      throw new ConflictException({
+        message: 'Cannot delete task with related data',
+        relations: relationUsage,
+      });
     }
 
     await this.prisma.task.delete({

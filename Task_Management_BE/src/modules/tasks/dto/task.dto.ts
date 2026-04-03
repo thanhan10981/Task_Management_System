@@ -1,4 +1,12 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { TaskPriority } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { Type } from 'class-transformer';
@@ -18,11 +26,11 @@ export class CreateTaskDto {
   priority?: TaskPriority;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({}, { message: 'startDate must be a valid ISO date string' })
   startDate?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({}, { message: 'dueDate must be a valid ISO date string' })
   dueDate?: string;
 
   @IsNotEmpty({ message: 'Project ID is required' })
@@ -57,11 +65,11 @@ export class UpdateTaskDto {
   priority?: TaskPriority;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({}, { message: 'startDate must be a valid ISO date string' })
   startDate?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString({}, { message: 'dueDate must be a valid ISO date string' })
   dueDate?: string;
 
   @IsOptional()

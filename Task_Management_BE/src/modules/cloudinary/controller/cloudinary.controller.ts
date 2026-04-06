@@ -24,16 +24,15 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { CloudinaryService } from './cloudinary.service';
-import { CreateFolderDto } from './dto/create-folder.dto';
-import { DeleteFolderDto } from './dto/delete-folder.dto';
-import { ListFolderFilesQueryDto } from './dto/list-folder-files-query.dto';
-import { RenameFolderDto } from './dto/rename-folder.dto';
-import { UploadFileDto } from './dto/upload-file.dto';
-
-interface UploadedMemoryFile {
-  buffer: Buffer;
-}
+import { CloudinaryService } from '../service/cloudinary.service';
+import { CreateFolderDto } from '../dto/create-folder.dto';
+import { DeleteFolderDto } from '../dto/delete-folder.dto';
+import { ListFolderFilesQueryDto } from '../dto/list-folder-files-query.dto';
+import { RenameFolderDto } from '../dto/rename-folder.dto';
+import { UploadFileDto } from '../dto/upload-file.dto';
+import { NormalizePathFieldsPipe } from '../pipes/normalize-path-fields.pipe';
+import { NormalizePathPipe } from '../pipes/normalize-path.pipe';
+import { UploadedMemoryFile } from '../types/cloudinary.types';
 
 @ApiTags('Cloudinary')
 @Controller('cloudinary')
@@ -63,13 +62,13 @@ export class CloudinaryController {
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: {
-        fileSize: 20 * 1024 * 1024,
+        fileSize: 20 * 1024 * 1024, //20MB
       },
     }),
   )
   uploadFile(
     @UploadedFile() file: UploadedMemoryFile,
-    @Body() dto: UploadFileDto,
+    @Body(new NormalizePathFieldsPipe(['folder', 'publicId'])) dto: UploadFileDto,
   ) {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -79,12 +78,13 @@ export class CloudinaryController {
   }
 
   @Delete('files/:publicId')
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete file by public ID' })
   @ApiParam({ name: 'publicId', description: 'Cloudinary public ID', example: 'tasks/attachments/task-1' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'File deleted successfully' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'File deleted successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'File not found' })
-  deleteFile(@Param('publicId') publicId: string) {
-    return this.cloudinaryService.deleteFile(decodeURIComponent(publicId));
+  deleteFile(@Param('publicId', NormalizePathPipe) publicId: string) {
+    return this.cloudinaryService.deleteFile(publicId);
   }
 
   @Get('folders')
@@ -99,7 +99,7 @@ export class CloudinaryController {
   @ApiBody({ type: CreateFolderDto })
   @ApiResponse({ status: HttpStatus.CREATED, description: 'Folder created successfully' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid folder path' })
-  createFolder(@Body() dto: CreateFolderDto) {
+  createFolder(@Body(new NormalizePathFieldsPipe(['path'])) dto: CreateFolderDto) {
     return this.cloudinaryService.createFolder(dto);
   }
 
@@ -108,17 +108,17 @@ export class CloudinaryController {
   @ApiBody({ type: RenameFolderDto })
   @ApiResponse({ status: HttpStatus.OK, description: 'Folder renamed successfully' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid folder path' })
-  renameFolder(@Body() dto: RenameFolderDto) {
+  renameFolder(@Body(new NormalizePathFieldsPipe(['fromPath', 'toPath'])) dto: RenameFolderDto) {
     return this.cloudinaryService.renameFolder(dto);
   }
 
   @Delete('folders')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete empty folder' })
   @ApiBody({ type: DeleteFolderDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Folder deleted successfully' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Folder deleted successfully' })
   @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Folder is not empty' })
-  deleteFolder(@Body() dto: DeleteFolderDto) {
+  deleteFolder(@Body(new NormalizePathFieldsPipe(['path'])) dto: DeleteFolderDto) {
     return this.cloudinaryService.deleteFolder(dto);
   }
 
@@ -128,16 +128,16 @@ export class CloudinaryController {
   @ApiQuery({ name: 'maxResults', required: false, type: Number, example: 30 })
   @ApiQuery({ name: 'nextCursor', required: false, type: String })
   @ApiResponse({ status: HttpStatus.OK, description: 'Files fetched successfully' })
-  listFolderFiles(@Query() query: ListFolderFilesQueryDto) {
+  listFolderFiles(@Query(new NormalizePathFieldsPipe(['folder'])) query: ListFolderFilesQueryDto) {
     return this.cloudinaryService.listFolderFiles(query);
   }
 
   @Delete('folders/recursive')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete folder recursively' })
   @ApiBody({ type: DeleteFolderDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Folder deleted recursively' })
-  deleteFolderRecursive(@Body() dto: DeleteFolderDto) {
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Folder deleted recursively' })
+  deleteFolderRecursive(@Body(new NormalizePathFieldsPipe(['path'])) dto: DeleteFolderDto) {
     return this.cloudinaryService.deleteFolderRecursive(dto);
   }
 }

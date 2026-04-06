@@ -26,20 +26,32 @@ import {
   UploadedMemoryFile,
 } from "../types/cloudinary.types";
 
+const DEFAULT_CLOUDINARY_ALLOWED_PREFIXES = ["tasks", "projects", "avatars"];
+
 @Injectable()
 export class CloudinaryService {
+  private readonly allowedPathPrefixes: string[];
+
   constructor(private readonly configService: ConfigService) {
     this.configureCloudinary();
+    this.allowedPathPrefixes = this.resolveAllowedPathPrefixes();
   }
 
   async uploadFile(file: UploadedMemoryFile, dto: UploadFileDto) {
+    const folder = dto.folder
+      ? this.validateAllowedPath(dto.folder, "folder")
+      : undefined;
+    const publicId = dto.publicId
+      ? this.validateAllowedPath(dto.publicId, "publicId")
+      : undefined;
+
     const uploadResult = await this.executeCloudinary(
       () =>
         new Promise<UploadApiResponse>((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             {
-              folder: dto.folder,
-              public_id: dto.publicId,
+              folder,
+              public_id: publicId,
               resource_type: dto.resourceType ?? CloudinaryResourceType.AUTO,
               overwrite: dto.overwrite,
               tags: dto.tags,
@@ -71,6 +83,7 @@ export class CloudinaryService {
   }
 
   async deleteFile(publicId: string) {
+    const normalizedPublicId = this.validateAllowedPath(publicId, "publicId");
     const resourceTypes: Array<
       | CloudinaryResourceType.IMAGE
       | CloudinaryResourceType.VIDEO
@@ -82,11 +95,11 @@ export class CloudinaryService {
     ];
 
     for (const resourceType of resourceTypes) {
-      const response = await this.destroyResource(publicId, resourceType);
+      const response = await this.destroyResource(normalizedPublicId, resourceType);
 
       if (response.result === "ok") {
         return {
-          publicId,
+          publicId: normalizedPublicId,
           deleted: true,
           resourceType,
         };
@@ -114,8 +127,9 @@ export class CloudinaryService {
   }
 
   async createFolder(dto: CreateFolderDto) {
+    const folderPath = this.validateAllowedPath(dto.path, "path");
     const response = await this.executeCloudinary(
-      () => cloudinary.api.create_folder(dto.path),
+      () => cloudinary.api.create_folder(folderPath),
       "Cloudinary returned empty create folder response",
     );
 
@@ -128,36 +142,41 @@ export class CloudinaryService {
   }
 
   async renameFolder(dto: RenameFolderDto) {
+    const fromPath = this.validateAllowedPath(dto.fromPath, "fromPath");
+    const toPath = this.validateAllowedPath(dto.toPath, "toPath");
+
     await this.executeCloudinary(
-      () => cloudinary.api.rename_folder(dto.fromPath, dto.toPath),
+      () => cloudinary.api.rename_folder(fromPath, toPath),
       "Cloudinary returned empty rename folder response",
     );
 
     return {
-      fromPath: dto.fromPath,
-      toPath: dto.toPath,
+      fromPath,
+      toPath,
       renamed: true,
     };
   }
 
   async deleteFolder(dto: DeleteFolderDto) {
+    const path = this.validateAllowedPath(dto.path, "path");
     await this.executeCloudinary(
-      () => cloudinary.api.delete_folder(dto.path),
+      () => cloudinary.api.delete_folder(path),
       "Cloudinary returned empty delete folder response",
     );
 
     return {
-      path: dto.path,
+      path,
       deleted: true,
     };
   }
 
   async listFolderFiles(query: ListFolderFilesQueryDto) {
+    const folder = this.validateAllowedPath(query.folder, "folder");
     const response = await this.executeCloudinary(
       () =>
         cloudinary.api.resources({
           type: "upload",
-          prefix: `${query.folder}/`,
+          prefix: `${folder}/`,
           max_results: query.maxResults,
           next_cursor: query.nextCursor,
         }),
@@ -180,21 +199,22 @@ export class CloudinaryService {
   }
 
   async deleteFolderRecursive(dto: DeleteFolderDto) {
+    const path = this.validateAllowedPath(dto.path, "path");
     const deletedResources =
       (await this.deleteResourcesByPrefix(
-        dto.path,
+        path,
         CloudinaryResourceType.IMAGE,
       )) +
       (await this.deleteResourcesByPrefix(
-        dto.path,
+        path,
         CloudinaryResourceType.VIDEO,
       )) +
       (await this.deleteResourcesByPrefix(
-        dto.path,
+        path,
         CloudinaryResourceType.RAW,
       ));
 
-    const subFolders = await this.getAllSubFolders(dto.path);
+    const subFolders = await this.getAllSubFolders(path);
 
     let deletedFolders = 0;
     for (const folderPath of subFolders.sort(
@@ -208,12 +228,12 @@ export class CloudinaryService {
     }
 
     await this.executeCloudinary(
-      () => cloudinary.api.delete_folder(dto.path),
+      () => cloudinary.api.delete_folder(path),
       "Cloudinary returned empty delete root folder response",
     );
 
     return {
-      path: dto.path,
+      path,
       deletedResources,
       deletedFolders: deletedFolders + 1,
       deleted: true,
@@ -307,6 +327,55 @@ export class CloudinaryService {
     });
   }
 
+  private resolveAllowedPathPrefixes(): string[] {
+    const rawPrefixes = this.configService.get<string>(
+      "CLOUDINARY_ALLOWED_PREFIXES",
+    );
+
+    const prefixes = (rawPrefixes ?? DEFAULT_CLOUDINARY_ALLOWED_PREFIXES.join(","))
+      .split(",")
+      .map((prefix) => this.normalizePath(prefix).toLowerCase())
+      .filter((prefix) => prefix.length > 0);
+
+    if (prefixes.length === 0) {
+      throw new InternalServerErrorException(
+        "CLOUDINARY_ALLOWED_PREFIXES cannot be empty",
+      );
+    }
+
+    return Array.from(new Set(prefixes));
+  }
+
+  private validateAllowedPath(path: string, fieldName: string): string {
+    const normalizedPath = this.normalizePath(path);
+
+    if (!normalizedPath) {
+      throw new BadRequestException(`${fieldName} is required`);
+    }
+
+    if (normalizedPath.includes("..") || normalizedPath.includes("\\")) {
+      throw new BadRequestException(`${fieldName} contains invalid path segments`);
+    }
+
+    const normalizedLowerPath = normalizedPath.toLowerCase();
+    const isAllowed = this.allowedPathPrefixes.some(
+      (prefix) =>
+        normalizedLowerPath === prefix || normalizedLowerPath.startsWith(`${prefix}/`),
+    );
+
+    if (!isAllowed) {
+      throw new ForbiddenException(
+        `${fieldName} must start with one of: ${this.allowedPathPrefixes.join(", ")}`,
+      );
+    }
+
+    return normalizedPath;
+  }
+
+  private normalizePath(path: string): string {
+    return path.trim().replace(/^\/+|\/+$/g, "");
+  }
+
   private async executeCloudinary<T>(
     operation: () => Promise<T>,
     emptyResultMessage: string,
@@ -321,7 +390,6 @@ export class CloudinaryService {
       return result;
     } catch (error) {
       this.handleCloudinaryError(error);
-      throw new InternalServerErrorException("Cloudinary request failed");
     }
   }
 

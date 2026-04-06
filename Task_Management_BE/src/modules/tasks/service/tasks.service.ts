@@ -8,11 +8,26 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateTaskDto, UpdateTaskDto, TaskQueryDto } from '../dto/task.dto';
 import { createPaginationOptions, createPaginatedResponse } from '../../../common/helpers/pagination.helper';
 
+const safeTaskUserSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  avatarUrl: true,
+  coverUrl: true,
+  jobTitle: true,
+  phone: true,
+  bio: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
 @Injectable()
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, createTaskDto: CreateTaskDto) {
+    const assigneeIds = Array.from(new Set([...(createTaskDto.assigneeIds ?? []), userId]));
+
     const task = await this.prisma.task.create({
       data: {
         title: createTaskDto.title,
@@ -23,8 +38,21 @@ export class TasksService {
         dueDate: createTaskDto.dueDate ? new Date(createTaskDto.dueDate) : null,
         startDate: createTaskDto.startDate ? new Date(createTaskDto.startDate) : null,
         createdBy: userId,
+        assignees: {
+          create: assigneeIds.map((assigneeId) => ({
+            userId: assigneeId,
+            assignedBy: userId,
+          })),
+        },
       },
-      include: { createdByUser: true, status: true, project: true },
+      include: {
+        createdByUser: {
+          select: safeTaskUserSelect,
+        },
+        status: true,
+        project: true,
+        assignees: true,
+      },
     });
 
     return this.mapTaskResponse(task);
@@ -57,7 +85,13 @@ export class TasksService {
     const [tasks, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
-        include: { createdByUser: true, status: true, project: true },
+        include: {
+          createdByUser: {
+            select: safeTaskUserSelect,
+          },
+          status: true,
+          project: true,
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take,
@@ -98,7 +132,13 @@ export class TasksService {
     const [tasks, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
-        include: { createdByUser: true, status: true, project: true },
+        include: {
+          createdByUser: {
+            select: safeTaskUserSelect,
+          },
+          status: true,
+          project: true,
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take,
@@ -114,7 +154,14 @@ export class TasksService {
   async findOne(userId: string, id: string) {
     const task = await this.prisma.task.findUnique({
       where: { id },
-      include: { createdByUser: true, status: true, project: true, assignees: true },
+      include: {
+        createdByUser: {
+          select: safeTaskUserSelect,
+        },
+        status: true,
+        project: true,
+        assignees: true,
+      },
     });
 
     if (!task) {

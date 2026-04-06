@@ -11,9 +11,11 @@ import {
   Post,
   Query,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import {
+  ApiCookieAuth,
   ApiBody,
   ApiConsumes,
   ApiOperation,
@@ -24,6 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CloudinaryService } from '../service/cloudinary.service';
 import { CreateFolderDto } from '../dto/create-folder.dto';
 import { DeleteFolderDto } from '../dto/delete-folder.dto';
@@ -34,7 +37,20 @@ import { NormalizePathFieldsPipe } from '../pipes/normalize-path-fields.pipe';
 import { NormalizePathPipe } from '../pipes/normalize-path.pipe';
 import { UploadedMemoryFile } from '../types/cloudinary.types';
 
+const ALLOWED_UPLOAD_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+  'application/pdf',
+  'text/plain',
+]);
+
 @ApiTags('Cloudinary')
+@ApiCookieAuth('accessToken')
+@UseGuards(JwtAuthGuard)
 @Controller('cloudinary')
 export class CloudinaryController {
   constructor(private readonly cloudinaryService: CloudinaryService) {}
@@ -63,6 +79,16 @@ export class CloudinaryController {
       storage: memoryStorage(),
       limits: {
         fileSize: 20 * 1024 * 1024, //20MB
+      },
+      fileFilter: (_req, file, callback) => {
+        if (!ALLOWED_UPLOAD_MIME_TYPES.has(file.mimetype)) {
+          return callback(
+            new BadRequestException('Unsupported file type. Allowed: images, mp4/webm videos, pdf, txt'),
+            false,
+          );
+        }
+
+        return callback(null, true);
       },
     }),
   )

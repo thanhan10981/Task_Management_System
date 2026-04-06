@@ -14,6 +14,19 @@ import {
   UpdateProjectDto,
 } from '../dto/project.dto';
 
+const safeUserSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  avatarUrl: true,
+  coverUrl: true,
+  jobTitle: true,
+  phone: true,
+  bio: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
 @Injectable()
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -42,7 +55,9 @@ export class ProjectsService {
         },
       },
       include: {
-        creator: true,
+        creator: {
+          select: safeUserSelect,
+        },
         members: true,
         _count: { select: { tasks: true, members: true } },
       },
@@ -82,7 +97,9 @@ export class ProjectsService {
       this.prisma.project.findMany({
         where,
         include: {
-          creator: true,
+          creator: {
+            select: safeUserSelect,
+          },
           members: true,
           _count: { select: { tasks: true, members: true } },
         },
@@ -103,10 +120,19 @@ export class ProjectsService {
         OR: [{ createdBy: userId }, { members: { some: { userId } } }],
       },
       include: {
-        creator: true,
+        creator: {
+          select: safeUserSelect,
+        },
         members: {
           include: {
-            user: true,
+            user: {
+              select: safeUserSelect,
+            },
+          },
+        },
+        taskStatuses: {
+          orderBy: {
+            position: 'asc',
           },
         },
         _count: { select: { tasks: true, members: true } },

@@ -12,6 +12,38 @@ export interface EnvVariables {
   JWT_REFRESH_SECRET: string;
   JWT_REFRESH_EXPIRES_IN: string;
   CLIENT_URL?: string;
+  SMTP_HOST?: string;
+  SMTP_PORT?: number;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  SMTP_FROM?: string;
+  MAIL_PUBLIC_FROM_NAME?: string;
+  MAIL_PUBLIC_FROM_ADDRESS?: string;
+  REMINDER_THRESHOLDS_MINUTES?: string;
+  RESET_PASSWORD_CODE_EXPIRES_MINUTES?: number;
+}
+
+function parseEmailAddress(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim();
+  if (!normalizedValue) {
+    return undefined;
+  }
+
+  const addressInBrackets = normalizedValue.match(/<([^>]+)>/)?.[1]?.trim();
+  const plainAddress =
+    normalizedValue.includes('@') && !normalizedValue.includes('<')
+      ? normalizedValue.replace(/^['\"]|['\"]$/g, '').trim()
+      : undefined;
+
+  return (addressInBrackets ?? plainAddress)?.toLowerCase();
+}
+
+function isPersonalMailbox(email: string): boolean {
+  return /@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email);
 }
 
 function readString(config: RawConfig, key: string, fallback = ''): string {
@@ -62,6 +94,34 @@ export function validate(config: RawConfig): EnvVariables {
     throw new Error('JWT_REFRESH_SECRET is required');
   }
 
+  const smtpHost = readString(config, 'SMTP_HOST') || undefined;
+  const smtpUser = readString(config, 'SMTP_USER') || undefined;
+  const smtpPass = readString(config, 'SMTP_PASS') || undefined;
+  const mailPublicFromName = readString(config, 'MAIL_PUBLIC_FROM_NAME') || 'Task Management';
+  const mailPublicFromAddress =
+    readString(config, 'MAIL_PUBLIC_FROM_ADDRESS') || 'no-reply@task.local';
+  const publicFromEmail = parseEmailAddress(mailPublicFromAddress);
+  const smtpUserEmail = parseEmailAddress(smtpUser);
+
+  const isSmtpConfigured = Boolean(smtpHost || smtpUser || smtpPass);
+  if (isSmtpConfigured && (!smtpHost || !smtpUser || !smtpPass)) {
+    throw new Error('SMTP_HOST, SMTP_USER, SMTP_PASS must all be provided together');
+  }
+
+  if (nodeEnv === 'production' && smtpUserEmail) {
+    if (isPersonalMailbox(smtpUserEmail)) {
+      throw new Error(
+        'SMTP_USER must not be a personal mailbox in production. Use a dedicated no-reply mailbox.',
+      );
+    }
+
+    if (publicFromEmail && smtpUserEmail !== publicFromEmail) {
+      throw new Error(
+        'MAIL_PUBLIC_FROM_ADDRESS must match SMTP_USER in production to prevent provider rewrite and sender leakage.',
+      );
+    }
+  }
+
   return {
     NODE_ENV: nodeEnv as EnvVariables['NODE_ENV'],
     PORT: readNumber(config, 'PORT', 3001),
@@ -74,5 +134,17 @@ export function validate(config: RawConfig): EnvVariables {
     JWT_REFRESH_SECRET: jwtRefreshSecret,
     JWT_REFRESH_EXPIRES_IN: readString(config, 'JWT_REFRESH_EXPIRES_IN', '7d'),
     CLIENT_URL: readString(config, 'CLIENT_URL') || undefined,
+    SMTP_HOST: smtpHost,
+    SMTP_PORT: config.SMTP_PORT ? readNumber(config, 'SMTP_PORT', 587) : undefined,
+    SMTP_USER: smtpUser,
+    SMTP_PASS: smtpPass,
+    SMTP_FROM: readString(config, 'SMTP_FROM') || undefined,
+    MAIL_PUBLIC_FROM_NAME: mailPublicFromName,
+    MAIL_PUBLIC_FROM_ADDRESS: mailPublicFromAddress,
+    REMINDER_THRESHOLDS_MINUTES:
+      readString(config, 'REMINDER_THRESHOLDS_MINUTES') || undefined,
+    RESET_PASSWORD_CODE_EXPIRES_MINUTES: config.RESET_PASSWORD_CODE_EXPIRES_MINUTES
+      ? readNumber(config, 'RESET_PASSWORD_CODE_EXPIRES_MINUTES', 15)
+      : undefined,
   };
 }

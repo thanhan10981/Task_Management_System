@@ -9,6 +9,7 @@ import { SprintsModule } from './modules/sprints/sprints.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UserModule } from './modules/user/user.module';
 import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
+import { ReminderModule } from './modules/reminder/reminder.module';
 
 import configuration from './config/configuration';
 import { validate } from './config/validateion.schema';
@@ -27,6 +28,7 @@ import { validate } from './config/validateion.schema';
     TasksModule,
     UserModule,
     CloudinaryModule,
+    ReminderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

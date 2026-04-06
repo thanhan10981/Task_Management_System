@@ -132,7 +132,6 @@ export class AuthService {
     if (!exp) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
-
     const currentTimeInSeconds = Math.floor(Date.now() / 1000);
     const remainingLifetime = exp - currentTimeInSeconds;
 

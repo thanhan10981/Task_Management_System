@@ -25,8 +25,7 @@ import {
   CloudinaryResourceListResponse,
   UploadedMemoryFile,
 } from "../types/cloudinary.types";
-
-const DEFAULT_CLOUDINARY_ALLOWED_PREFIXES = ["tasks", "projects", "avatars"];
+import { DEFAULT_CLOUDINARY_ALLOWED_PREFIXES } from '../../../common/constants/app.constants';
 
 @Injectable()
 export class CloudinaryService {

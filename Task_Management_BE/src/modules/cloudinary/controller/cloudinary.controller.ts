@@ -36,17 +36,7 @@ import { UploadFileDto } from '../dto/upload-file.dto';
 import { NormalizePathFieldsPipe } from '../pipes/normalize-path-fields.pipe';
 import { NormalizePathPipe } from '../pipes/normalize-path.pipe';
 import { UploadedMemoryFile } from '../types/cloudinary.types';
-
-const ALLOWED_UPLOAD_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'video/mp4',
-  'video/webm',
-  'application/pdf',
-  'text/plain',
-]);
+import { ALLOWED_UPLOAD_MIME_TYPES } from '../../../common/constants/app.constants';
 
 @ApiTags('Cloudinary')
 @ApiCookieAuth('accessToken')

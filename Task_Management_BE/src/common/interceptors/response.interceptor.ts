@@ -14,8 +14,6 @@ export class ResponseInterceptor implements NestInterceptor<unknown, Response<un
     return next.handle().pipe(
       map((res) => {
         const sanitizedResponse = this.sanitizeSensitiveFields(res);
-
-        // If the response is already formatted (e.g., paginated response with meta), return as is
         if (
           sanitizedResponse &&
           typeof sanitizedResponse === 'object' &&
@@ -25,7 +23,6 @@ export class ResponseInterceptor implements NestInterceptor<unknown, Response<un
           return sanitizedResponse as Response<unknown>;
         }
 
-        // Handle case where we return { data, message } directly from service
         if (
           sanitizedResponse &&
           typeof sanitizedResponse === 'object' &&
@@ -35,7 +32,6 @@ export class ResponseInterceptor implements NestInterceptor<unknown, Response<un
           return sanitizedResponse as Response<unknown>;
         }
 
-        // Wrap the standard response
         return {
           data: sanitizedResponse,
         };

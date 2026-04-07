@@ -7,19 +7,7 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateTaskDto, UpdateTaskDto, TaskQueryDto } from '../dto/task.dto';
 import { createPaginationOptions, createPaginatedResponse } from '../../../common/helpers/pagination.helper';
-
-const safeTaskUserSelect = {
-  id: true,
-  fullName: true,
-  email: true,
-  avatarUrl: true,
-  coverUrl: true,
-  jobTitle: true,
-  phone: true,
-  bio: true,
-  createdAt: true,
-  updatedAt: true,
-};
+import { SAFE_USER_SELECT } from '../../../common/constants/app.constants';
 
 @Injectable()
 export class TasksService {
@@ -47,7 +35,7 @@ export class TasksService {
       },
       include: {
         createdByUser: {
-          select: safeTaskUserSelect,
+          select: SAFE_USER_SELECT,
         },
         status: true,
         project: true,
@@ -87,7 +75,7 @@ export class TasksService {
         where,
         include: {
           createdByUser: {
-            select: safeTaskUserSelect,
+            select: SAFE_USER_SELECT,
           },
           status: true,
           project: true,
@@ -134,7 +122,7 @@ export class TasksService {
         where,
         include: {
           createdByUser: {
-            select: safeTaskUserSelect,
+            select: SAFE_USER_SELECT,
           },
           status: true,
           project: true,
@@ -156,7 +144,7 @@ export class TasksService {
       where: { id },
       include: {
         createdByUser: {
-          select: safeTaskUserSelect,
+          select: SAFE_USER_SELECT,
         },
         status: true,
         project: true,

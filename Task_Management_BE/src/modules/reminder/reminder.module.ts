@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ScheduleModule } from '@nestjs/schedule';
 import { buildMailFrom } from '../../common/helpers/mail-from.helper';
+import { MailJobQueueService } from '../../common/mail/services/mail-job-queue.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { TaskRepository } from './repository/task.repository';
 import { MailService } from './service/mail.service';
@@ -54,7 +55,7 @@ import { ReminderService } from './service/reminder.service';
       },
     }),
   ],
-  providers: [TaskRepository, MailService, ReminderService],
+  providers: [TaskRepository, MailService, ReminderService, MailJobQueueService],
   exports: [ReminderService],
 })
 export class ReminderModule {}

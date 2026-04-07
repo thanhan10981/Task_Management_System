@@ -1,5 +1,7 @@
-const DEFAULT_MAIL_FROM_NAME = 'Task Management';
-const DEFAULT_MAIL_FROM_ADDRESS = 'no-reply@task.local';
+import {
+  DEFAULT_MAIL_FROM_ADDRESS,
+  DEFAULT_MAIL_FROM_NAME,
+} from '../constants/app.constants';
 
 export const buildMailFrom = (
   publicName?: string,

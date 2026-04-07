@@ -10,9 +10,11 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { UserModule } from './modules/user/user.module';
 import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
 import { ReminderModule } from './modules/reminder/reminder.module';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 import configuration from './config/configuration';
-import { validate } from './config/validateion.schema';
+import { validate } from './config/validation.schema';
 
 @Module({
   imports: [
@@ -31,6 +33,6 @@ import { validate } from './config/validateion.schema';
     ReminderModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, LoggingInterceptor, ResponseInterceptor],
 })
 export class AppModule {}

@@ -1,11 +1,12 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { MailerService } from '@nestjs-modules/mailer';
 import { NotificationType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { createHash, randomInt } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { buildMailFrom } from '../../../common/helpers/mail-from.helper';
+import { MailJobQueueService } from '../../../common/mail/services/mail-job-queue.service';
+import { resetPasswordTemplate } from '../../../common/mail/templates/reset-password.template';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
@@ -20,13 +21,11 @@ type JwtPayload = {
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private mailerService: MailerService,
+    private mailJobQueueService: MailJobQueueService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -123,15 +122,19 @@ export class AuthService {
       },
     });
 
-    // Do not reveal whether email exists.
     if (!user) {
       return;
     }
 
-    const verificationCode = this.generateResetCode();
-    const codeHash = this.hashResetCode(verificationCode);
+    const resetToken = randomUUID();
+    const tokenHash = this.hashResetCode(resetToken);
     const expiresInMinutes = this.getResetCodeExpiryMinutes();
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+    const clientUrl = this.configService.get<string>('CLIENT_URL') || 'http://localhost:5173';
+    const normalizedClientUrl = clientUrl.replace(/\/$/, '');
+    const resetLink = `${normalizedClientUrl}/auth/reset-password?token=${encodeURIComponent(
+      resetToken,
+    )}`;
 
     await this.prisma.$transaction([
       this.prisma.notification.deleteMany({
@@ -141,7 +144,7 @@ export class AuthService {
           isRead: false,
           data: {
             path: ['purpose'],
-            equals: 'PASSWORD_RESET_OTP',
+            equals: 'PASSWORD_RESET_TOKEN',
           },
         },
       }),
@@ -149,50 +152,29 @@ export class AuthService {
         data: {
           userId: user.id,
           type: NotificationType.SYSTEM,
-          title: 'Password reset verification',
-          content: 'Use verification code to reset password',
+          title: 'Password reset request',
+          content: 'Use reset link to reset password',
           data: {
-            purpose: 'PASSWORD_RESET_OTP',
-            codeHash,
+            purpose: 'PASSWORD_RESET_TOKEN',
+            tokenHash,
             expiresAt: expiresAt.toISOString(),
           },
         },
       }),
     ]);
 
-    try {
-      await this.mailerService.sendMail({
-        to: user.email,
-        from: buildMailFrom(
-          this.configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-          this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
-        ),
-        subject: 'Password Reset Verification Code',
-        text: [
-          `Dear ${user.fullName},`,
-          '',
-          'We received a request to reset your account password.',
-          `Your verification code is: ${verificationCode}`,
-          `This code will expire in ${expiresInMinutes} minutes.`,
-          '',
-          'If you did not make this request, please ignore this email.',
-          '',
-          'Best regards,',
-          'Task Management Team',
-        ].join('\n'),
-        html: `
-          <p>Dear ${user.fullName},</p>
-          <p>We received a request to reset your account password.</p>
-          <p><strong>Your verification code is:</strong> ${verificationCode}</p>
-          <p>This code will expire in <strong>${expiresInMinutes} minutes</strong>.</p>
-          <p>If you did not make this request, please ignore this email.</p>
-          <p>Best regards,<br/>Task Management Team</p>
-        `,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown mail error';
-      this.logger.error(`Failed to send password reset email to ${user.email}: ${message}`);
-    }
+    const mail = resetPasswordTemplate(user.fullName, resetLink, expiresInMinutes);
+
+    this.mailJobQueueService.enqueue({
+      to: user.email,
+      from: buildMailFrom(
+        this.configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
+        this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
+      ),
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+    });
   }
 
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
@@ -203,34 +185,33 @@ export class AuthService {
       });
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: {
-        email: resetPasswordDto.email,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!user) {
-      throw new BadRequestException('Invalid or expired reset token');
-    }
+    const incomingTokenHash = this.hashResetCode(resetPasswordDto.resetToken);
 
     const notification = await this.prisma.notification.findFirst({
       where: {
-        userId: user.id,
         type: NotificationType.SYSTEM,
         isRead: false,
-        data: {
-          path: ['purpose'],
-          equals: 'PASSWORD_RESET_OTP',
-        },
+        AND: [
+          {
+            data: {
+              path: ['purpose'],
+              equals: 'PASSWORD_RESET_TOKEN',
+            },
+          },
+          {
+            data: {
+              path: ['tokenHash'],
+              equals: incomingTokenHash,
+            },
+          },
+        ],
       },
       orderBy: {
         createdAt: 'desc',
       },
       select: {
         id: true,
+        userId: true,
         data: true,
       },
     });
@@ -239,7 +220,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    const storedCodeHash = this.readStringFromJson(notification.data, 'codeHash');
+    const storedCodeHash = this.readStringFromJson(notification.data, 'tokenHash');
     const storedExpiresAt = this.readStringFromJson(notification.data, 'expiresAt');
 
     if (!storedCodeHash || !storedExpiresAt) {
@@ -250,8 +231,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
-    const incomingCodeHash = this.hashResetCode(resetPasswordDto.verificationCode);
-    if (storedCodeHash !== incomingCodeHash) {
+    if (storedCodeHash !== incomingTokenHash) {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
@@ -260,7 +240,7 @@ export class AuthService {
 
     await this.prisma.$transaction([
       this.prisma.user.update({
-        where: { id: user.id },
+        where: { id: notification.userId },
         data: { passwordHash },
       }),
       this.prisma.notification.update({
@@ -272,7 +252,7 @@ export class AuthService {
       }),
       this.prisma.notification.deleteMany({
         where: {
-          userId: user.id,
+          userId: notification.userId,
           type: NotificationType.SYSTEM,
           isRead: false,
           id: {
@@ -280,7 +260,7 @@ export class AuthService {
           },
           data: {
             path: ['purpose'],
-            equals: 'PASSWORD_RESET_OTP',
+            equals: 'PASSWORD_RESET_TOKEN',
           },
         },
       }),
@@ -343,16 +323,10 @@ export class AuthService {
     payload: { sub: string; email: string },
     remainingLifetime: number,
   ) {
-    // Keep the original refresh token expiry boundary to prevent infinite sliding sessions.
-    // We only mint a new refresh token for the exact time that remains.
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('jwt.refreshSecret'),
       expiresIn: remainingLifetime,
     });
-  }
-
-  private generateResetCode() {
-    return String(randomInt(100000, 1000000));
   }
 
   private hashResetCode(code: string) {

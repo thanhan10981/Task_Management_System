@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { buildMailFrom } from '../../common/helpers/mail-from.helper';
+import { MailJobQueueService } from '../../common/mail/services/mail-job-queue.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { AuthService } from './service/auth.service';
 import { AuthController } from './controller/auth.controller';
@@ -64,7 +65,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy,JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, MailJobQueueService],
   exports: [AuthService],
 })
 export class AuthModule {}

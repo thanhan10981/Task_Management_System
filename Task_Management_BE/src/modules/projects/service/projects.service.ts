@@ -13,19 +13,7 @@ import {
   ProjectQueryDto,
   UpdateProjectDto,
 } from '../dto/project.dto';
-
-const safeUserSelect = {
-  id: true,
-  fullName: true,
-  email: true,
-  avatarUrl: true,
-  coverUrl: true,
-  jobTitle: true,
-  phone: true,
-  bio: true,
-  createdAt: true,
-  updatedAt: true,
-};
+import { SAFE_USER_SELECT } from '../../../common/constants/app.constants';
 
 @Injectable()
 export class ProjectsService {
@@ -56,7 +44,7 @@ export class ProjectsService {
       },
       include: {
         creator: {
-          select: safeUserSelect,
+          select: SAFE_USER_SELECT,
         },
         members: true,
         _count: { select: { tasks: true, members: true } },
@@ -98,7 +86,7 @@ export class ProjectsService {
         where,
         include: {
           creator: {
-            select: safeUserSelect,
+            select: SAFE_USER_SELECT,
           },
           members: true,
           _count: { select: { tasks: true, members: true } },
@@ -121,12 +109,12 @@ export class ProjectsService {
       },
       include: {
         creator: {
-          select: safeUserSelect,
+          select: SAFE_USER_SELECT,
         },
         members: {
           include: {
             user: {
-              select: safeUserSelect,
+              select: SAFE_USER_SELECT,
             },
           },
         },

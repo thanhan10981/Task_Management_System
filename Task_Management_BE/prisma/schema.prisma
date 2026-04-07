@@ -136,8 +136,6 @@ model Project {
   status      ProjectStatus @default(ACTIVE)
   color       String?       @db.VarChar(20)
   icon        String?       @db.VarChar(50)
-  startDate   DateTime?     @db.Date
-  endDate     DateTime?     @db.Date
   createdBy   String
   createdAt   DateTime      @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime      @updatedAt @db.Timestamptz(6)

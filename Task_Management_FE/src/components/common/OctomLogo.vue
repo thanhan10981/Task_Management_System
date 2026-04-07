@@ -4,10 +4,10 @@
     <svg
       xmlns="http://www.w3.org/2000/svg"
       xmlns:xlink="http://www.w3.org/1999/xlink"
-      width="50"
+      :width="iconSize"
       zoomAndPan="magnify"
       viewBox="0 0 37.5 37.499999"
-      height="50"
+      :height="iconSize"
       preserveAspectRatio="xMidYMid meet"
       version="1.0"
     >

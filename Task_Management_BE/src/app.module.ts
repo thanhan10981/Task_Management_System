@@ -9,6 +9,9 @@ import { SprintsModule } from './modules/sprints/sprints.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UserModule } from './modules/user/user.module';
 import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
+import { FilesModule } from './modules/files/files.module';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 import configuration from './config/configuration';
 import { validate } from './config/validateion.schema';
@@ -27,8 +30,9 @@ import { validate } from './config/validateion.schema';
     TasksModule,
     UserModule,
     CloudinaryModule,
+    FilesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, LoggingInterceptor, ResponseInterceptor],
 })
 export class AppModule {}

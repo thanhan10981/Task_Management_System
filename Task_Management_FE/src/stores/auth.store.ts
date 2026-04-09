@@ -1,4 +1,5 @@
 import type { User } from '@/types/user.types'
+import { useProjectStore } from '@/stores/project.store'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -29,6 +30,13 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('auth_user')
+
+    try {
+      const projectStore = useProjectStore()
+      projectStore.resetProjectContext()
+    } catch {
+      // Ignore reset errors when pinia is not available yet.
+    }
   }
 
   return {

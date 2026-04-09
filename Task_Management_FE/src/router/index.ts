@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/auth.store'
+import { useProjectStore } from '@/stores/project.store'
 import type { RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
 
@@ -10,6 +11,10 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
+        redirect: { name: 'dashboard' },
+      },
+      {
+        path: 'dashboard',
         name: 'dashboard',
         component: () => import('@/features/dashboard/views/DashboardView.vue'),
         meta: { title: 'Dashboard' },
@@ -18,13 +23,31 @@ const routes: RouteRecordRaw[] = [
         path: 'tasks',
         name: 'tasks',
         component: () => import('@/features/tasks/views/TaskListView.vue'),
-        meta: { title: 'Tasks' },
+        meta: { title: 'Tasks', requiresProject: true },
       },
       {
         path: 'tasks/:id',
         name: 'task-detail',
         component: () => import('@/features/tasks/views/TaskDetailView.vue'),
-        meta: { title: 'Task Detail' },
+        meta: { title: 'Task Detail', requiresProject: true },
+      },
+      {
+        path: 'files',
+        name: 'files',
+        component: () => import('@/features/files/views/FilesView.vue'),
+        meta: { title: 'Files', requiresProject: true },
+      },
+      {
+        path: 'timeline',
+        name: 'timeline',
+        component: () => import('@/features/dashboard/views/DashboardView.vue'),
+        meta: { title: 'Timeline', requiresProject: true },
+      },
+      {
+        path: 'settings',
+        name: 'settings',
+        component: () => import('@/features/dashboard/views/DashboardView.vue'),
+        meta: { title: 'Settings', requiresProject: true },
       },
     ],
   },
@@ -66,7 +89,7 @@ const router = createRouter({
 })
 
 // Navigation guard
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
   const pageTitle = to.meta.title as string | undefined
   document.title = pageTitle ? `${pageTitle} | OCTOM` : 'OCTOM'
@@ -77,6 +100,23 @@ router.beforeEach((to) => {
 
   if (to.meta.guestOnly && authStore.isAuthenticated) {
     return { name: 'dashboard' }
+  }
+
+  if (authStore.isAuthenticated) {
+    const projectStore = useProjectStore()
+    await projectStore.initializeAfterAuth()
+
+    const currentProjectExists = projectStore.currentProjectId
+      ? projectStore.projects.some((project) => project.id === projectStore.currentProjectId)
+      : false
+
+    if (projectStore.currentProjectId && !currentProjectExists) {
+      projectStore.setCurrentProjectId(null)
+    }
+
+    if (to.meta.requiresProject && !projectStore.currentProjectId) {
+      return { name: 'dashboard', query: to.query, hash: to.hash }
+    }
   }
 })
 

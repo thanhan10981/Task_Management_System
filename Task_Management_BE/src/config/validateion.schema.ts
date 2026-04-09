@@ -12,6 +12,10 @@ export interface EnvVariables {
   JWT_REFRESH_SECRET: string;
   JWT_REFRESH_EXPIRES_IN: string;
   CLIENT_URL?: string;
+  FRONTEND_URL?: string;
+  CLOUDINARY_CLOUD_NAME?: string;
+  CLOUDINARY_API_KEY?: string;
+  CLOUDINARY_API_SECRET?: string;
 }
 
 function readString(config: RawConfig, key: string, fallback = ''): string {
@@ -49,6 +53,9 @@ export function validate(config: RawConfig): EnvVariables {
   const databaseUrl = readString(config, 'DATABASE_URL');
   const jwtSecret = readString(config, 'JWT_SECRET');
   const jwtRefreshSecret = readString(config, 'JWT_REFRESH_SECRET');
+  const cloudinaryCloudName = readString(config, 'CLOUDINARY_CLOUD_NAME') || undefined;
+  const cloudinaryApiKey = readString(config, 'CLOUDINARY_API_KEY') || undefined;
+  const cloudinaryApiSecret = readString(config, 'CLOUDINARY_API_SECRET') || undefined;
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required');
@@ -60,6 +67,13 @@ export function validate(config: RawConfig): EnvVariables {
 
   if (!jwtRefreshSecret) {
     throw new Error('JWT_REFRESH_SECRET is required');
+  }
+
+  const hasAnyCloudinaryCredential = Boolean(cloudinaryCloudName || cloudinaryApiKey || cloudinaryApiSecret);
+  const hasAllCloudinaryCredentials = Boolean(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret);
+
+  if (hasAnyCloudinaryCredential && !hasAllCloudinaryCredentials) {
+    throw new Error('CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET must be provided together');
   }
 
   return {
@@ -74,5 +88,9 @@ export function validate(config: RawConfig): EnvVariables {
     JWT_REFRESH_SECRET: jwtRefreshSecret,
     JWT_REFRESH_EXPIRES_IN: readString(config, 'JWT_REFRESH_EXPIRES_IN', '7d'),
     CLIENT_URL: readString(config, 'CLIENT_URL') || undefined,
+    FRONTEND_URL: readString(config, 'FRONTEND_URL') || undefined,
+    CLOUDINARY_CLOUD_NAME: cloudinaryCloudName,
+    CLOUDINARY_API_KEY: cloudinaryApiKey,
+    CLOUDINARY_API_SECRET: cloudinaryApiSecret,
   };
 }

@@ -11,7 +11,7 @@ export class NormalizePathFieldsPipe<T extends Record<string, unknown>>
       return value;
     }
 
-    const normalized = { ...value };
+    const normalized: Record<string, unknown> = { ...value };
 
     for (const field of this.fields) {
       const fieldValue = normalized[field];
@@ -20,6 +20,6 @@ export class NormalizePathFieldsPipe<T extends Record<string, unknown>>
       }
     }
 
-    return normalized;
+    return normalized as T;
   }
 }

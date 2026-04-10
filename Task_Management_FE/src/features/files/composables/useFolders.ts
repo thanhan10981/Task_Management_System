@@ -1,5 +1,7 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import { getFolderMetadata, normalizeFolderPath } from '@/api/cloudinary'
+import { QUERY_KEYS } from '@/constants/query-keys'
+import { useQuery } from '@tanstack/vue-query'
 import type { CloudinaryFolder } from '../types/files-view.types'
 
 interface FolderRow extends CloudinaryFolder {
@@ -20,21 +22,51 @@ export function useFolders(options: UseFoldersOptions) {
   const { currentFolder, currentProjectId, toast, errorMessage } = options
 
   const folders = ref<CloudinaryFolder[]>([])
-  const loadingFolders = ref(false)
   const expandedFolderPaths = ref<Set<string>>(new Set())
+  const loadingFolders = ref(false)
 
   const folderRows = computed<FolderRow[]>(() => buildFolderRows(folders.value, expandedFolderPaths.value, currentFolder.value))
 
-  async function loadFolders() {
-    if (!currentProjectId.value) {
+  const folderQuery = useQuery({
+    queryKey: computed(() => QUERY_KEYS.files.folders(currentProjectId.value ?? '')),
+    enabled: computed(() => Boolean(currentProjectId.value)),
+    queryFn: async () => {
+      if (!currentProjectId.value) {
+        return []
+      }
+
+      return getFolderMetadata(currentProjectId.value)
+    },
+  })
+
+  watch(
+    () => folderQuery.isFetching.value,
+    (isFetching) => {
+      loadingFolders.value = isFetching
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => currentProjectId.value,
+    (projectId) => {
+      if (projectId) {
+        return
+      }
+
       folders.value = []
       currentFolder.value = ''
-      return
-    }
+    },
+    { immediate: true },
+  )
 
-    loadingFolders.value = true
-    try {
-      const backendFolders = await getFolderMetadata(currentProjectId.value)
+  watch(
+    () => folderQuery.data.value,
+    (backendFolders) => {
+      if (!backendFolders || !currentProjectId.value) {
+        return
+      }
+
       const loaded = backendFolders.map((folder) => ({
         name: folder.name || (folder.path ? folder.path.split('/').pop() || folder.path : EMPTY_FOLDER_NAME),
         path: normalizeFolderPath(folder.path),
@@ -46,14 +78,32 @@ export function useFolders(options: UseFoldersOptions) {
       if (!folders.value.some((folder) => folder.path === currentFolder.value)) {
         currentFolder.value = folders.value[0]?.path ?? ''
       }
-    } catch (error) {
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => folderQuery.error.value,
+    (error) => {
+      if (!error || !currentProjectId.value) {
+        return
+      }
+
       folders.value = []
       currentFolder.value = ''
       console.error('[FilesView] loadFolders failed', error)
       toast.error(errorMessage(error, 'Cannot load folders'))
-    } finally {
-      loadingFolders.value = false
+    },
+  )
+
+  async function loadFolders() {
+    if (!currentProjectId.value) {
+      folders.value = []
+      currentFolder.value = ''
+      return
     }
+
+    await folderQuery.refetch()
   }
 
   function autoExpandRoots(allFolders: CloudinaryFolder[]) {
@@ -92,7 +142,6 @@ export function useFolders(options: UseFoldersOptions) {
   function resetFoldersState() {
     folders.value = []
     expandedFolderPaths.value = new Set()
-    loadingFolders.value = false
     currentFolder.value = ''
   }
 

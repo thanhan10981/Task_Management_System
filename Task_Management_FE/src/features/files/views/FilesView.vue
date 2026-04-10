@@ -310,7 +310,9 @@ import {
   type CloudinaryUploadResult,
 } from '@/api/cloudinary'
 import { useToast } from '@/composables/useToast'
+import { QUERY_KEYS } from '@/constants/query-keys'
 import { useProjectStore } from '@/stores/project.store'
+import { useQueryClient } from '@tanstack/vue-query'
 import { useFiles } from '../composables/useFiles'
 import { useFolders } from '../composables/useFolders'
 import { useStorage } from '../composables/useStorage'
@@ -339,6 +341,7 @@ const newFolderName = ref('')
 const uploaderRef = ref<HTMLElement | null>(null)
 
 const toast = useToast()
+const queryClient = useQueryClient()
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
 
@@ -398,7 +401,6 @@ onMounted(async () => {
   if (!currentProjectId.value) {
     return
   }
-
   await loadAllData()
 })
 
@@ -426,6 +428,9 @@ watch(
 )
 
 async function refreshAll() {
+  if (currentProjectId.value) {
+    await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
+  }
   await loadAllData()
 }
 
@@ -445,6 +450,7 @@ async function createFolder() {
     }
 
     await createCloudinaryFolder(currentProjectId.value, path)
+    await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
     showCreateFolder.value = false
     newFolderName.value = ''
     await refreshFoldersUntilVisible(path)

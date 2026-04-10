@@ -1,5 +1,7 @@
 import { createProject, listUserProjects } from '@/api/projects'
+import { QUERY_KEYS } from '@/constants/query-keys'
 import type { CreateProjectPayload, ProjectSummary } from '@/types/project.types'
+import { queryClient } from '@/lib/query-client'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -47,7 +49,10 @@ export const useProjectStore = defineStore('project', () => {
   async function loadProjects() {
     loadingProjects.value = true
     try {
-      projects.value = await listUserProjects()
+      projects.value = await queryClient.fetchQuery({
+        queryKey: QUERY_KEYS.projects.list(),
+        queryFn: () => listUserProjects(),
+      })
       ensureCurrentProjectSelection()
     } finally {
       loadingProjects.value = false
@@ -65,6 +70,7 @@ export const useProjectStore = defineStore('project', () => {
 
   async function createAndSelectProject(payload: CreateProjectPayload) {
     const created = await createProject(payload)
+    await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.all })
     await initializeAfterAuth(true)
 
     if (created?.id) {

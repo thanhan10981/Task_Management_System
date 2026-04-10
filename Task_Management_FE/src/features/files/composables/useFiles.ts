@@ -1,10 +1,12 @@
-import { ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import {
   deleteFileMetadata,
   getUploadedFileMetadata,
   normalizeFolderPath,
   type CloudinaryUploadResult,
 } from '@/api/cloudinary'
+import { QUERY_KEYS } from '@/constants/query-keys'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { CloudinaryFile, CloudinaryFolder } from '../types/files-view.types'
 
 interface UseFilesOptions {
@@ -21,52 +23,53 @@ interface UseFilesOptions {
 
 export function useFiles(options: UseFilesOptions) {
   const { currentFolder, currentProjectId, folders, loadFolders, toast, errorMessage } = options
+  const queryClient = useQueryClient()
 
   const recentFiles = ref<CloudinaryFile[]>([])
   const allFiles = ref<CloudinaryFile[]>([])
   const loadingFiles = ref(false)
   const deletingFile = ref<string | null>(null)
-  const latestFilesRequestId = ref(0)
+  const folderSignature = computed(() =>
+    folders.value
+      .map((folder) => normalizeFolderPath(folder.path))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+      .join('|'),
+  )
 
-  async function loadFiles() {
-    if (!currentProjectId.value) {
-      recentFiles.value = []
-      return
-    }
-
-    const requestId = ++latestFilesRequestId.value
-    loadingFiles.value = true
-    try {
-      const files = await getUploadedFileMetadata(currentProjectId.value, currentFolder.value || undefined, true)
-      if (requestId === latestFilesRequestId.value) {
-        recentFiles.value = files
+  const recentFilesQuery = useQuery({
+    queryKey: computed(() =>
+      QUERY_KEYS.files.list(
+        currentProjectId.value ?? '',
+        normalizeFolderPath(currentFolder.value),
+        true,
+      ),
+    ),
+    enabled: computed(() => Boolean(currentProjectId.value)),
+    queryFn: async () => {
+      if (!currentProjectId.value) {
+        return []
       }
-    } catch (error) {
-      if (requestId === latestFilesRequestId.value) {
-        recentFiles.value = []
-        console.error('[FilesView] loadFiles failed', error)
-        toast.error(errorMessage(error, 'Cannot load files'))
+
+      const folderPath = normalizeFolderPath(currentFolder.value)
+      return getUploadedFileMetadata(currentProjectId.value, folderPath || undefined, true)
+    },
+  })
+
+  const allFilesQuery = useQuery({
+    queryKey: computed(() =>
+      QUERY_KEYS.files.allInProject(currentProjectId.value ?? '').concat(folderSignature.value),
+    ),
+    enabled: computed(() => Boolean(currentProjectId.value)),
+    queryFn: async () => {
+      if (!currentProjectId.value) {
+        return []
       }
-    } finally {
-      if (requestId === latestFilesRequestId.value) {
-        loadingFiles.value = false
-      }
-    }
-  }
 
-  async function loadAllFiles() {
-    if (!currentProjectId.value) {
-      allFiles.value = []
-      return
-    }
-
-    const projectId = currentProjectId.value
-
-    try {
+      const projectId = currentProjectId.value
       const rootAllFiles = await getUploadedFileMetadata(projectId, undefined, true)
       if (rootAllFiles.length || folders.value.length === 0) {
-        allFiles.value = rootAllFiles
-        return
+        return rootAllFiles
       }
 
       const uniqueFolderPaths = [...new Set(
@@ -90,10 +93,95 @@ export function useFiles(options: UseFilesOptions) {
         }
       }
 
-      allFiles.value = [...mergedByPublicId.values()]
-    } catch (error) {
+      return [...mergedByPublicId.values()]
+    },
+  })
+
+  watch(
+    () => currentProjectId.value,
+    (projectId) => {
+      if (projectId) {
+        return
+      }
+
+      recentFiles.value = []
+      allFiles.value = []
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => recentFilesQuery.isFetching.value,
+    (isFetching) => {
+      loadingFiles.value = isFetching
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => recentFilesQuery.data.value,
+    (files) => {
+      if (!files || !currentProjectId.value) {
+        return
+      }
+
+      recentFiles.value = files
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => recentFilesQuery.error.value,
+    (error) => {
+      if (!error || !currentProjectId.value) {
+        return
+      }
+
+      recentFiles.value = []
+      console.error('[FilesView] loadFiles failed', error)
+      toast.error(errorMessage(error, 'Cannot load files'))
+    },
+  )
+
+  watch(
+    () => allFilesQuery.data.value,
+    (files) => {
+      if (!files || !currentProjectId.value) {
+        return
+      }
+
+      allFiles.value = files
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => allFilesQuery.error.value,
+    (error) => {
+      if (!error || !currentProjectId.value) {
+        return
+      }
+
       console.error('[FilesView] loadAllFiles failed', error)
+    },
+  )
+
+  async function loadFiles() {
+    if (!currentProjectId.value) {
+      recentFiles.value = []
+      return
     }
+
+    await recentFilesQuery.refetch()
+  }
+
+  async function loadAllFiles() {
+    if (!currentProjectId.value) {
+      allFiles.value = []
+      return
+    }
+
+    await allFilesQuery.refetch()
   }
 
   async function deleteFile(file: CloudinaryFile) {
@@ -104,6 +192,9 @@ export function useFiles(options: UseFilesOptions) {
     deletingFile.value = fileId
     try {
       await deleteFileMetadata(fileId)
+      if (currentProjectId.value) {
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
+      }
       toast.success('File deleted')
       await Promise.all([loadFiles(), loadAllFiles()])
     } catch (error) {
@@ -117,6 +208,8 @@ export function useFiles(options: UseFilesOptions) {
     if (!currentProjectId.value) {
       return false
     }
+
+    await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
 
     const maxAttempts = 4
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -169,9 +262,7 @@ export function useFiles(options: UseFilesOptions) {
   function resetFilesState() {
     recentFiles.value = []
     allFiles.value = []
-    loadingFiles.value = false
     deletingFile.value = null
-    latestFilesRequestId.value += 1
   }
 
   return {

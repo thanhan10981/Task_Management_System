@@ -13,7 +13,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const now = Date.now();
 
     return next.handle().pipe(
-      tap((response) => {
+      tap(() => {
         const statusCode = context.switchToHttp().getResponse().statusCode;
         const duration = Date.now() - now;
 

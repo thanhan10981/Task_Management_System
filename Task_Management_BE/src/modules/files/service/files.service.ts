@@ -159,7 +159,6 @@ export class FilesService {
       }
     }
 
-    // Backward compatibility: include legacy folders discovered from DB records.
     const dbFolders = await this.prisma.file.findMany({
       where: {
         projectId,
@@ -346,10 +345,6 @@ export class FilesService {
     }
 
     return segments.slice(0, -1).join('/');
-  }
-
-  private isFolderMarkerResource(publicId: string) {
-    return publicId.endsWith('/.folder-marker') || publicId.endsWith('/.folder-marker.txt');
   }
 
   private normalizePath(path?: string | null) {

@@ -1,6 +1,6 @@
 type RawConfig = Record<string, unknown>;
 
-export interface EnvVariables {
+interface EnvVariables {
   NODE_ENV: 'development' | 'production' | 'test';
   PORT: number;
   DATABASE_URL: string;

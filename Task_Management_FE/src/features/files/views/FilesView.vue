@@ -315,8 +315,22 @@ import { useFiles } from '../composables/useFiles'
 import { useFolders } from '../composables/useFolders'
 import { useStorage } from '../composables/useStorage'
 import { storeToRefs } from 'pinia'
+import {
+  extractErrorMessage,
+  fileName,
+  fileTypeBg,
+  folderColor,
+  formatBytes,
+  formatDate,
+  getFileIconText,
+  memberColor,
+  memberInitials,
+} from '../utils/file.utils'
 
 const DEFAULT_FOLDER = ''
+const MAX_FOLDER_REFRESH_RETRY = 3
+const FOLDER_REFRESH_DELAY_MS = 350
+
 const currentFolder = ref(DEFAULT_FOLDER)
 
 const creatingFolder = ref(false)
@@ -327,6 +341,10 @@ const uploaderRef = ref<HTMLElement | null>(null)
 const toast = useToast()
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
+
+function errorMessage(error: unknown, fallback: string) {
+  return extractErrorMessage(error, fallback)
+}
 
 const {
   folders,
@@ -360,15 +378,20 @@ const {
   applyFolderCountsFromFiles,
 } = useStorage({ allFiles, folders })
 
-watch(allFiles, () => {
-  applyFolderCountsFromFiles(allFiles.value)
-})
+const lastAppliedFilesRef = ref<typeof allFiles.value | null>(null)
 
-const PALETTE = ['#6366f1','#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4']
-function folderColor(path: string) {
-  let hash = 0
-  for (let i = 0; i < path.length; i++) hash = path.charCodeAt(i) + ((hash << 5) - hash)
-  return PALETTE[Math.abs(hash) % PALETTE.length]
+function syncFolderCounts() {
+  const files = allFiles.value
+  if (lastAppliedFilesRef.value === files) return
+
+  applyFolderCountsFromFiles(files)
+  lastAppliedFilesRef.value = files
+}
+
+async function loadAllData() {
+  await loadFolders()
+  await Promise.all([loadFiles(), loadAllFiles()])
+  syncFolderCounts()
 }
 
 onMounted(async () => {
@@ -376,32 +399,34 @@ onMounted(async () => {
     return
   }
 
-  await loadFolders()
-  await Promise.all([loadFiles(), loadAllFiles()])
-  applyFolderCountsFromFiles(allFiles.value)
+  await loadAllData()
 })
-
-watch(currentFolder, () => { void loadAllFiles() })
 
 watch(currentProjectId, async () => {
   resetFoldersState()
   resetFilesState()
   currentFolder.value = DEFAULT_FOLDER
+  lastAppliedFilesRef.value = null
 
   if (!currentProjectId.value) {
     applyFolderCountsFromFiles([])
     return
   }
 
-  await loadFolders()
-  await Promise.all([loadFiles(), loadAllFiles()])
-  applyFolderCountsFromFiles(allFiles.value)
+  await loadAllData()
 })
 
+watch(
+  () => allFiles.value,
+  (nextFiles, prevFiles) => {
+    if (nextFiles === prevFiles) return
+    syncFolderCounts()
+  },
+  { deep: false },
+)
+
 async function refreshAll() {
-  await loadFolders()
-  await Promise.all([loadFiles(), loadAllFiles()])
-  applyFolderCountsFromFiles(allFiles.value)
+  await loadAllData()
 }
 
 function selectFolder(path: string) {
@@ -426,7 +451,7 @@ async function createFolder() {
     currentFolder.value = normalizeFolderPath(path)
     expandAncestors(currentFolder.value)
     await Promise.all([loadFiles(), loadAllFiles()])
-    applyFolderCountsFromFiles(allFiles.value)
+    syncFolderCounts()
     toast.success('Folder created')
   } catch (error) {
     toast.error(errorMessage(error, 'Create folder failed'))
@@ -436,10 +461,10 @@ async function createFolder() {
 }
 
 async function refreshFoldersUntilVisible(path: string) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < MAX_FOLDER_REFRESH_RETRY; attempt++) {
     await loadFolders()
     if (folders.value.some((folder) => folder.path === path)) return
-    await new Promise((resolve) => { window.setTimeout(resolve, 350) })
+    await new Promise((resolve) => { window.setTimeout(resolve, FOLDER_REFRESH_DELAY_MS) })
   }
 }
 
@@ -450,7 +475,7 @@ async function handleUploaded(results: CloudinaryUploadResult[]) {
   if (!synced && results.length) {
     mergeOptimisticUploadedFiles(results)
   }
-  applyFolderCountsFromFiles(allFiles.value)
+  syncFolderCounts()
 }
 
 function triggerUploader() {
@@ -458,75 +483,7 @@ function triggerUploader() {
 }
 
 function openFile(url: string) { window.open(url, '_blank', 'noopener,noreferrer') }
-function fileName(publicId: string) { return publicId.split('/').pop() ?? publicId }
 function displayFolderName(path: string) { return normalizeFolderPath(path).split('/').filter(Boolean).pop() ?? 'Root' }
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  return `${(bytes / 1024 ** index).toFixed(index >= 2 ? 1 : 0)} ${units[index]}`
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-/* ── Member helpers ── */
-const MEMBER_PALETTE = [
-  '#6366f1', '#3b82f6', '#f59e0b', '#10b981',
-  '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4',
-  '#f97316', '#14b8a6', '#84cc16', '#a855f7',
-]
-function memberColor(id: string): string {
-  let hash = 0
-  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash)
-  return MEMBER_PALETTE[Math.abs(hash) % MEMBER_PALETTE.length]
-}
-function memberInitials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('')
-}
-
-function getFileIconText(format: string): string {
-  const m: Record<string, string> = {
-    pdf: 'PDF', doc: 'DOC', docx: 'DOC', xls: 'XLS', xlsx: 'XLS',
-    jpg: 'IMG', jpeg: 'IMG', png: 'IMG', gif: 'GIF', webp: 'IMG',
-    mp4: 'VID', mov: 'VID', avi: 'VID', mp3: 'AUD', wav: 'AUD',
-    zip: 'ZIP', rar: 'ZIP', txt: 'TXT', fig: 'FIG', ai: 'AI',
-  }
-  return m[(format || '').toLowerCase()] ?? 'FILE'
-}
-
-const FILE_TYPE_COLORS: Record<string, string> = {
-  PDF: '#ef4444', DOC: '#3b82f6', XLS: '#10b981', IMG: '#6366f1',
-  GIF: '#8b5cf6', VID: '#f59e0b', AUD: '#ec4899', ZIP: '#64748b',
-  TXT: '#94a3b8', FIG: '#06b6d4', AI: '#f97316', FILE: '#94a3b8',
-}
-function fileTypeBg(format: string) {
-  const key = getFileIconText(format)
-  return (FILE_TYPE_COLORS[key] ?? '#94a3b8') + '22'
-}
-
-function errorMessage(error: unknown, fallback: string) {
-  if (typeof error === 'object' && error && 'response' in error) {
-    const response = (error as { response?: { data?: unknown } }).response
-    const payload = response?.data
-    if (payload && typeof payload === 'object') {
-      const direct = (payload as { message?: unknown }).message
-      if (typeof direct === 'string') return direct
-      const nested = (payload as { data?: { message?: unknown } }).data?.message
-      if (typeof nested === 'string') return nested
-    }
-  }
-  if (error instanceof Error && error.message) return error.message
-  return fallback
-}
 </script>
 
 <style scoped>

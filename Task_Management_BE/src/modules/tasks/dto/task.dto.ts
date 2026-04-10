@@ -10,7 +10,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TaskPriority } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
-import { Type } from 'class-transformer';
 
 export class CreateTaskDto {
   @ApiProperty({ description: 'Task title', example: 'Implement auth middleware' })

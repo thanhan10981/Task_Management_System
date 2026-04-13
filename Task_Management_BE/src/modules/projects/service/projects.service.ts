@@ -46,12 +46,6 @@ export class ProjectsService {
         status: createProjectDto.status || 'ACTIVE',
         color: createProjectDto.color,
         icon: createProjectDto.icon,
-        startDate: createProjectDto.startDate
-          ? new Date(createProjectDto.startDate)
-          : null,
-        endDate: createProjectDto.endDate
-          ? new Date(createProjectDto.endDate)
-          : null,
         createdBy: userId,
         members: {
           create: [
@@ -200,12 +194,6 @@ export class ProjectsService {
           status: updateProjectDto.status,
           color: updateProjectDto.color,
           icon: updateProjectDto.icon,
-          startDate: updateProjectDto.startDate
-            ? new Date(updateProjectDto.startDate)
-            : undefined,
-          endDate: updateProjectDto.endDate
-            ? new Date(updateProjectDto.endDate)
-            : undefined,
         },
       });
 

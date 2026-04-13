@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -20,6 +21,24 @@ export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string, createProjectDto: CreateProjectDto) {
+    const requestedMemberIds = Array.from(
+      new Set((createProjectDto.memberIds ?? []).filter((memberId) => memberId !== userId)),
+    );
+
+    if (requestedMemberIds.length > 0) {
+      const existingUsersCount = await this.prisma.user.count({
+        where: {
+          id: {
+            in: requestedMemberIds,
+          },
+        },
+      });
+
+      if (existingUsersCount !== requestedMemberIds.length) {
+        throw new BadRequestException('One or more selected members do not exist');
+      }
+    }
+
     const project = await this.prisma.project.create({
       data: {
         name: createProjectDto.name,
@@ -35,11 +54,18 @@ export class ProjectsService {
           : null,
         createdBy: userId,
         members: {
-          create: {
-            userId,
-            role: 'OWNER',
-            addedBy: userId,
-          },
+          create: [
+            {
+              userId,
+              role: 'OWNER',
+              addedBy: userId,
+            },
+            ...requestedMemberIds.map((memberId) => ({
+              userId: memberId,
+              role: 'MEMBER' as const,
+              addedBy: userId,
+            })),
+          ],
         },
       },
       include: {
@@ -147,21 +173,53 @@ export class ProjectsService {
       throw new ForbiddenException('Only project owner can update this project');
     }
 
-    await this.prisma.project.update({
-      where: { id },
-      data: {
-        name: updateProjectDto.name,
-        description: updateProjectDto.description,
-        status: updateProjectDto.status,
-        color: updateProjectDto.color,
-        icon: updateProjectDto.icon,
-        startDate: updateProjectDto.startDate
-          ? new Date(updateProjectDto.startDate)
-          : undefined,
-        endDate: updateProjectDto.endDate
-          ? new Date(updateProjectDto.endDate)
-          : undefined,
-      },
+    const requestedMemberIds = Array.from(
+      new Set((updateProjectDto.memberIds ?? []).filter((memberId) => memberId !== existingProject.createdBy)),
+    );
+
+    if (requestedMemberIds.length > 0) {
+      const existingUsersCount = await this.prisma.user.count({
+        where: {
+          id: {
+            in: requestedMemberIds,
+          },
+        },
+      });
+
+      if (existingUsersCount !== requestedMemberIds.length) {
+        throw new BadRequestException('One or more selected members do not exist');
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id },
+        data: {
+          name: updateProjectDto.name,
+          description: updateProjectDto.description,
+          status: updateProjectDto.status,
+          color: updateProjectDto.color,
+          icon: updateProjectDto.icon,
+          startDate: updateProjectDto.startDate
+            ? new Date(updateProjectDto.startDate)
+            : undefined,
+          endDate: updateProjectDto.endDate
+            ? new Date(updateProjectDto.endDate)
+            : undefined,
+        },
+      });
+
+      if (requestedMemberIds.length > 0) {
+        await tx.projectMember.createMany({
+          data: requestedMemberIds.map((memberId) => ({
+            projectId: id,
+            userId: memberId,
+            role: 'MEMBER',
+            addedBy: userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
     });
 
     return this.findOne(userId, id);

@@ -237,11 +237,7 @@ export class SprintsService {
 			return null;
 		}
 
-		const date = new Date(value);
-        if (isNaN(date.getTime())) {
-        throw new BadRequestException('Invalid date format');
-        }
-        return date;
+		return new Date(value);
 	}
 
 	private normalizeOptionalDateInput(value?: string | null): Date | null | undefined {
@@ -253,11 +249,7 @@ export class SprintsService {
 			return null;
 		}
 
-		const date = new Date(value);
-        if (isNaN(date.getTime())) {
-        throw new BadRequestException('Invalid date format');
-        }
-        return date;
+		return new Date(value);
 	}
 
 	private validateSprintBusinessRules({

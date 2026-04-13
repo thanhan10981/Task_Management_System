@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -176,7 +177,16 @@ export class TasksService {
       throw new ForbiddenException('You do not have access to this task');
     }
 
-    const updateData: any = { ...updateTaskDto };
+    const assigneeIds = this.normalizeAssigneeIds(updateTaskDto.assigneeIds);
+    await this.ensureUsersExist(assigneeIds, 'One or more selected assignees do not exist');
+
+    const updateData: any = {
+      title: updateTaskDto.title,
+      description: updateTaskDto.description,
+      statusId: updateTaskDto.statusId,
+      priority: updateTaskDto.priority,
+      parentTaskId: updateTaskDto.parentTaskId,
+    };
     if (updateTaskDto.dueDate) {
       updateData.dueDate = new Date(updateTaskDto.dueDate);
     }
@@ -185,9 +195,22 @@ export class TasksService {
     }
     updateData.updatedBy = userId;
 
-    await this.prisma.task.update({
-      where: { id },
-      data: updateData,
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.update({
+        where: { id },
+        data: updateData,
+      });
+
+      if (assigneeIds.length > 0) {
+        await tx.taskAssignee.createMany({
+          data: assigneeIds.map((assigneeId) => ({
+            taskId: id,
+            userId: assigneeId,
+            assignedBy: userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
     });
 
     return this.findOne(userId, id);
@@ -240,5 +263,27 @@ export class TasksService {
 
   private mapTaskResponse(task: any) {
     return task;
+  }
+
+  private normalizeAssigneeIds(assigneeIds?: string[]) {
+    return Array.from(new Set(assigneeIds ?? []));
+  }
+
+  private async ensureUsersExist(userIds: string[], errorMessage: string) {
+    if (userIds.length === 0) {
+      return;
+    }
+
+    const existingUsersCount = await this.prisma.user.count({
+      where: {
+        id: {
+          in: userIds,
+        },
+      },
+    });
+
+    if (existingUsersCount !== userIds.length) {
+      throw new BadRequestException(errorMessage);
+    }
   }
 }

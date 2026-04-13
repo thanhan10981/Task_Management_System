@@ -108,7 +108,7 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string) {
+  async logout(_userId: string) {
     return { success: true };
   }
 

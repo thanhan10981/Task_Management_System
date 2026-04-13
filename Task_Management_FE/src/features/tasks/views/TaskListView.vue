@@ -12,7 +12,7 @@
         v-for="task in data.data"
         :key="task.id"
         class="card hover:shadow-md transition-shadow cursor-pointer"
-        @click="router.push({ name: 'task-detail', params: { id: task.id } })"
+        @click="openTask(task.id)"
       >
         <div class="flex items-center justify-between">
           <h3 class="font-medium text-secondary-900">{{ task.title }}</h3>
@@ -42,8 +42,21 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useProjectStore } from '@/stores/project.store'
+import { storeToRefs } from 'pinia'
 import { useTasksQuery } from '../composables/useTasksQuery'
 
 const router = useRouter()
+const projectStore = useProjectStore()
+const { currentProjectId } = storeToRefs(projectStore)
 const { data, isLoading, isError } = useTasksQuery()
+
+function openTask(taskId: string) {
+  if (!currentProjectId.value) return
+
+  void router.push({
+    name: 'task-detail',
+    params: { id: taskId },
+  })
+}
 </script>

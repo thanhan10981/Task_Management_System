@@ -16,7 +16,7 @@ async function bootstrap() {
     process.env.FRONTEND_URL,
     'http://localhost:5173',
     'http://localhost:3000',
-  ].filter(Boolean) as string[];
+  ].filter((origin, index, all) => Boolean(origin) && all.indexOf(origin) === index) as string[];
   
   app.setGlobalPrefix('api');
   

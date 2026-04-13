@@ -12,7 +12,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TaskPriority } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
-import { Type } from 'class-transformer';
 
 export class CreateTaskDto {
   @ApiProperty({ description: 'Task title', example: 'Implement auth middleware' })
@@ -104,6 +103,16 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsUUID()
   parentTaskId?: string;
+
+  @ApiPropertyOptional({
+    description: 'User IDs to add as assignees during update',
+    type: [String],
+    example: ['44444444-4444-4444-4444-444444444444'],
+  })
+  @IsOptional()
+  @IsArray({ message: 'assigneeIds must be an array of UUID strings' })
+  @IsUUID(4, { each: true, message: 'Each assignee id must be a valid UUID' })
+  assigneeIds?: string[];
 }
 
 export class TaskQueryDto extends PaginationDto {

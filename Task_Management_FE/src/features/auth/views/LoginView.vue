@@ -37,7 +37,12 @@
       <div>
         <div class="flex items-center justify-between mb-1.5">
           <label class="auth-label !mb-0" for="password">Password</label>
-          <a href="#" class="text-xs text-sky-400 hover:text-sky-300 transition-colors">Forgot password?</a>
+          <RouterLink
+            to="/auth/forgot-password"
+            class="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+          >
+            Forgot password?
+          </RouterLink>
         </div>
         <div class="relative">
           <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
@@ -112,18 +117,18 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { post } from '@/api/client'
 import { useApiError } from '@/composables/useApiError'
 import { useAuthStore } from '@/stores/auth.store'
-import type { User } from '@/types/user.types'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { useRouter } from 'vue-router'
+import { useLoginMutation } from '../composables/useAuthMutations'
 import { loginSchema } from '../schemas/auth.schema'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const { apiError, handleError, clearError } = useApiError()
+const loginMutation = useLoginMutation()
 
 const { errors, handleSubmit, isSubmitting, defineField } = useForm({
   validationSchema: toTypedSchema(loginSchema),
@@ -136,7 +141,7 @@ const showPassword = ref(false)
 const onSubmit = handleSubmit(async (values) => {
   clearError()
   try {
-    const response = await post<{ data: { user: User }; message: string }>('/auth/login', values)
+    const response = await loginMutation.mutateAsync(values)
     authStore.setAuth(null, response.data.user)
     router.push({ name: 'dashboard' })
   } catch (err) {

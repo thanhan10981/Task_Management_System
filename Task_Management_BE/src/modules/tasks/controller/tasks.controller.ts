@@ -9,7 +9,6 @@ import {
   UseGuards,
   Request,
   Query,
-  HttpCode,
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';

@@ -3,9 +3,14 @@ import { useAuthStore } from '@/stores/auth.store'
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
+function isFilesApiRequest(url?: string): boolean {
+  if (!url) return false
+  return url.includes('/files/cloudinary') || url.includes('/files/') || url.endsWith('/files')
+}
+
 const apiClient: AxiosInstance = axios.create({
   baseURL: env.VITE_API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -16,6 +21,15 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor – attach auth token
 apiClient.interceptors.request.use(
   (config) => {
+    if (isFilesApiRequest(config.url)) {
+      console.log('[API][Request]', {
+        method: config.method,
+        baseURL: config.baseURL,
+        url: config.url,
+        params: config.params,
+      })
+    }
+
     const authStore = useAuthStore()
     if (authStore.accessToken) {
       config.headers.Authorization = `Bearer ${authStore.accessToken}`
@@ -27,9 +41,28 @@ apiClient.interceptors.request.use(
 
 // Response interceptor – handle 401 globally
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    if (isFilesApiRequest(response.config?.url)) {
+      console.log('[API][Response]', {
+        status: response.status,
+        url: response.config?.url,
+        data: response.data,
+      })
+    }
+    return response
+  },
   async (error) => {
     const status = error.response?.status
+    const requestUrl = error?.config?.url as string | undefined
+
+    if (isFilesApiRequest(requestUrl)) {
+      console.error('[API][Error]', {
+        status,
+        url: requestUrl,
+        message: error?.message,
+        data: error?.response?.data,
+      })
+    }
 
     if (status === 401) {
       const authStore = useAuthStore()

@@ -3,6 +3,8 @@ import { ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nes
 import { AuthService } from '../service/auth.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @ApiTags('Auth')
@@ -40,7 +42,6 @@ export class AuthController {
   }
 
   @Post('login')
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login and receive auth cookies' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: HttpStatus.OK, description: 'Login successful' })
@@ -70,7 +71,6 @@ export class AuthController {
   }
 
   @Post('refresh')
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token using refreshToken cookie' })
   @ApiCookieAuth('accessToken')
   @ApiResponse({ status: HttpStatus.OK, description: 'Token refreshed successfully' })
@@ -97,9 +97,31 @@ export class AuthController {
     });
   }
 
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset email' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'If email exists, reset link is sent' })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(forgotPasswordDto);
+    return {
+      message: 'If your email is registered, a reset link has been sent',
+    };
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password using reset token' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password has been reset successfully' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid reset token or payload' })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    await this.authService.resetPassword(resetPasswordDto);
+    return {
+      message: 'Password has been reset successfully',
+    };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout current user and clear cookies' })
   @ApiCookieAuth('accessToken')
   @ApiResponse({ status: HttpStatus.OK, description: 'Logout successful' })

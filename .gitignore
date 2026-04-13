@@ -68,3 +68,6 @@ docker-compose.override.yml
 uploads/
 tmp/
 temp/
+
+#gitignore for copilot instructions
+.github/

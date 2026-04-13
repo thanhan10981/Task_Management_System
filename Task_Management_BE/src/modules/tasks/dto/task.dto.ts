@@ -108,4 +108,16 @@ export class TaskQueryDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by project id', example: '11111111-1111-1111-1111-111111111111' })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+}
+
+export class AssignTaskUserDto {
+  @ApiProperty({ description: 'User id to assign', example: '0b8390cb-83ce-4f67-a843-b422f8bc7087' })
+  @IsNotEmpty({ message: 'User id is required' })
+  @IsUUID()
+  userId: string;
 }

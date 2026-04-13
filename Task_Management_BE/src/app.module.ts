@@ -8,6 +8,10 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { SprintsModule } from './modules/sprints/sprints.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UserModule } from './modules/user/user.module';
+import { UserSettingsModule } from './modules/user-settings/user-settings.module';
+import { CommentsModule } from './modules/comments/comments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
 
 import configuration from './config/configuration';
 import { validate } from './config/validateion.schema';
@@ -25,6 +29,10 @@ import { validate } from './config/validateion.schema';
     SprintsModule,
     TasksModule,
     UserModule,
+    UserSettingsModule,
+    CommentsModule,
+    NotificationsModule,
+    ActivityLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,14 +1,15 @@
 import { Type } from 'class-transformer';
 import {
-  IsDateString,
   IsEnum,
+  IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProjectStatus } from '@prisma/client';
+import { ProjectMemberRole, ProjectStatus } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class CreateProjectDto {
@@ -40,15 +41,6 @@ export class CreateProjectDto {
   @MaxLength(50, { message: 'Icon must be at most 50 characters' })
   icon?: string;
 
-  @ApiPropertyOptional({ description: 'Project start date (ISO)', example: '2026-04-10' })
-  @IsOptional()
-  @IsDateString({}, { message: 'startDate must be a valid ISO date string' })
-  startDate?: string;
-
-  @ApiPropertyOptional({ description: 'Project end date (ISO)', example: '2026-05-10' })
-  @IsOptional()
-  @IsDateString({}, { message: 'endDate must be a valid ISO date string' })
-  endDate?: string;
 }
 
 export class UpdateProjectDto {
@@ -81,15 +73,6 @@ export class UpdateProjectDto {
   @MaxLength(50, { message: 'Icon must be at most 50 characters' })
   icon?: string;
 
-  @ApiPropertyOptional({ description: 'Project start date (ISO)', example: '2026-04-10' })
-  @IsOptional()
-  @IsDateString({}, { message: 'startDate must be a valid ISO date string' })
-  startDate?: string;
-
-  @ApiPropertyOptional({ description: 'Project end date (ISO)', example: '2026-05-10' })
-  @IsOptional()
-  @IsDateString({}, { message: 'endDate must be a valid ISO date string' })
-  endDate?: string;
 }
 
 export class ProjectQueryDto extends PaginationDto {
@@ -102,4 +85,23 @@ export class ProjectQueryDto extends PaginationDto {
   @IsOptional()
   @IsEnum(ProjectStatus)
   status?: ProjectStatus;
+}
+
+export class AddProjectMemberDto {
+  @ApiProperty({ description: 'User id to add into project', example: '3a76d18a-10b5-47f5-bf68-f6f4f5f890a0' })
+  @IsNotEmpty({ message: 'User id is required' })
+  @IsUUID()
+  userId: string;
+
+  @ApiPropertyOptional({ description: 'Role for member', enum: ProjectMemberRole, example: 'MEMBER' })
+  @IsOptional()
+  @IsEnum(ProjectMemberRole)
+  role?: ProjectMemberRole;
+}
+
+export class UpdateProjectMemberRoleDto {
+  @ApiProperty({ description: 'Updated role for member', enum: ProjectMemberRole, example: 'ADMIN' })
+  @IsNotEmpty({ message: 'Role is required' })
+  @IsEnum(ProjectMemberRole)
+  role: ProjectMemberRole;
 }

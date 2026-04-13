@@ -12,6 +12,10 @@ import { FilesModule } from './modules/files/files.module';
 import { ReminderModule } from './modules/reminder/reminder.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { UserSettingsModule } from './modules/user-settings/user-settings.module';
+import { CommentsModule } from './modules/comments/comments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
 
 import configuration from './config/configuration';
 import { validate } from './config/validation.schema';
@@ -31,6 +35,10 @@ import { validate } from './config/validation.schema';
     UserModule,
     FilesModule,
     ReminderModule,
+    UserSettingsModule,
+    CommentsModule,
+    NotificationsModule,
+    ActivityLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService, LoggingInterceptor, ResponseInterceptor],

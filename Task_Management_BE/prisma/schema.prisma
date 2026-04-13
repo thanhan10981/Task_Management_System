@@ -228,6 +228,7 @@ model Task {
   tags         Json?
   checklist    Json?
   coverFileId  String?
+  isDeleted    Boolean      @default(false)
   createdBy    String
   updatedBy    String?
   createdAt    DateTime     @default(now()) @db.Timestamptz(6)

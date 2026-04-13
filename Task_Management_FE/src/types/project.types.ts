@@ -12,4 +12,5 @@ export interface CreateProjectPayload {
   description?: string
   color?: string
   icon?: string
+  memberIds?: string[]
 }

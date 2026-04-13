@@ -16,6 +16,8 @@ interface EnvVariables {
   CLOUDINARY_CLOUD_NAME?: string;
   CLOUDINARY_API_KEY?: string;
   CLOUDINARY_API_SECRET?: string;
+  CLOUDINARY_AUTH_TOKEN_KEY?: string;
+  CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS?: number;
 }
 
 function readString(config: RawConfig, key: string, fallback = ''): string {
@@ -56,6 +58,11 @@ export function validate(config: RawConfig): EnvVariables {
   const cloudinaryCloudName = readString(config, 'CLOUDINARY_CLOUD_NAME') || undefined;
   const cloudinaryApiKey = readString(config, 'CLOUDINARY_API_KEY') || undefined;
   const cloudinaryApiSecret = readString(config, 'CLOUDINARY_API_SECRET') || undefined;
+  const cloudinaryAuthTokenKey = readString(config, 'CLOUDINARY_AUTH_TOKEN_KEY') || undefined;
+  const cloudinaryAuthenticatedUrlTtlRaw = config['CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS'];
+  const cloudinaryAuthenticatedUrlTtl = cloudinaryAuthenticatedUrlTtlRaw == null
+    ? undefined
+    : readNumber(config, 'CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS', 300);
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required');
@@ -76,6 +83,10 @@ export function validate(config: RawConfig): EnvVariables {
     throw new Error('CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET must be provided together');
   }
 
+  if (cloudinaryAuthenticatedUrlTtl !== undefined && cloudinaryAuthenticatedUrlTtl <= 0) {
+    throw new Error('CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS must be greater than 0');
+  }
+
   return {
     NODE_ENV: nodeEnv as EnvVariables['NODE_ENV'],
     PORT: readNumber(config, 'PORT', 3001),
@@ -92,5 +103,7 @@ export function validate(config: RawConfig): EnvVariables {
     CLOUDINARY_CLOUD_NAME: cloudinaryCloudName,
     CLOUDINARY_API_KEY: cloudinaryApiKey,
     CLOUDINARY_API_SECRET: cloudinaryApiSecret,
+    CLOUDINARY_AUTH_TOKEN_KEY: cloudinaryAuthTokenKey,
+    CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS: cloudinaryAuthenticatedUrlTtl,
   };
 }

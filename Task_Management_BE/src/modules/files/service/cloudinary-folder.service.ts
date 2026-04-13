@@ -62,7 +62,16 @@ export class CloudinaryFolderService {
 
   async listFolders(parentPath?: string): Promise<CloudinaryFolderPayload[]> {
     this.ensureConfigured();
-    return this.listDirectFolders(parentPath);
+
+    try {
+      return await this.listDirectFolders(parentPath);
+    } catch (error) {
+      this.logger.error(
+        `Failed to list Cloudinary folders for parentPath=${normalizePath(parentPath) ?? '<root>'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to list Cloudinary folders');
+    }
   }
 
   async listFoldersRecursive(parentPath?: string): Promise<CloudinaryFolderPayload[]> {
@@ -73,7 +82,16 @@ export class CloudinaryFolderService {
     const queue: string[] = [];
     const collected: CloudinaryFolderPayload[] = [];
 
-    const rootFolders = await this.listDirectFolders(normalizedParent);
+    let rootFolders: CloudinaryFolderPayload[];
+    try {
+      rootFolders = await this.listDirectFolders(normalizedParent);
+    } catch (error) {
+      this.logger.error(
+        `Failed to list Cloudinary folders recursively for parentPath=${normalizedParent ?? '<root>'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to list Cloudinary folders recursively');
+    }
     for (const folder of rootFolders) {
       if (!visited.has(folder.path)) {
         visited.add(folder.path);
@@ -107,7 +125,7 @@ export class CloudinaryFolderService {
     const normalizedParent = normalizePath(parentPath);
     const folders = recursive
       ? await this.listFoldersRecursive(normalizedParent)
-      : await this.listDirectFolders(normalizedParent);
+      : await this.listFolders(normalizedParent);
 
     const countByPath = recursive
       ? await this.countFoldersUsingSinglePass(folders, normalizedParent)

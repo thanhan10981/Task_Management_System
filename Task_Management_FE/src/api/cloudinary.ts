@@ -6,6 +6,7 @@ import type {
   SaveFileMetadataPayload,
   UploadProgressEvent,
 } from '@/types/cloudinary.types'
+import apiClient from './client'
 import { del, get, post } from './client'
 
 export type {
@@ -23,6 +24,32 @@ interface UploadToCloudinaryOptions {
 
 interface ApiEnvelope<T> {
   data?: T
+}
+
+interface SignedFileAccessPayload {
+  id: string
+  previewUrl?: string
+  downloadUrl?: string
+  fileName?: string
+  expiresInSeconds?: number
+  resourceType?: string
+  format?: string
+}
+
+export interface SignedDownloadAccess {
+  downloadUrl: string
+  fileName: string
+}
+
+interface BackendUploadResponse {
+  id: string
+  originalFilename: string
+  publicId: string
+  resourceType: string
+  format: string
+  projectId: string
+  taskId?: string
+  secureUrl: string
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -55,12 +82,12 @@ function extractFilesFromPayload(payload: unknown): CloudinaryFileMetadata[] | n
 }
 
 export function normalizeFolderPath(path?: string | null): string {
-  return (path ?? '').trim().replace(/^\/+|\/+$/g, '')
+  return (path ?? '').trim().replace(/^\/+|\/+$/g, '').toLowerCase()
 }
 
 export function buildProjectScopedFolderPath(projectId: string, folderPath?: string | null): string {
   const normalizedFolderPath = normalizeFolderPath(folderPath)
-  return normalizedFolderPath ? `project-${projectId}/${normalizedFolderPath}` : `project-${projectId}`
+  return normalizedFolderPath ? `projects/${projectId}/${normalizedFolderPath}` : `projects/${projectId}`
 }
 
 function unwrapApiPayload<T>(response: T | ApiEnvelope<T>): T {
@@ -194,6 +221,62 @@ export async function saveUploadedFileMetadata(payload: SaveFileMetadataPayload)
   await post('/files', payload)
 }
 
+export async function uploadProjectFileToBackend(
+  projectId: string,
+  file: File,
+  options?: { taskId?: string; folderPath?: string },
+): Promise<CloudinaryUploadResult> {
+  const formData = new FormData()
+  formData.append('projectId', projectId)
+  if (options?.taskId) {
+    formData.append('taskId', options.taskId)
+  }
+
+  const normalizedFolderPath = normalizeFolderPath(options?.folderPath)
+  if (normalizedFolderPath) {
+    formData.append('folderPath', normalizedFolderPath)
+  }
+  formData.append('file', file)
+
+  let response
+  try {
+    response = await apiClient.post<BackendUploadResponse | ApiEnvelope<BackendUploadResponse>>('/files/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 60000,
+    })
+  } catch (error) {
+    if (isAxiosTimeoutError(error)) {
+      throw new Error('Upload request timed out. File may still be uploaded. Refreshing list...')
+    }
+
+    throw error
+  }
+
+  const payload = unwrapApiPayload(response.data)
+
+  return {
+    publicId: payload.publicId,
+    url: payload.secureUrl,
+    secureUrl: payload.secureUrl,
+    format: payload.format,
+    resourceType: payload.resourceType,
+    bytes: file.size,
+    folder: payload.publicId.split('/').slice(0, -1).join('/'),
+    originalFilename: payload.originalFilename,
+  }
+}
+
+function isAxiosTimeoutError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false
+  }
+
+  const payload = error as { code?: string; message?: string }
+  return payload.code === 'ECONNABORTED' || payload.message?.toLowerCase().includes('timeout') === true
+}
+
 export async function getUploadedFileMetadata(
   projectId: string,
   folderPath?: string,
@@ -271,4 +354,29 @@ export async function getFolderMetadata(projectId: string): Promise<CloudinaryFo
 
 export async function deleteFileMetadata(fileId: string): Promise<void> {
   await del(`/files/${fileId}`)
+}
+
+export async function getFilePreviewUrl(fileId: string): Promise<string> {
+  const response = await get<SignedFileAccessPayload | ApiEnvelope<SignedFileAccessPayload>>(`/files/${fileId}/view`)
+  const payload = unwrapApiPayload(response)
+
+  if (!payload?.previewUrl) {
+    throw new Error('Preview URL is missing from server response')
+  }
+
+  return payload.previewUrl
+}
+
+export async function getFileDownloadUrl(fileId: string): Promise<SignedDownloadAccess> {
+  const response = await get<SignedFileAccessPayload | ApiEnvelope<SignedFileAccessPayload>>(`/files/${fileId}/download`)
+  const payload = unwrapApiPayload(response)
+
+  if (!payload?.downloadUrl) {
+    throw new Error('Download URL is missing from server response')
+  }
+
+  return {
+    downloadUrl: payload.downloadUrl,
+    fileName: payload.fileName || 'file',
+  }
 }

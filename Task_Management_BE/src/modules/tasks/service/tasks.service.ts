@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -13,18 +14,36 @@ export class TasksService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, createTaskDto: CreateTaskDto) {
-    const task = await this.prisma.task.create({
-      data: {
-        title: createTaskDto.title,
-        description: createTaskDto.description,
-        priority: createTaskDto.priority || 'MEDIUM',
-        projectId: createTaskDto.projectId,
-        statusId: createTaskDto.statusId,
-        dueDate: createTaskDto.dueDate ? new Date(createTaskDto.dueDate) : null,
-        startDate: createTaskDto.startDate ? new Date(createTaskDto.startDate) : null,
-        createdBy: userId,
-      },
-      include: { createdByUser: true, status: true, project: true },
+    const assigneeIds = this.normalizeAssigneeIds(createTaskDto.assigneeIds);
+    await this.ensureUsersExist(assigneeIds, 'One or more selected assignees do not exist');
+
+    const task = await this.prisma.$transaction(async (tx) => {
+      const createdTask = await tx.task.create({
+        data: {
+          title: createTaskDto.title,
+          description: createTaskDto.description,
+          priority: createTaskDto.priority || 'MEDIUM',
+          projectId: createTaskDto.projectId,
+          statusId: createTaskDto.statusId,
+          dueDate: createTaskDto.dueDate ? new Date(createTaskDto.dueDate) : null,
+          startDate: createTaskDto.startDate ? new Date(createTaskDto.startDate) : null,
+          createdBy: userId,
+        },
+        include: { createdByUser: true, status: true, project: true, assignees: true },
+      });
+
+      if (assigneeIds.length > 0) {
+        await tx.taskAssignee.createMany({
+          data: assigneeIds.map((assigneeId) => ({
+            taskId: createdTask.id,
+            userId: assigneeId,
+            assignedBy: userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return createdTask;
     });
 
     return this.mapTaskResponse(task);
@@ -141,7 +160,16 @@ export class TasksService {
       throw new ForbiddenException('You do not have access to this task');
     }
 
-    const updateData: any = { ...updateTaskDto };
+    const assigneeIds = this.normalizeAssigneeIds(updateTaskDto.assigneeIds);
+    await this.ensureUsersExist(assigneeIds, 'One or more selected assignees do not exist');
+
+    const updateData: any = {
+      title: updateTaskDto.title,
+      description: updateTaskDto.description,
+      statusId: updateTaskDto.statusId,
+      priority: updateTaskDto.priority,
+      parentTaskId: updateTaskDto.parentTaskId,
+    };
     if (updateTaskDto.dueDate) {
       updateData.dueDate = new Date(updateTaskDto.dueDate);
     }
@@ -150,9 +178,22 @@ export class TasksService {
     }
     updateData.updatedBy = userId;
 
-    await this.prisma.task.update({
-      where: { id },
-      data: updateData,
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.update({
+        where: { id },
+        data: updateData,
+      });
+
+      if (assigneeIds.length > 0) {
+        await tx.taskAssignee.createMany({
+          data: assigneeIds.map((assigneeId) => ({
+            taskId: id,
+            userId: assigneeId,
+            assignedBy: userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
     });
 
     return this.findOne(userId, id);
@@ -205,5 +246,27 @@ export class TasksService {
 
   private mapTaskResponse(task: any) {
     return task;
+  }
+
+  private normalizeAssigneeIds(assigneeIds?: string[]) {
+    return Array.from(new Set(assigneeIds ?? []));
+  }
+
+  private async ensureUsersExist(userIds: string[], errorMessage: string) {
+    if (userIds.length === 0) {
+      return;
+    }
+
+    const existingUsersCount = await this.prisma.user.count({
+      where: {
+        id: {
+          in: userIds,
+        },
+      },
+    });
+
+    if (existingUsersCount !== userIds.length) {
+      throw new BadRequestException(errorMessage);
+    }
   }
 }

@@ -1,7 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateFileRecordDto } from '../dto/create-file-record.dto';
-import { CloudinaryAdminService } from './cloudinary-admin.service';
+import { UploadProjectFileDto } from '../dto/upload-project-file.dto';
+import { FilesRepository } from '../repository/files.repository';
+import { CloudinaryFileManagerService } from './cloudinary-file-manager.service';
 
 interface ListCloudinaryResourcesParams {
   projectId: string;
@@ -14,17 +16,28 @@ interface CreateCloudinaryFolderParams {
   path: string;
 }
 
-const PROJECT_FOLDER_PREFIX = 'project';
+type UploadedProjectFile = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+};
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cloudinaryAdminService: CloudinaryAdminService,
+    private readonly filesRepository: FilesRepository,
+    private readonly cloudinaryFileManagerService: CloudinaryFileManagerService,
   ) {}
 
   async create(userId: string, dto: CreateFileRecordDto) {
-    const normalizedFolderPath = this.resolveLogicalFolderPath(dto.projectId, dto.folderPath, dto.publicId);
+    const normalizedFolderPath = this.cloudinaryFileManagerService.resolveLogicalFolderPath(
+      dto.projectId,
+      dto.folderPath,
+      dto.publicId,
+    );
 
     await this.ensureProjectAccess(userId, dto.projectId);
 
@@ -35,41 +48,37 @@ export class FilesService {
       }
     }
 
-    const cloudinaryAsset = await this.cloudinaryAdminService.getResource(dto.publicId, dto.resourceType);
+    const cloudinaryAsset = await this.cloudinaryFileManagerService.getResource(dto.publicId, dto.resourceType);
 
     if (!cloudinaryAsset) {
       throw new BadRequestException('Cloudinary asset does not exist or is not accessible');
     }
 
-    const file = await this.prisma.file.create({
-      data: {
-        fileName: dto.fileName || this.extractFileName(dto.publicId),
-        fileUrl: cloudinaryAsset.secure_url ?? dto.secureUrl,
-        fileType: cloudinaryAsset.format ?? dto.format,
-        fileCategory: cloudinaryAsset.resource_type ?? dto.resourceType,
-        storageKey: dto.publicId,
-        folderPath: normalizedFolderPath,
-        sizeBytes: typeof cloudinaryAsset.bytes === 'number'
-          ? BigInt(cloudinaryAsset.bytes)
-          : typeof dto.sizeBytes === 'number'
-            ? BigInt(dto.sizeBytes)
-            : undefined,
-        projectId: dto.projectId,
-        taskId: dto.taskId,
-        commentId: dto.commentId,
-        uploadedBy: userId,
-      },
-      select: {
-        id: true,
-        fileName: true,
-        fileUrl: true,
-        storageKey: true,
-        fileType: true,
-        fileCategory: true,
-        folderPath: true,
-        sizeBytes: true,
-        createdAt: true,
-      },
+    if (!cloudinaryAsset.public_id) {
+      throw new BadRequestException('Cloudinary asset public ID is missing');
+    }
+
+    this.logger.log(`Saving metadata from Cloudinary canonical publicId=${cloudinaryAsset.public_id} (requested=${dto.publicId})`);
+
+    const file = await this.filesRepository.createFileMetadata({
+      fileName: dto.fileName || this.cloudinaryFileManagerService.extractFileName(cloudinaryAsset.public_id),
+      fileUrl: cloudinaryAsset.secure_url ?? dto.secureUrl,
+      fileType: cloudinaryAsset.format
+        ?? dto.format
+        ?? this.cloudinaryFileManagerService.extractFileExtension(dto.fileName)
+        ?? this.cloudinaryFileManagerService.extractFileExtension(cloudinaryAsset.public_id),
+      fileCategory: cloudinaryAsset.resource_type ?? dto.resourceType,
+      storageKey: cloudinaryAsset.public_id,
+      folderPath: normalizedFolderPath,
+      sizeBytes: typeof cloudinaryAsset.bytes === 'number'
+        ? BigInt(cloudinaryAsset.bytes)
+        : typeof dto.sizeBytes === 'number'
+          ? BigInt(dto.sizeBytes)
+          : undefined,
+      projectId: dto.projectId,
+      taskId: dto.taskId,
+      commentId: dto.commentId,
+      uploadedBy: userId,
     });
 
     return {
@@ -77,26 +86,193 @@ export class FilesService {
       fileName: file.fileName,
       secureUrl: file.fileUrl,
       publicId: file.storageKey,
-      format: file.fileType,
-      resourceType: file.fileCategory,
+      format: this.cloudinaryFileManagerService.normalizeStoredFormat(file.fileType, file.fileName, file.storageKey),
+      resourceType: this.cloudinaryFileManagerService.normalizeStoredResourceType(
+        file.fileCategory,
+        file.fileName,
+        file.fileType,
+      ),
       folderPath: file.folderPath,
-      sizeBytes: file.sizeBytes ? Number(file.sizeBytes) : 0,
+      sizeBytes: this.serializeSizeBytes(file.sizeBytes),
       createdAt: file.createdAt,
       uploadedBy: userId,
       canSaveToProject: true,
     };
   }
 
+  async uploadProjectFile(userId: string, dto: UploadProjectFileDto, file: UploadedProjectFile) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    await this.ensureProjectAccess(userId, dto.projectId);
+
+    if (dto.taskId) {
+      const task = await this.ensureTaskAccess(userId, dto.taskId);
+      if (task.projectId !== dto.projectId) {
+        throw new BadRequestException('Task does not belong to the provided project');
+      }
+    }
+
+    const logicalFolderPath = this.cloudinaryFileManagerService.normalizePath(dto.folderPath) || 'tasks';
+
+    const uploadedAsset = await this.cloudinaryFileManagerService.uploadProjectTaskFile({
+      fileBuffer: file.buffer,
+      originalFilename: file.originalname,
+      mimeType: file.mimetype,
+      projectId: dto.projectId,
+      folderPath: logicalFolderPath,
+    });
+
+    this.logger.log(`Uploaded to Cloudinary with publicId=${uploadedAsset.public_id}, resourceType=${uploadedAsset.resource_type}, format=${uploadedAsset.format}`);
+
+    const fileRecord = await this.filesRepository.createFileMetadata({
+      fileName: file.originalname,
+      fileUrl: uploadedAsset.secure_url,
+      fileType: uploadedAsset.format ?? this.cloudinaryFileManagerService.extractFileExtension(file.originalname),
+      fileCategory: uploadedAsset.resource_type,
+      storageKey: uploadedAsset.public_id,
+      folderPath: this.cloudinaryFileManagerService.resolveLogicalFolderPath(
+        dto.projectId,
+        logicalFolderPath,
+        uploadedAsset.public_id,
+      ),
+      sizeBytes: typeof uploadedAsset.bytes === 'number' ? BigInt(uploadedAsset.bytes) : undefined,
+      projectId: dto.projectId,
+      taskId: dto.taskId,
+      uploadedBy: userId,
+    });
+
+    return {
+      id: fileRecord.id,
+      originalFilename: fileRecord.fileName,
+      publicId: fileRecord.storageKey,
+      resourceType: this.cloudinaryFileManagerService.normalizeStoredResourceType(
+        fileRecord.fileCategory,
+        fileRecord.fileName,
+        fileRecord.fileType,
+      ),
+      format: this.cloudinaryFileManagerService.normalizeStoredFormat(
+        fileRecord.fileType,
+        fileRecord.fileName,
+        fileRecord.storageKey,
+      ),
+      projectId: fileRecord.projectId,
+      taskId: fileRecord.taskId,
+      secureUrl: fileRecord.fileUrl,
+    };
+  }
+
+  async getSecurePreviewUrl(userId: string, fileId: string) {
+    const file = await this.filesRepository.findActiveFileById(fileId, userId);
+
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    if (!file.storageKey) {
+      throw new BadRequestException('File metadata is missing public ID');
+    }
+
+    await this.ensureProjectAccess(userId, file.projectId);
+
+    const previewOptions = this.cloudinaryFileManagerService.detectPreviewOptions(
+      file.fileName,
+      file.fileType,
+      file.fileCategory,
+      file.storageKey,
+    );
+
+    if (!previewOptions.canPreview) {
+      throw new BadRequestException('Preview is only available for image resources');
+    }
+
+    const expiresInSeconds = this.cloudinaryFileManagerService.getDefaultAuthenticatedUrlTtlSeconds();
+
+    this.logger.log(`Generating preview URL for fileId=${file.id}, publicId=${file.storageKey}`);
+
+    const previewUrl = await this.cloudinaryFileManagerService.createPreviewUrl({
+      publicId: file.storageKey,
+      resourceType: previewOptions.resourceType,
+      format: previewOptions.format,
+      expiresInSeconds,
+    });
+
+    return {
+      id: file.id,
+      previewUrl,
+      expiresInSeconds,
+      resourceType: previewOptions.resourceType,
+      format: previewOptions.format,
+    };
+  }
+
+  async getSecureDownloadUrl(userId: string, fileId: string) {
+    const file = await this.filesRepository.findActiveFileById(fileId, userId);
+
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    if (!file.storageKey) {
+      throw new BadRequestException('File metadata is missing public ID');
+    }
+
+    await this.ensureProjectAccess(userId, file.projectId);
+
+    const expiresInSeconds = this.cloudinaryFileManagerService.getDefaultAuthenticatedUrlTtlSeconds();
+
+    const resourceType = this.cloudinaryFileManagerService.toAllowedResourceType(file.fileCategory);
+    const normalizedFormat = this.cloudinaryFileManagerService.resolveDownloadFormat(
+      file.fileName,
+      file.fileType,
+      resourceType,
+      file.storageKey,
+    );
+
+    this.logger.log(`Generating download URL for fileId=${file.id}, publicId=${file.storageKey}, resourceType=${resourceType}`);
+
+    const downloadUrl = await this.cloudinaryFileManagerService.createDownloadUrl({
+      publicId: file.storageKey,
+      resourceType,
+      format: normalizedFormat,
+      fileName: file.fileName,
+      expiresInSeconds,
+    });
+
+    const resolvedFileName = this.cloudinaryFileManagerService.resolveDownloadFileName(
+      file.fileName,
+      normalizedFormat,
+      file.storageKey,
+    );
+
+    return {
+      id: file.id,
+      downloadUrl,
+      fileName: resolvedFileName,
+      expiresInSeconds,
+      resourceType,
+      format: normalizedFormat,
+    };
+  }
+
   async list(userId: string, projectId: string, folderPath?: string) {
     await this.ensureProjectAccess(userId, projectId);
 
-    const normalizedFolderPath = this.normalizePath(folderPath);
+    const normalizedFolderPath = this.cloudinaryFileManagerService.normalizePath(folderPath);
 
     const files = await this.prisma.file.findMany({
       where: {
         projectId,
         isDeleted: false,
-        ...(normalizedFolderPath ? { folderPath: normalizedFolderPath } : {}),
+        ...(normalizedFolderPath
+          ? {
+              folderPath: {
+                equals: normalizedFolderPath,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
       },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -118,9 +294,13 @@ export class FilesService {
         fileName: file.fileName,
         secureUrl: file.fileUrl,
         publicId: file.storageKey ?? file.id,
-        format: file.fileType ?? '',
-        resourceType: file.fileCategory ?? 'raw',
-        bytes: file.sizeBytes ? Number(file.sizeBytes) : 0,
+        format: this.cloudinaryFileManagerService.normalizeStoredFormat(file.fileType, file.fileName, file.storageKey) ?? '',
+        resourceType: this.cloudinaryFileManagerService.normalizeStoredResourceType(
+          file.fileCategory,
+          file.fileName,
+          file.fileType,
+        ),
+        bytes: this.serializeSizeBytes(file.sizeBytes),
         createdAt: file.createdAt,
         uploadedBy: file.uploadedBy,
         isSaved: true,
@@ -132,27 +312,25 @@ export class FilesService {
   async listCloudinaryFolders(userId: string, projectId: string, parentPath?: string, recursive = false) {
     await this.ensureProjectAccess(userId, projectId);
 
-    const normalizedParentPath = this.normalizePath(parentPath);
-    const scopedParentPath = this.toScopedFolderPath(projectId, normalizedParentPath);
+    const normalizedParentPath = this.cloudinaryFileManagerService.normalizePath(parentPath);
+    const scopedParentPath = this.cloudinaryFileManagerService.toScopedFolderPath(projectId, normalizedParentPath);
 
     const mergedPaths = new Set<string>();
-    const cloudinaryFolders = recursive
-      ? await this.cloudinaryAdminService.listFoldersRecursive(scopedParentPath)
-      : await this.cloudinaryAdminService.listFolders(scopedParentPath);
+    const cloudinaryFolders = await this.cloudinaryFileManagerService.listFolders(scopedParentPath, recursive);
 
     for (const cloudFolder of cloudinaryFolders) {
-      const logicalPath = this.toLogicalFolderPath(projectId, cloudFolder.path);
+      const logicalPath = this.cloudinaryFileManagerService.toLogicalFolderPath(projectId, cloudFolder.path);
       if (!logicalPath) {
         continue;
       }
 
       if (recursive) {
-        const descendantPath = this.deriveDescendantPath(logicalPath, normalizedParentPath);
+        const descendantPath = this.cloudinaryFileManagerService.deriveDescendantPath(logicalPath, normalizedParentPath);
         if (descendantPath) {
           mergedPaths.add(descendantPath);
         }
       } else {
-        const directChild = this.deriveDirectChildPath(logicalPath, normalizedParentPath);
+        const directChild = this.cloudinaryFileManagerService.deriveDirectChildPath(logicalPath, normalizedParentPath);
         if (directChild) {
           mergedPaths.add(directChild);
         }
@@ -177,34 +355,26 @@ export class FilesService {
       }
 
       if (recursive) {
-        const descendantPath = this.deriveDescendantPath(dbFolder.folderPath, normalizedParentPath);
+        const descendantPath = this.cloudinaryFileManagerService.deriveDescendantPath(
+          dbFolder.folderPath,
+          normalizedParentPath,
+        );
         if (descendantPath) {
           mergedPaths.add(descendantPath);
         }
       } else {
-        const directChild = this.deriveDirectChildPath(dbFolder.folderPath, normalizedParentPath);
+        const directChild = this.cloudinaryFileManagerService.deriveDirectChildPath(
+          dbFolder.folderPath,
+          normalizedParentPath,
+        );
         if (directChild) {
           mergedPaths.add(directChild);
         }
       }
     }
 
-    const countByPath = new Map<string, number>();
-
     const folderPaths = [...mergedPaths];
-    await Promise.all(
-      folderPaths.map(async (path) => {
-        const fileCount = await this.prisma.file.count({
-          where: {
-            projectId,
-            isDeleted: false,
-            folderPath: path,
-          },
-        });
-
-        countByPath.set(path, fileCount);
-      }),
-    );
+    const countByPath = await this.countFilesByFolderPath(projectId, folderPaths);
 
     const folders = [...mergedPaths]
       .sort((a, b) => a.localeCompare(b))
@@ -224,7 +394,7 @@ export class FilesService {
   async listCloudinaryResources(userId: string, params: ListCloudinaryResourcesParams) {
     await this.ensureProjectAccess(userId, params.projectId);
 
-    const normalizedFolderPath = this.normalizePath(params.folderPath);
+    const normalizedFolderPath = this.cloudinaryFileManagerService.normalizePath(params.folderPath);
     const includeDescendants = params.includeDescendants ?? true;
     const savedFiles = await this.prisma.file.findMany({
       where: {
@@ -234,11 +404,26 @@ export class FilesService {
           ? includeDescendants
             ? {
                 OR: [
-                  { folderPath: normalizedFolderPath },
-                  { folderPath: { startsWith: `${normalizedFolderPath}/` } },
+                  {
+                    folderPath: {
+                      equals: normalizedFolderPath,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    folderPath: {
+                      startsWith: `${normalizedFolderPath}/`,
+                      mode: 'insensitive',
+                    },
+                  },
                 ],
               }
-            : { folderPath: normalizedFolderPath }
+            : {
+                folderPath: {
+                  equals: normalizedFolderPath,
+                  mode: 'insensitive',
+                },
+              }
           : {}),
       },
       select: {
@@ -260,18 +445,26 @@ export class FilesService {
     return {
       files: savedFiles.map((savedFile) => ({
         id: savedFile.id,
-        fileName: savedFile.fileName ?? this.extractFileName(savedFile.storageKey ?? ''),
+        fileName: savedFile.fileName ?? this.cloudinaryFileManagerService.extractFileName(savedFile.storageKey ?? ''),
         publicId: savedFile.storageKey ?? '',
-        format: savedFile.fileType ?? '',
-        resourceType: savedFile.fileCategory ?? 'raw',
-        bytes: savedFile.sizeBytes ? Number(savedFile.sizeBytes) : 0,
+        format: this.cloudinaryFileManagerService.normalizeStoredFormat(
+          savedFile.fileType,
+          savedFile.fileName,
+          savedFile.storageKey,
+        ) ?? '',
+        resourceType: this.cloudinaryFileManagerService.normalizeStoredResourceType(
+          savedFile.fileCategory,
+          savedFile.fileName,
+          savedFile.fileType,
+        ),
+        bytes: this.serializeSizeBytes(savedFile.sizeBytes),
         secureUrl: savedFile.fileUrl ?? '',
         createdAt: savedFile.createdAt ?? null,
         uploadedBy: savedFile.uploadedBy ?? null,
         isSaved: true,
         canSaveToProject: true,
         projectId: savedFile.projectId,
-        folderPath: this.normalizePath(savedFile.folderPath) ?? '',
+        folderPath: this.cloudinaryFileManagerService.normalizePath(savedFile.folderPath) ?? '',
       })),
       requestedBy: userId,
     };
@@ -280,14 +473,9 @@ export class FilesService {
   async createCloudinaryFolder(userId: string, params: CreateCloudinaryFolderParams) {
     await this.ensureProjectAccess(userId, params.projectId);
 
-    const normalizedPath = this.normalizePath(params.path);
-
-    if (!normalizedPath) {
-      throw new BadRequestException('Folder path is required');
-    }
-
-    const scopedFolderPath = this.toScopedFolderPath(params.projectId, normalizedPath);
-    const folder = await this.cloudinaryAdminService.createFolder(scopedFolderPath);
+    const normalizedPath = this.cloudinaryFileManagerService.ensureFolderPath(params.path);
+    const scopedFolderPath = this.cloudinaryFileManagerService.toScopedFolderPath(params.projectId, normalizedPath);
+    const folder = await this.cloudinaryFileManagerService.createFolder(scopedFolderPath);
 
     return {
       folder: {
@@ -300,140 +488,107 @@ export class FilesService {
   }
 
   async delete(userId: string, fileId: string) {
-    const file = await this.prisma.file.findUnique({
-      where: { id: fileId },
-      select: {
-        id: true,
-        uploadedBy: true,
-        isDeleted: true,
-        storageKey: true,
-        fileCategory: true,
-        projectId: true,
-      },
-    });
+    const file = await this.filesRepository.findActiveFileById(fileId, userId);
 
-    if (!file || file.isDeleted) {
+    if (!file) {
       throw new NotFoundException('File not found');
     }
 
     await this.ensureProjectAccess(userId, file.projectId);
 
-    if (file.uploadedBy !== userId) {
-      throw new ForbiddenException('You do not have permission to delete this file');
-    }
+    let cloudinaryDeleted = false;
 
     if (file.storageKey) {
-      await this.cloudinaryAdminService.deleteAsset(file.storageKey, file.fileCategory ?? 'image');
+      try {
+        await this.cloudinaryFileManagerService.deleteAsset(
+          file.storageKey,
+          this.cloudinaryFileManagerService.toAllowedResourceType(file.fileCategory),
+        );
+        cloudinaryDeleted = true;
+      } catch (error) {
+        this.logger.warn(
+          `Cloudinary delete failed for fileId=${file.id}, publicId=${file.storageKey}. Proceeding with database deletion.`,
+        );
+        if (error instanceof Error) {
+          this.logger.warn(error.message);
+        }
+      }
     }
 
-    await this.prisma.file.update({
-      where: { id: fileId },
-      data: { isDeleted: true },
+    await this.filesRepository.deleteFileById(fileId, userId);
+
+    return {
+      message: cloudinaryDeleted
+        ? 'File deleted from Cloudinary and database'
+        : 'File deleted from database. Cloudinary asset was missing or could not be deleted.',
+    };
+  }
+
+
+  // Convert bigint-like values into JSON-safe primitives while preserving precision for large values.
+  private serializeSizeBytes(sizeBytes?: bigint | string | number | null): number | string {
+    if (sizeBytes === null || sizeBytes === undefined) {
+      return 0;
+    }
+
+    try {
+      const normalized = typeof sizeBytes === 'bigint'
+        ? sizeBytes
+        : typeof sizeBytes === 'number'
+          ? BigInt(sizeBytes)
+          : BigInt(sizeBytes);
+
+      if (normalized <= BigInt(Number.MAX_SAFE_INTEGER)) {
+        return Number(normalized);
+      }
+
+      return normalized.toString();
+    } catch {
+      return 0;
+    }
+  }
+
+
+  private async countFilesByFolderPath(projectId: string, folderPaths: string[]): Promise<Map<string, number>> {
+    if (!folderPaths.length) {
+      return new Map();
+    }
+
+    const uniqueFolders = [
+      ...new Set(
+        folderPaths
+          .map((path) => this.cloudinaryFileManagerService.normalizePath(path))
+          .filter((path): path is string => Boolean(path)),
+      ),
+    ];
+
+    if (!uniqueFolders.length) {
+      return new Map();
+    }
+
+    const grouped = await this.prisma.file.groupBy({
+      by: ['folderPath'],
+      where: {
+        projectId,
+        isDeleted: false,
+        folderPath: { in: uniqueFolders },
+      },
+      _count: {
+        _all: true,
+      },
     });
 
-    return { message: 'File deleted from Cloudinary and database' };
-  }
+    const byPath = new Map<string, number>();
+    for (const row of grouped) {
+      const normalized = this.cloudinaryFileManagerService.normalizePath(row.folderPath);
+      if (!normalized) {
+        continue;
+      }
 
-  private extractFileName(publicId: string) {
-    return publicId.split('/').pop() ?? publicId;
-  }
-
-  private extractFolderPath(publicId: string) {
-    const segments = publicId.split('/').filter(Boolean);
-    if (segments.length <= 1) {
-      return '';
+      byPath.set(normalized, row._count._all);
     }
 
-    return segments.slice(0, -1).join('/');
-  }
-
-  private normalizePath(path?: string | null) {
-    const normalized = path?.trim().replace(/^\/+|\/+$/g, '');
-    return normalized || undefined;
-  }
-
-  private getProjectRootFolder(projectId: string) {
-    return `${PROJECT_FOLDER_PREFIX}-${projectId}`;
-  }
-
-  private toScopedFolderPath(projectId: string, logicalFolderPath?: string) {
-    const root = this.getProjectRootFolder(projectId);
-    const normalizedLogicalPath = this.normalizePath(logicalFolderPath);
-    return normalizedLogicalPath ? `${root}/${normalizedLogicalPath}` : root;
-  }
-
-  private toLogicalFolderPath(projectId: string, folderPath?: string | null) {
-    const normalizedPath = this.normalizePath(folderPath);
-    if (!normalizedPath) {
-      return '';
-    }
-
-    const root = this.getProjectRootFolder(projectId);
-    if (normalizedPath === root) {
-      return '';
-    }
-
-    if (normalizedPath.startsWith(`${root}/`)) {
-      return normalizedPath.slice(root.length + 1);
-    }
-
-    return normalizedPath;
-  }
-
-  private resolveLogicalFolderPath(projectId: string, folderPath?: string | null, publicId?: string | null) {
-    const normalizedFolderPath = this.normalizePath(folderPath);
-    if (normalizedFolderPath) {
-      return this.toLogicalFolderPath(projectId, normalizedFolderPath);
-    }
-
-    if (!publicId) {
-      return undefined;
-    }
-
-    const extracted = this.extractFolderPath(publicId);
-    const logicalPath = this.toLogicalFolderPath(projectId, extracted);
-    return this.normalizePath(logicalPath);
-  }
-
-  private deriveDirectChildPath(path: string | null | undefined, parentPath?: string) {
-    const normalizedPath = this.normalizePath(path);
-    if (!normalizedPath) {
-      return '';
-    }
-
-    const segments = normalizedPath.split('/').filter(Boolean);
-    if (!segments.length) {
-      return '';
-    }
-
-    if (!parentPath) {
-      return segments[0] ?? '';
-    }
-
-    const parentSegments = parentPath.split('/').filter(Boolean);
-    const isUnderParent = parentSegments.every((segment, index) => segments[index] === segment);
-    if (!isUnderParent || segments.length <= parentSegments.length) {
-      return '';
-    }
-
-    return [...parentSegments, segments[parentSegments.length]].join('/');
-  }
-
-  private deriveDescendantPath(path: string | null | undefined, parentPath?: string) {
-    const normalizedPath = this.normalizePath(path);
-    if (!normalizedPath) {
-      return '';
-    }
-
-    if (!parentPath) {
-      return normalizedPath;
-    }
-
-    const parentSegments = parentPath.split('/').filter(Boolean);
-    const pathSegments = normalizedPath.split('/').filter(Boolean);
-    const isUnderParent = parentSegments.every((segment, index) => pathSegments[index] === segment);
-
-    return isUnderParent ? normalizedPath : '';
+    return byPath;
   }
 
   private async ensureProjectAccess(userId: string, projectId: string) {

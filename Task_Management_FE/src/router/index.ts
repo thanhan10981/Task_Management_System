@@ -70,6 +70,12 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
+    path: '/files/open/:id',
+    name: 'file-open',
+    component: () => import('@/features/files/views/FileOpenRedirectView.vue'),
+    meta: { title: 'Opening File', requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/features/errors/views/NotFoundView.vue'),

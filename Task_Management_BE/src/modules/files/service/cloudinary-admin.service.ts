@@ -3,6 +3,7 @@ import {
   CloudinaryFolderPayload,
   CloudinaryFolderWithCountPayload,
   CloudinaryResourcePayload,
+  CloudinaryResourceType,
 } from '../types/cloudinary.types';
 import { CloudinaryFolderService } from './cloudinary-folder.service';
 import { CloudinaryResourceService } from './cloudinary-resource.service';
@@ -14,7 +15,7 @@ export class CloudinaryAdminService {
     private readonly cloudinaryResourceService: CloudinaryResourceService,
   ) {}
 
-  async deleteAsset(publicId: string, resourceType = 'image') {
+  async deleteAsset(publicId: string, resourceType: CloudinaryResourceType = 'image') {
     return this.cloudinaryResourceService.deleteAsset(publicId, resourceType);
   }
 

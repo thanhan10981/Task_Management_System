@@ -1,10 +1,36 @@
-import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { BadRequestException, Body, Controller, Delete, Get, HttpStatus, Param, ParseUUIDPipe, Post, Query, Request, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiCookieAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CreateCloudinaryFolderDto } from '../dto/create-cloudinary-folder.dto';
 import { CreateFileRecordDto } from '../dto/create-file-record.dto';
 import { ProjectScopedFilesQueryDto } from '../dto/project-scoped-files-query.dto';
+import { UploadProjectFileDto } from '../dto/upload-project-file.dto';
 import { FilesService } from '../service/files.service';
+
+type UploadedProjectFile = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+};
+
+function normalizeUploadedFileName(fileName: string) {
+  const trimmedName = fileName.trim();
+  if (!trimmedName) {
+    return 'file';
+  }
+  const looksLikeMojibake = /Ã.|Â.|á»|â€|â€™|â€œ/u.test(trimmedName);
+  if (!looksLikeMojibake) {
+    return trimmedName;
+  }
+
+  try {
+    const decoded = Buffer.from(trimmedName, 'latin1').toString('utf8').trim();
+    return decoded || trimmedName;
+  } catch {
+    return trimmedName;
+  }
+}
 
 @ApiTags('Files')
 @ApiCookieAuth('accessToken')
@@ -19,6 +45,40 @@ export class FilesController {
   @ApiResponse({ status: HttpStatus.CREATED, description: 'File metadata saved successfully' })
   create(@Request() req, @Body() dto: CreateFileRecordDto) {
     return this.filesService.create(req.user.id, dto);
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload PDF/DOCX file to Cloudinary (authenticated) and store metadata' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['projectId', 'file'],
+      properties: {
+        projectId: { type: 'string', format: 'uuid' },
+        taskId: { type: 'string', format: 'uuid' },
+        folderPath: { type: 'string', example: 'attachments' },
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'File uploaded and metadata saved successfully' })
+  upload(
+    @Request() req,
+    @Body() dto: UploadProjectFileDto,
+    @UploadedFile() file: UploadedProjectFile,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const normalizedFile: UploadedProjectFile = {
+      ...file,
+      originalname: normalizeUploadedFileName(file.originalname),
+    };
+
+    return this.filesService.uploadProjectFile(req.user.id, dto, normalizedFile);
   }
 
   @Get()
@@ -75,5 +135,21 @@ export class FilesController {
   @ApiResponse({ status: HttpStatus.OK, description: 'File deleted successfully' })
   delete(@Request() req, @Param('id') id: string) {
     return this.filesService.delete(req.user.id, id);
+  }
+
+  @Get(':id/view')
+  @ApiOperation({ summary: 'Get signed preview URL for a PDF file (expires in 5 minutes)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Signed preview URL generated successfully' })
+  view(@Request() req, @Param('id', ParseUUIDPipe) id: string) {
+    return this.filesService.getSecurePreviewUrl(req.user.id, id);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: 'Get signed secure download URL for file (expires in 5 minutes)' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Signed download URL generated successfully' })
+  download(@Request() req, @Param('id', ParseUUIDPipe) id: string) {
+    return this.filesService.getSecureDownloadUrl(req.user.id, id);
   }
 }

@@ -55,11 +55,9 @@
 
 <script setup lang="ts">
 import {
-  buildProjectScopedFolderPath,
-  type CloudinaryUploadResult,
   normalizeFolderPath,
-  saveUploadedFileMetadata,
-  uploadToCloudinary,
+  type CloudinaryUploadResult,
+  uploadProjectFileToBackend,
 } from '@/api/cloudinary'
 import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
@@ -111,6 +109,7 @@ async function processFiles(files: File[]) {
   }
 
   const uploadedResults: CloudinaryUploadResult[] = []
+  let hasTimeoutLikeError = false
 
   for (const file of files) {
     if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -134,11 +133,10 @@ async function processFiles(files: File[]) {
     uploadQueue.value.unshift(queueItem)
 
     try {
-      const logicalFolderPath = normalizeFolderPath(props.folder)
-      const scopedFolderPath = buildProjectScopedFolderPath(projectIdAtStart, logicalFolderPath)
-      const result = await uploadToCloudinary(file, scopedFolderPath, (evt) => {
-        queueItem.progress = evt.percentage
+      const result = await uploadProjectFileToBackend(projectIdAtStart, file, {
+        folderPath: normalizeFolderPath(props.folder) || undefined,
       })
+      queueItem.progress = 100
 
       queueItem.status = 'cloudinary-success'
       queueItem.progress = 100
@@ -146,37 +144,28 @@ async function processFiles(files: File[]) {
       uploadedResults.push(result)
 
       queueItem.status = 'saving-metadata'
-      try {
-        await saveUploadedFileMetadata({
-          fileName: result.originalFilename || extractFileName(result.publicId),
-          secureUrl: result.secureUrl,
-          publicId: result.publicId,
-          projectId: projectIdAtStart,
-          format: result.format,
-          resourceType: result.resourceType,
-          folderPath: logicalFolderPath,
-          sizeBytes: result.bytes,
-        })
-        queueItem.status = 'success'
-      } catch (metadataError) {
-        queueItem.status = 'error'
-        queueItem.error = metadataError instanceof Error ? metadataError.message : 'Metadata sync failed'
-        console.error('[CloudinaryUploader] Metadata sync failed', metadataError)
-        continue
-      }
+      queueItem.status = 'success'
     } catch (error) {
       queueItem.status = 'error'
       queueItem.error = error instanceof Error ? error.message : 'Upload or metadata sync failed'
+      if (isUploadTimeoutLikeError(error)) {
+        hasTimeoutLikeError = true
+      }
     }
   }
 
-  if (uploadedResults.length) {
+  if (uploadedResults.length || hasTimeoutLikeError) {
     emit('uploaded', uploadedResults)
   }
 }
 
-function extractFileName(publicId: string) {
-  return publicId.split('/').pop() ?? publicId
+function isUploadTimeoutLikeError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  const message = error.message.toLowerCase()
+  return message.includes('timed out') || message.includes('timeout')
 }
 
 function uploadStatusLabel(status: UploadQueueItem['status'], progress: number) {

@@ -183,14 +183,14 @@
                   </td>
                   <td>
                     <div class="file-actions">
-                      <button class="action-btn action-btn--open" title="Open" @click="openFile(file.secureUrl)">
+                      <button class="action-btn action-btn--open" title="Open" @click="openFile(file)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                       </button>
                       <button
                         class="action-btn action-btn--delete"
                         :disabled="deletingFile === file.id"
                         title="Delete"
-                        @click="deleteFile(file)"
+                        @click="requestDelete(file)"
                       >
                         <svg v-if="deletingFile !== file.id" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                         <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/></svg>
@@ -298,11 +298,53 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- ── Delete File Modal ─────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div
+          v-if="showDeleteConfirm"
+          class="modal-overlay"
+          @click.self="closeDeleteConfirm"
+        >
+          <div class="modal-box">
+            <div class="modal-icon modal-icon--danger">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18"/>
+                <path d="M8 6V4h8v2"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/>
+                <path d="M14 11v6"/>
+              </svg>
+            </div>
+            <h3 class="modal-title">Delete File</h3>
+            <p class="modal-desc">
+              Are you sure you want to delete
+              <code>{{ pendingDeleteFileName }}</code>
+              ?
+            </p>
+
+            <div class="modal-actions">
+              <button class="btn-ghost" :disabled="confirmingDelete" @click="closeDeleteConfirm">Cancel</button>
+              <button
+                class="btn-danger"
+                :disabled="confirmingDelete"
+                @click="confirmDelete"
+              >
+                <svg v-if="confirmingDelete" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/></svg>
+                {{ confirmingDelete ? 'Deleting...' : 'Delete' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import CloudinaryUploader from '../components/CloudinaryUploader.vue'
 import {
   createCloudinaryFolder,
@@ -317,6 +359,7 @@ import { useFiles } from '../composables/useFiles'
 import { useFolders } from '../composables/useFolders'
 import { useStorage } from '../composables/useStorage'
 import { storeToRefs } from 'pinia'
+import type { CloudinaryFile } from '../types/files-view.types'
 import {
   extractErrorMessage,
   fileName,
@@ -332,6 +375,7 @@ import {
 const DEFAULT_FOLDER = ''
 const MAX_FOLDER_REFRESH_RETRY = 3
 const FOLDER_REFRESH_DELAY_MS = 350
+const DOWNLOAD_EVENT_KEY = 'tms:file-download-event'
 
 const currentFolder = ref(DEFAULT_FOLDER)
 
@@ -339,8 +383,20 @@ const creatingFolder = ref(false)
 const showCreateFolder = ref(false)
 const newFolderName = ref('')
 const uploaderRef = ref<HTMLElement | null>(null)
+const showDeleteConfirm = ref(false)
+const confirmingDelete = ref(false)
+const pendingDeleteFile = ref<CloudinaryFile | null>(null)
+const pendingDeleteFileName = computed(() => {
+  const file = pendingDeleteFile.value
+  if (!file) {
+    return 'this file'
+  }
+
+  return (file.fileName || fileName(file.publicId) || 'this file').trim()
+})
 
 const toast = useToast()
+const router = useRouter()
 const queryClient = useQueryClient()
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
@@ -398,10 +454,16 @@ async function loadAllData() {
 }
 
 onMounted(async () => {
+  window.addEventListener('storage', handleStorageEvent)
+
   if (!currentProjectId.value) {
     return
   }
   await loadAllData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', handleStorageEvent)
 })
 
 watch(currentProjectId, async () => {
@@ -488,8 +550,89 @@ function triggerUploader() {
   uploaderRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
-function openFile(url: string) { window.open(url, '_blank', 'noopener,noreferrer') }
+function openFile(file: {
+  id: string | null
+  format?: string | null
+  resourceType?: string | null
+  fileName?: string | null
+  publicId?: string | null
+  secureUrl: string
+}) {
+  if (!file.id) {
+    window.open(file.secureUrl, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  const normalizedFormat = (file.format ?? '').toLowerCase()
+  const normalizedResourceType = (file.resourceType ?? '').toLowerCase()
+  const previewableVideoFormats = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi'])
+  const mode = normalizedResourceType === 'image'
+    || normalizedResourceType === 'video'
+    || previewableVideoFormats.has(normalizedFormat)
+    ? 'preview'
+    : 'download'
+
+  const resolvedRoute = router.resolve({
+    name: 'file-open',
+    params: { id: file.id },
+    query: { mode },
+  })
+
+  const openedWindow = window.open(resolvedRoute.href, '_blank', 'noopener,noreferrer')
+  if (!openedWindow) {
+    toast.error('Browser blocked popup. Please allow popups and try again.')
+  }
+}
+
+function requestDelete(file: CloudinaryFile) {
+  if (!file.id) {
+    return
+  }
+
+  pendingDeleteFile.value = file
+  showDeleteConfirm.value = true
+}
+
+function closeDeleteConfirm() {
+  if (confirmingDelete.value) {
+    return
+  }
+
+  showDeleteConfirm.value = false
+  pendingDeleteFile.value = null
+}
+
+async function confirmDelete() {
+  const file = pendingDeleteFile.value
+  if (!file) {
+    return
+  }
+
+  confirmingDelete.value = true
+  try {
+    await deleteFile(file)
+    showDeleteConfirm.value = false
+    pendingDeleteFile.value = null
+  } finally {
+    confirmingDelete.value = false
+  }
+}
+
 function displayFolderName(path: string) { return normalizeFolderPath(path).split('/').filter(Boolean).pop() ?? 'Root' }
+
+function handleStorageEvent(event: StorageEvent) {
+  if (event.key !== DOWNLOAD_EVENT_KEY || !event.newValue) {
+    return
+  }
+
+  try {
+    const payload = JSON.parse(event.newValue) as { fileName?: string }
+    const fileNameLabel = payload.fileName?.trim() || 'file'
+    toast.success(`Downloaded ${fileNameLabel} successfully`)
+  } catch {
+    toast.success('Downloaded file successfully')
+  }
+}
 </script>
 
 <style scoped>
@@ -575,6 +718,24 @@ function displayFolderName(path: string) { return normalizeFolderPath(path).spli
   transition: background 0.15s;
 }
 .btn-ghost:hover { background: #f8fafc; }
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-danger:hover { background: #dc2626; }
+.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ─── Grid layout ─────────────────────────────────────────────── */
 .files-grid {
@@ -892,6 +1053,10 @@ function displayFolderName(path: string) { return normalizeFolderPath(path).spli
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 18px;
   color: #6366f1;
+}
+.modal-icon--danger {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #dc2626;
 }
 .modal-title { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0 0 6px; }
 .modal-desc { font-size: 13px; color: #94a3b8; margin: 0 0 20px; }

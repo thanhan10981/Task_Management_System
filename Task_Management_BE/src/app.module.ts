@@ -8,7 +8,6 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { SprintsModule } from './modules/sprints/sprints.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UserModule } from './modules/user/user.module';
-import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
 import { FilesModule } from './modules/files/files.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -29,7 +28,6 @@ import { validate } from './config/validateion.schema';
     SprintsModule,
     TasksModule,
     UserModule,
-    CloudinaryModule,
     FilesModule,
   ],
   controllers: [AppController],

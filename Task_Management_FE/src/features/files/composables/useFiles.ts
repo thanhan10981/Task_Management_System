@@ -187,7 +187,7 @@ export function useFiles(options: UseFilesOptions) {
   async function deleteFile(file: CloudinaryFile) {
     const fileId = file.id
     if (!fileId) return
-    if (!confirm('Are you sure you want to delete this file?')) return
+    const displayName = (file.fileName || fileName(file.publicId) || 'this file').trim()
 
     deletingFile.value = fileId
     try {
@@ -195,7 +195,7 @@ export function useFiles(options: UseFilesOptions) {
       if (currentProjectId.value) {
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
       }
-      toast.success('File deleted')
+      toast.success(`Deleted "${displayName}" successfully`)
       await Promise.all([loadFiles(), loadAllFiles()])
     } catch (error) {
       toast.error(errorMessage(error, 'Cannot delete file'))

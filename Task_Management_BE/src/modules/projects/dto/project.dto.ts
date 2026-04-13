@@ -1,8 +1,10 @@
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -48,6 +50,16 @@ export class CreateProjectDto {
   @IsOptional()
   @IsDateString({}, { message: 'endDate must be a valid ISO date string' })
   endDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'User IDs to add as members while creating project',
+    type: [String],
+    example: ['7f89e4d4-4c62-4f10-8e29-5eb7e0fb9df1'],
+  })
+  @IsOptional()
+  @IsArray({ message: 'memberIds must be an array of UUID strings' })
+  @IsUUID(4, { each: true, message: 'Each member id must be a valid UUID' })
+  memberIds?: string[];
 }
 
 export class UpdateProjectDto {
@@ -89,6 +101,16 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsDateString({}, { message: 'endDate must be a valid ISO date string' })
   endDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'User IDs to add as project members during update',
+    type: [String],
+    example: ['7f89e4d4-4c62-4f10-8e29-5eb7e0fb9df1'],
+  })
+  @IsOptional()
+  @IsArray({ message: 'memberIds must be an array of UUID strings' })
+  @IsUUID(4, { each: true, message: 'Each member id must be a valid UUID' })
+  memberIds?: string[];
 }
 
 export class ProjectQueryDto extends PaginationDto {

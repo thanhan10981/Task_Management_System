@@ -21,6 +21,8 @@ export default () => ({
     cloudName: process?.env?.CLOUDINARY_CLOUD_NAME,
     apiKey: process?.env?.CLOUDINARY_API_KEY,
     apiSecret: process?.env?.CLOUDINARY_API_SECRET,
+    authTokenKey: process?.env?.CLOUDINARY_AUTH_TOKEN_KEY,
+    authenticatedUrlTtlSeconds: parseInt(process?.env?.CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS ?? '300', 10),
   },
 
   clientUrl: process?.env?.CLIENT_URL || process?.env?.FRONTEND_URL || 'http://localhost:5173',

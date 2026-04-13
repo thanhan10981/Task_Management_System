@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import { CLOUDINARY_MAX_RESULTS, CLOUDINARY_RESOURCE_TYPES } from '../constants/cloudinary.constants';
@@ -27,22 +27,45 @@ export class CloudinaryResourceService {
     this.hasCredentials = configureCloudinary(this.configService);
   }
 
-  async deleteAsset(publicId: string, resourceType = 'image') {
+  async deleteAsset(publicId: string, resourceType: CloudinaryResourceType = 'image') {
     this.ensureConfigured();
 
-    return cloudinary.uploader.destroy(publicId, {
-      resource_type: (toResourceType(resourceType) ?? 'image') as 'image' | 'video' | 'raw',
-      invalidate: true,
-    });
+    const normalizedPublicId = publicId?.trim();
+    if (!normalizedPublicId) {
+      throw new BadRequestException('Cloudinary public ID is required');
+    }
+
+    try {
+      return await cloudinary.uploader.destroy(normalizedPublicId, {
+        resource_type: (toResourceType(resourceType) ?? 'image') as 'image' | 'video' | 'raw',
+        type: 'authenticated',
+        invalidate: true,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete Cloudinary asset publicId=${normalizedPublicId}, resourceType=${resourceType}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to delete Cloudinary asset');
+    }
   }
 
   async listResources(folderPath?: string, includeDescendants = false): Promise<CloudinaryResourcePayload[]> {
     this.ensureConfigured();
 
     const normalizedFolder = normalizePath(folderPath);
-    const assetsByType = await Promise.all(
-      CLOUDINARY_RESOURCE_TYPES.map((resourceType) => this.listResourcesByFolderMode(resourceType, normalizedFolder, includeDescendants)),
-    );
+    let assetsByType: CloudinaryResourcePayload[][];
+    try {
+      assetsByType = await Promise.all(
+        CLOUDINARY_RESOURCE_TYPES.map((resourceType) => this.listResourcesByFolderMode(resourceType, normalizedFolder, includeDescendants)),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to list Cloudinary resources for folder=${normalizedFolder ?? '<root>'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to list Cloudinary resources');
+    }
 
     const byPublicId = new Map<string, CloudinaryResourcePayload>();
     for (const resource of assetsByType.flat()) {
@@ -91,6 +114,11 @@ export class CloudinaryResourceService {
   async getResource(publicId: string, resourceType?: string): Promise<CloudinaryResourcePayload | null> {
     this.ensureConfigured();
 
+    const normalizedPublicId = publicId?.trim();
+    if (!normalizedPublicId) {
+      throw new BadRequestException('Cloudinary public ID is required');
+    }
+
     const typedResource = toResourceType(resourceType);
     const candidateTypes: CloudinaryResourceType[] = typedResource
       ? [typedResource]
@@ -98,7 +126,7 @@ export class CloudinaryResourceService {
 
     for (const type of candidateTypes) {
       try {
-        const resource = await cloudinary.api.resource(publicId, {
+        const resource = await cloudinary.api.resource(normalizedPublicId, {
           resource_type: type,
           type: 'upload',
         });
@@ -110,7 +138,7 @@ export class CloudinaryResourceService {
         }
 
         this.logger.error(
-          `Failed to resolve Cloudinary asset for publicId=${publicId}, resourceType=${type}`,
+          `Failed to resolve Cloudinary asset for publicId=${normalizedPublicId}, resourceType=${type}`,
           error instanceof Error ? error.stack : undefined,
         );
         throw new InternalServerErrorException('Failed to resolve Cloudinary asset');

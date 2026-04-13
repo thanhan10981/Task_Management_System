@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -52,6 +53,16 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   parentTaskId?: string;
+
+  @ApiPropertyOptional({
+    description: 'User IDs assigned to this task',
+    type: [String],
+    example: ['44444444-4444-4444-4444-444444444444'],
+  })
+  @IsOptional()
+  @IsArray({ message: 'assigneeIds must be an array of UUID strings' })
+  @IsUUID(4, { each: true, message: 'Each assignee id must be a valid UUID' })
+  assigneeIds?: string[];
 }
 
 export class UpdateTaskDto {
@@ -90,6 +101,16 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsUUID()
   parentTaskId?: string;
+
+  @ApiPropertyOptional({
+    description: 'User IDs to add as assignees during update',
+    type: [String],
+    example: ['44444444-4444-4444-4444-444444444444'],
+  })
+  @IsOptional()
+  @IsArray({ message: 'assigneeIds must be an array of UUID strings' })
+  @IsUUID(4, { each: true, message: 'Each assignee id must be a valid UUID' })
+  assigneeIds?: string[];
 }
 
 export class TaskQueryDto extends PaginationDto {

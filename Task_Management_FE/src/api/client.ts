@@ -10,7 +10,7 @@ function isFilesApiRequest(url?: string): boolean {
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: env.VITE_API_BASE_URL,
-  timeout: 10000,
+  timeout: 60000,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

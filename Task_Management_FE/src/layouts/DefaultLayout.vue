@@ -9,8 +9,6 @@
       </div>
 
       <div class="sidebar-divider" />
-
-
       <!-- Nav -->
       <nav class="sidebar-nav">
         <RouterLink
@@ -153,6 +151,52 @@
                 rows="3"
               />
 
+              <label class="project-field-label" for="create-project-members">Add members</label>
+              <div ref="memberPickerRef" class="member-picker">
+                <div v-if="selectedMembers.length" class="member-chip-list">
+                  <button
+                    v-for="member in selectedMembers"
+                    :key="member.id"
+                    type="button"
+                    class="member-chip"
+                    @click="removeMember(member.id)"
+                  >
+                    <span class="member-chip-name">{{ displayMemberName(member) }}</span>
+                    <span class="member-chip-remove">&times;</span>
+                  </button>
+                </div>
+
+                <input
+                  id="create-project-members"
+                  v-model.trim="memberSearchQuery"
+                  type="text"
+                  class="project-field-input"
+                  placeholder="Search user by name or email"
+                  @focus="memberDropdownOpen = true"
+                >
+
+                <div v-if="memberDropdownOpen" class="member-dropdown">
+                  <p v-if="loadingAssignableUsers" class="member-dropdown-state">Loading members...</p>
+                  <p v-else-if="memberLoadError" class="member-dropdown-state member-dropdown-state--error">
+                    {{ memberLoadError }}
+                  </p>
+                  <p v-else-if="filteredAssignableUsers.length === 0" class="member-dropdown-state">
+                    No members found
+                  </p>
+
+                  <button
+                    v-for="user in filteredAssignableUsers"
+                    :key="user.id"
+                    type="button"
+                    class="member-dropdown-item"
+                    @click="addMember(user)"
+                  >
+                    <span class="member-option-name">{{ displayMemberName(user) }}</span>
+                    <span class="member-option-email">{{ user.email }}</span>
+                  </button>
+                </div>
+              </div>
+
               <p v-if="createProjectError" class="project-error">{{ createProjectError }}</p>
 
               <div class="project-modal-actions">
@@ -180,6 +224,8 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
 import OctomLogo from '@/components/common/OctomLogo.vue'
+import { listUsers } from '@/api/users'
+import type { User } from '@/types/user.types'
 
 const router = useRouter()
 const route  = useRoute()
@@ -205,9 +251,35 @@ const projectMenuWrapRef = ref<HTMLElement | null>(null)
 const createProjectModalOpen = ref(false)
 const creatingProject = ref(false)
 const createProjectError = ref('')
+const assignableUsers = ref<User[]>([])
+const loadingAssignableUsers = ref(false)
+const memberLoadError = ref('')
+const memberSearchQuery = ref('')
+const memberDropdownOpen = ref(false)
+const memberPickerRef = ref<HTMLElement | null>(null)
+const selectedMembers = ref<User[]>([])
 const createProjectForm = reactive({
   name: '',
   description: '',
+})
+
+const selectedMemberIds = computed(() => new Set(selectedMembers.value.map((member) => member.id)))
+const filteredAssignableUsers = computed(() => {
+  const query = memberSearchQuery.value.trim().toLowerCase()
+
+  return assignableUsers.value
+    .filter((user) => user.id !== authStore.user?.id)
+    .filter((user) => !selectedMemberIds.value.has(user.id))
+    .filter((user) => {
+      if (!query) {
+        return true
+      }
+
+      const fullName = (user.fullName || '').toLowerCase()
+      const email = user.email.toLowerCase()
+      return fullName.includes(query) || email.includes(query)
+    })
+    .slice(0, 8)
 })
 
 const currentProjectName = computed(() => {
@@ -231,6 +303,10 @@ function onClickOutside(e: MouseEvent) {
 
   if (projectMenuWrapRef.value && !projectMenuWrapRef.value.contains(e.target as Node)) {
     projectMenuOpen.value = false
+  }
+
+  if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node)) {
+    memberDropdownOpen.value = false
   }
 }
 
@@ -268,6 +344,8 @@ function goToCreateProject() {
   projectMenuOpen.value = false
   createProjectError.value = ''
   createProjectModalOpen.value = true
+  memberDropdownOpen.value = false
+  void ensureAssignableUsersLoaded()
 }
 
 function closeCreateProjectModal() {
@@ -275,6 +353,44 @@ function closeCreateProjectModal() {
   createProjectError.value = ''
   createProjectForm.name = ''
   createProjectForm.description = ''
+  memberSearchQuery.value = ''
+  memberDropdownOpen.value = false
+  selectedMembers.value = []
+}
+
+function displayMemberName(user: User) {
+  return user.fullName?.trim() || user.email
+}
+
+function addMember(user: User) {
+  if (selectedMemberIds.value.has(user.id)) {
+    return
+  }
+
+  selectedMembers.value.push(user)
+  memberSearchQuery.value = ''
+  memberDropdownOpen.value = true
+}
+
+function removeMember(userId: string) {
+  selectedMembers.value = selectedMembers.value.filter((member) => member.id !== userId)
+}
+
+async function ensureAssignableUsersLoaded() {
+  if (assignableUsers.value.length > 0 || loadingAssignableUsers.value) {
+    return
+  }
+
+  loadingAssignableUsers.value = true
+  memberLoadError.value = ''
+
+  try {
+    assignableUsers.value = await listUsers()
+  } catch {
+    memberLoadError.value = 'Failed to load users'
+  } finally {
+    loadingAssignableUsers.value = false
+  }
 }
 
 async function submitCreateProject() {
@@ -286,6 +402,7 @@ async function submitCreateProject() {
     const created = await projectStore.createAndSelectProject({
       name: createProjectForm.name,
       description: createProjectForm.description || undefined,
+      memberIds: selectedMembers.value.map((member) => member.id),
     })
 
     if (created?.id) {
@@ -919,6 +1036,90 @@ const navItems = [
 .project-field-textarea {
   resize: vertical;
   min-height: 80px;
+}
+
+.member-picker {
+  position: relative;
+}
+
+.member-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #3730a3;
+  cursor: pointer;
+}
+
+.member-chip-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-chip-remove {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.member-dropdown {
+  margin-top: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.member-dropdown-item {
+  width: 100%;
+  border: none;
+  background: #ffffff;
+  text-align: left;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.member-dropdown-item:hover {
+  background: #f8fafc;
+}
+
+.member-option-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.member-option-email {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.member-dropdown-state {
+  margin: 0;
+  padding: 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.member-dropdown-state--error {
+  color: #dc2626;
 }
 
 .project-error {

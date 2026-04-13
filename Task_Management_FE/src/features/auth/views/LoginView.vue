@@ -37,7 +37,12 @@
       <div>
         <div class="flex items-center justify-between mb-1.5">
           <label class="auth-label !mb-0" for="password">Password</label>
-          <a href="#" class="text-xs text-sky-400 hover:text-sky-300 transition-colors">Forgot password?</a>
+          <RouterLink
+            to="/auth/forgot-password"
+            class="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+          >
+            Forgot password?
+          </RouterLink>
         </div>
         <div class="relative">
           <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">

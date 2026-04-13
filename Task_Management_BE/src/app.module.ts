@@ -9,11 +9,12 @@ import { SprintsModule } from './modules/sprints/sprints.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { UserModule } from './modules/user/user.module';
 import { FilesModule } from './modules/files/files.module';
+import { ReminderModule } from './modules/reminder/reminder.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 import configuration from './config/configuration';
-import { validate } from './config/validateion.schema';
+import { validate } from './config/validation.schema';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { validate } from './config/validateion.schema';
     TasksModule,
     UserModule,
     FilesModule,
+    ReminderModule,
   ],
   controllers: [AppController],
   providers: [AppService, LoggingInterceptor, ResponseInterceptor],

@@ -27,12 +27,14 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
+    "@nestjs-modules/mailer": "^2.3.4",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.2",
     "@nestjs/core": "^10.0.0",
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/schedule": "^6.1.1",
     "@nestjs/swagger": "^8.0.7",
     "@prisma/client": "^5.7.1",
     "bcryptjs": "^2.4.3",
@@ -40,6 +42,7 @@
     "class-validator": "^0.14.1",
     "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.6",
+    "nodemailer": "^8.0.4",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",

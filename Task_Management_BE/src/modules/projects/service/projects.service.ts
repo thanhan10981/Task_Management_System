@@ -14,6 +14,7 @@ import {
   ProjectQueryDto,
   UpdateProjectDto,
 } from '../dto/project.dto';
+import { SAFE_USER_SELECT } from '../../../common/constants/app.constants';
 
 @Injectable()
 export class ProjectsService {
@@ -68,7 +69,9 @@ export class ProjectsService {
         },
       },
       include: {
-        creator: true,
+        creator: {
+          select: SAFE_USER_SELECT,
+        },
         members: true,
         _count: { select: { tasks: true, members: true } },
       },
@@ -108,7 +111,9 @@ export class ProjectsService {
       this.prisma.project.findMany({
         where,
         include: {
-          creator: true,
+          creator: {
+            select: SAFE_USER_SELECT,
+          },
           members: true,
           _count: { select: { tasks: true, members: true } },
         },
@@ -129,10 +134,19 @@ export class ProjectsService {
         OR: [{ createdBy: userId }, { members: { some: { userId } } }],
       },
       include: {
-        creator: true,
+        creator: {
+          select: SAFE_USER_SELECT,
+        },
         members: {
           include: {
-            user: true,
+            user: {
+              select: SAFE_USER_SELECT,
+            },
+          },
+        },
+        taskStatuses: {
+          orderBy: {
+            position: 'asc',
           },
         },
         _count: { select: { tasks: true, members: true } },

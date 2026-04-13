@@ -1,4 +1,5 @@
 import {
+  ArrayUnique,
   IsArray,
   IsDateString,
   IsEnum,
@@ -55,13 +56,14 @@ export class CreateTaskDto {
   parentTaskId?: string;
 
   @ApiPropertyOptional({
-    description: 'User IDs assigned to this task',
+    description: 'Assignee user ids. If omitted, creator is assigned automatically.',
     type: [String],
     example: ['44444444-4444-4444-4444-444444444444'],
   })
   @IsOptional()
-  @IsArray({ message: 'assigneeIds must be an array of UUID strings' })
-  @IsUUID(4, { each: true, message: 'Each assignee id must be a valid UUID' })
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
   assigneeIds?: string[];
 }
 

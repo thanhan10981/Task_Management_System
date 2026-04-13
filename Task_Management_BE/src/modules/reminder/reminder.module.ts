@@ -1,28 +1,19 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { ScheduleModule } from '@nestjs/schedule';
 import { buildMailFrom } from '../../common/helpers/mail-from.helper';
 import { MailJobQueueService } from '../../common/mail/services/mail-job-queue.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
-import { AuthService } from './service/auth.service';
-import { AuthController } from './controller/auth.controller';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { TaskRepository } from './repository/task.repository';
+import { MailService } from './service/mail.service';
+import { ReminderService } from './service/reminder.service';
 
 @Module({
   imports: [
+    ConfigModule,
     PrismaModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn'),
-        },
-      }),
-    }),
+    ScheduleModule.forRoot(),
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -64,8 +55,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, MailJobQueueService],
-  exports: [AuthService],
+  providers: [TaskRepository, MailService, ReminderService, MailJobQueueService],
+  exports: [ReminderService],
 })
-export class AuthModule {}
+export class ReminderModule {}

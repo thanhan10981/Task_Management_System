@@ -1,11 +1,14 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../common/prisma/prisma.service';
+import { ProjectAccessService } from '../../../common/access/project-access.service';
 import {
   createPaginatedResponse,
   createPaginationOptions,
@@ -18,12 +21,14 @@ import {
   UpdateProjectMemberRoleDto,
 } from '../dto/project.dto';
 import { SAFE_USER_SELECT } from '../../../common/constants/app.constants';
+import { ProjectsRepository } from '../repository/projects.repository';
 
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly projectsRepository: ProjectsRepository,
     private readonly projectAccessService: ProjectAccessService,
   ) {}

@@ -1,7 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpStatus, Param, ParseUUIDPipe, Post, Query, Request, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpStatus, Param, ParseUUIDPipe, Post, Query, Request, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiCookieAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CreateCloudinaryFolderDto } from '../dto/create-cloudinary-folder.dto';
 import { CreateFileRecordDto } from '../dto/create-file-record.dto';
 import { ProjectScopedFilesQueryDto } from '../dto/project-scoped-files-query.dto';
@@ -34,7 +33,6 @@ function normalizeUploadedFileName(fileName: string) {
 
 @ApiTags('Files')
 @ApiCookieAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('files')
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}

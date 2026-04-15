@@ -9,7 +9,6 @@ import {
   Post,
   Query,
   Request,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -18,7 +17,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import {
   AddProjectMemberDto,
   CreateProjectDto,
@@ -30,7 +28,6 @@ import { ProjectsService } from '../service/projects.service';
 
 @ApiTags('Projects')
 @ApiCookieAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('projects')
 export class ProjectsController {
   // Project member APIs intentionally live inside project routes,

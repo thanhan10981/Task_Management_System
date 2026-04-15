@@ -1,17 +1,15 @@
-import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Request } from '@nestjs/common';
 import {
   ApiCookieAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { ActivityLogQueryDto } from '../dto/activity-log.dto';
 import { ActivityLogsService } from '../service/activity-logs.service';
 
 @ApiTags('Activity Logs')
 @ApiCookieAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('activity-logs')
 export class ActivityLogsController {
   constructor(private readonly activityLogsService: ActivityLogsService) {}

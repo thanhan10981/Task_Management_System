@@ -14,8 +14,6 @@ export class UserSettingsService {
   async updateCurrentSettings(userId: string, dto: UpdateUserSettingsDto) {
     // No create/delete endpoints are exposed; settings lifecycle is user-owned.
     return this.userSettingsRepository.upsertByUserId(userId, {
-      language: dto.language,
-      timezone: dto.timezone,
       theme: dto.theme,
       notificationSettings: dto.notificationSettings,
       privacySettings: dto.privacySettings,

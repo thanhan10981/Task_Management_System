@@ -67,7 +67,15 @@ apiClient.interceptors.response.use(
     if (status === 401) {
       const authStore = useAuthStore()
       authStore.logout()
-      window.location.href = '/auth/login'
+
+      const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const isOnAuthRoute = redirectPath.startsWith('/auth/')
+
+      if (isOnAuthRoute) {
+        window.location.href = '/auth/login'
+      } else {
+        window.location.href = `/auth/login?redirect=${encodeURIComponent(redirectPath)}`
+      }
     }
 
     return Promise.reject(error)

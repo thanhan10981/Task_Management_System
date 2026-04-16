@@ -5,7 +5,7 @@
     <aside class="sidebar">
       <!-- Logo -->
       <div class="sidebar-logo">
-        <OctomLogo size="sm" orientation="col" text-color="text-slate-800" />
+        <OctomLogo size="sm" orientation="col" />
       </div>
 
       <div class="sidebar-divider" />
@@ -102,7 +102,7 @@
                 <div class="dropdown-header">
                   <div class="dropdown-avatar">{{ userInitial }}</div>
                   <div>
-                    <p class="dropdown-name">{{ authStore.user?.email?.split('@')[0] ?? 'User' }}</p>
+                    <p class="dropdown-name">{{ displayUserName }}</p>
                     <p class="dropdown-email">{{ authStore.user?.email ?? '' }}</p>
                   </div>
                 </div>
@@ -218,6 +218,7 @@
 </template>
 
 <script setup lang="ts">
+import { get } from '@/api/client'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
@@ -310,13 +311,45 @@ function onClickOutside(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onClickOutside))
+async function hydrateCurrentUser() {
+  if (authStore.user || !authStore.accessToken) {
+    return
+  }
+
+  try {
+    const response = await get<{ data: User }>('/auth/me')
+    if (response?.data) {
+      authStore.setAuth(authStore.accessToken, response.data)
+    }
+  } catch (error) {
+    console.error('[DefaultLayout] Cannot hydrate current user', error)
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', onClickOutside)
+  void hydrateCurrentUser()
+})
 onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 /* ── Auth ──────────────────────────────────────────── */
 const userInitial = computed(() => {
+  const fullName = authStore.user?.fullName?.trim() ?? ''
+  if (fullName) {
+    return fullName
+      .split(/\s+/)
+      .map((part) => part.charAt(0))
+      .slice(0, 2)
+      .join('')
+      .toUpperCase()
+  }
+
   const email = authStore.user?.email ?? ''
   return email.charAt(0).toUpperCase() || 'U'
+})
+
+const displayUserName = computed(() => {
+  return authStore.user?.fullName?.trim() || authStore.user?.email?.split('@')[0] || 'User'
 })
 
 function handleLogout() {
@@ -512,7 +545,7 @@ const navItems = [
 .app-shell {
   display: flex;
   min-height: 100vh;
-  background: #f3f4f8;
+  background: var(--bg-app);
   font-family: 'Inter', system-ui, sans-serif;
 }
 
@@ -522,8 +555,8 @@ const navItems = [
 .sidebar {
   width: 80px;
   min-height: 100vh;
-  background: #ffffff;
-  border-right: 1px solid #f1f5f9;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -548,7 +581,7 @@ const navItems = [
 .sidebar-divider {
   width: 32px;
   height: 1px;
-  background: #f1f5f9;
+  background: var(--border-base);
   margin: 10px 0;
 }
 
@@ -571,15 +604,15 @@ const navItems = [
   justify-content: center;
   cursor: pointer;
   transition: background 0.18s, color 0.18s, transform 0.15s, box-shadow 0.18s;
-  color: #94a3b8;
+  color: var(--text-subtle);
   border: none;
   background: transparent;
   text-decoration: none;
   font-family: inherit;
 }
 .nav-item:hover {
-  background: #f0f0ff;
-  color: #6366f1;
+  background: var(--nav-hover-bg);
+  color: var(--nav-hover-color);
   transform: translateY(-1px);
 }
 .nav-item--active {
@@ -639,8 +672,8 @@ const navItems = [
 /* ── TOP HEADER ────────────────────────────────────────────────── */
 .top-header {
   height: 64px;
-  background: #ffffff;
-  border-bottom: 1px solid #f1f5f9;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
   display: flex;
   align-items: center;
   padding: 0 28px;
@@ -648,7 +681,7 @@ const navItems = [
   position: sticky;
   top: 0;
   z-index: 40;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Brand */
@@ -683,19 +716,19 @@ const navItems = [
   width: 100%;
   height: 38px;
   border-radius: 12px;
-  border: 1.5px solid #e8edf5;
-  background: #f8fafc;
+  border: 1.5px solid var(--search-border);
+  background: var(--search-bg);
   padding: 0 14px 0 40px;
   font-size: 13px;
-  color: #334155;
+  color: var(--text-secondary);
   outline: none;
   font-family: inherit;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-.search-input::placeholder { color: #94a3b8; }
+.search-input::placeholder { color: var(--text-subtle); }
 .search-input:focus {
   border-color: #6366f1;
-  background: #fff;
+  background: var(--search-focus-bg);
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
 }
 
@@ -717,9 +750,9 @@ const navItems = [
   align-items: center;
   gap: 8px;
   border-radius: 12px;
-  border: 1.5px solid #e8edf5;
-  background: #fff;
-  color: #334155;
+  border: 1.5px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--text-secondary);
   padding: 0 12px;
   font-size: 13px;
   font-weight: 600;
@@ -729,8 +762,8 @@ const navItems = [
 }
 
 .project-menu-btn:hover {
-  border-color: #c7d2fe;
-  background: #f5f5ff;
+  border-color: var(--btn-hover-border);
+  background: var(--btn-hover-bg);
 }
 
 .project-menu-label {
@@ -746,10 +779,10 @@ const navItems = [
   right: 0;
   min-width: 240px;
   max-width: 300px;
-  background: #fff;
+  background: var(--dropdown-bg);
   border-radius: 16px;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+  border: 1px solid var(--border-base);
+  box-shadow: var(--shadow-lg);
   padding: 8px;
   z-index: 300;
 }
@@ -762,7 +795,7 @@ const navItems = [
   border: none;
   border-radius: 10px;
   background: none;
-  color: #334155;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -771,11 +804,11 @@ const navItems = [
 }
 
 .project-dropdown-item:hover {
-  background: #f8fafc;
+  background: var(--dropdown-item-hover);
 }
 
 .project-dropdown-item--active {
-  background: #eef2ff;
+  background: var(--bg-active);
   color: #4338ca;
 }
 
@@ -807,7 +840,7 @@ const navItems = [
 }
 
 .project-create-btn:hover {
-  background: #eef2ff;
+  background: var(--bg-active);
 }
 
 /* ── Notification bell ────────────────────────────────── */
@@ -816,8 +849,8 @@ const navItems = [
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1.5px solid #e8edf5;
-  background: #fff;
+  border: 1.5px solid var(--btn-border);
+  background: var(--btn-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -828,7 +861,7 @@ const navItems = [
 }
 .notif-btn:hover {
   border-color: #a5b4fc;
-  background: #eef2ff;
+  background: var(--bg-active);
   transform: translateY(-1px);
 }
 .notif-badge {
@@ -866,13 +899,13 @@ const navItems = [
   position: relative;
   padding: 4px 8px;
   border-radius: 12px;
-  border: 1.5px solid #e8edf5;
-  background: #fff;
+  border: 1.5px solid var(--btn-border);
+  background: var(--btn-bg);
   transition: border-color 0.2s, background 0.2s;
 }
 .avatar-wrap:hover {
-  border-color: #c7d2fe;
-  background: #f5f5ff;
+  border-color: var(--btn-hover-border);
+  background: var(--btn-hover-bg);
 }
 .header-avatar {
   width: 30px; height: 30px;
@@ -894,10 +927,10 @@ const navItems = [
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #fff;
+  background: var(--dropdown-bg);
   border-radius: 16px;
-  border: 1px solid #f1f5f9;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+  border: 1px solid var(--border-base);
+  box-shadow: var(--shadow-lg);
   padding: 8px;
   min-width: 220px;
   z-index: 300;
@@ -923,13 +956,13 @@ const navItems = [
 .dropdown-name {
   font-size: 13px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-heading);
   margin: 0;
   text-transform: capitalize;
 }
 .dropdown-email {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--text-subtle);
   margin: 2px 0 0;
   max-width: 160px;
   overflow: hidden;
@@ -938,7 +971,7 @@ const navItems = [
 }
 .dropdown-divider {
   height: 1px;
-  background: #f1f5f9;
+  background: var(--divider);
   margin: 4px 0;
 }
 .dropdown-item {
@@ -968,8 +1001,10 @@ const navItems = [
 /* ── MAIN CONTENT ──────────────────────────────────────────────── */
 .main-content {
   flex: 1;
-  padding: 28px 32px;
-  overflow: auto;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-overlay {
@@ -986,24 +1021,24 @@ const navItems = [
 .project-modal {
   width: 100%;
   max-width: 520px;
-  background: #ffffff;
+  background: var(--modal-bg);
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.24);
+  border: 1px solid var(--modal-border);
+  box-shadow: var(--shadow-xl);
   padding: 20px;
 }
 
 .project-modal-title {
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-heading);
   margin: 0;
 }
 
 .project-modal-subtitle {
   margin: 6px 0 16px;
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .project-modal-form {
@@ -1015,16 +1050,19 @@ const navItems = [
 .project-field-label {
   font-size: 12px;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-secondary);
 }
 
 .project-field-input {
   width: 100%;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
   outline: none;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-family: inherit;
   transition: border-color 0.18s, box-shadow 0.18s;
 }
 
@@ -1076,10 +1114,10 @@ const navItems = [
 
 .member-dropdown {
   margin-top: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-medium);
   border-radius: 10px;
-  background: #ffffff;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  background: var(--dropdown-bg);
+  box-shadow: var(--shadow-md);
   max-height: 190px;
   overflow-y: auto;
 }
@@ -1087,7 +1125,7 @@ const navItems = [
 .member-dropdown-item {
   width: 100%;
   border: none;
-  background: #ffffff;
+  background: var(--dropdown-bg);
   text-align: left;
   padding: 8px 10px;
   display: flex;
@@ -1097,25 +1135,25 @@ const navItems = [
 }
 
 .member-dropdown-item:hover {
-  background: #f8fafc;
+  background: var(--dropdown-item-hover);
 }
 
 .member-option-name {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-heading);
 }
 
 .member-option-email {
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .member-dropdown-state {
   margin: 0;
   padding: 10px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .member-dropdown-state--error {
@@ -1147,12 +1185,12 @@ const navItems = [
 }
 
 .project-cancel-btn {
-  background: #f1f5f9;
-  color: #334155;
+  background: var(--bg-surface-3);
+  color: var(--text-secondary);
 }
 
 .project-cancel-btn:hover {
-  background: #e2e8f0;
+  background: var(--border-medium);
 }
 
 .project-submit-btn {

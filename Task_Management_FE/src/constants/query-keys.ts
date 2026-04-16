@@ -9,6 +9,11 @@ export const QUERY_KEYS = {
     all: ['projects'] as const,
     list: () => [...QUERY_KEYS.projects.all, 'list'] as const,
   },
+  taskAnalytics: {
+    all: ['task-analytics'] as const,
+    chart: (period: 'daily' | 'weekly' | 'monthly') =>
+      [...QUERY_KEYS.taskAnalytics.all, 'chart', period] as const,
+  },
   files: {
     all: ['files'] as const,
     folders: (projectId: string) => [...QUERY_KEYS.files.all, 'folders', projectId] as const,

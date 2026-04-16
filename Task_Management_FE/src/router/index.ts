@@ -20,6 +20,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Dashboard' },
       },
       {
+        path: 'projects/create',
+        name: 'create-project',
+        component: () => import('@/features/dashboard/views/CreateProjectView.vue'),
+        meta: { title: 'Create Project' },
+      },
+      {
         path: 'tasks',
         name: 'tasks',
         component: () => import('@/features/tasks/views/TaskListView.vue'),
@@ -40,14 +46,14 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'timeline',
         name: 'timeline',
-        component: () => import('@/features/dashboard/views/DashboardView.vue'),
+        component: () => import('@/features/tasks/views/TimelineView.vue'),
         meta: { title: 'Timeline', requiresProject: true },
       },
       {
         path: 'settings',
         name: 'settings',
-        component: () => import('@/features/dashboard/views/DashboardView.vue'),
-        meta: { title: 'Settings', requiresProject: true },
+        component: () => import('@/features/settings/views/SettingsView.vue'),
+        meta: { title: 'Settings' },
       },
     ],
   },
@@ -113,7 +119,12 @@ router.beforeEach(async (to) => {
   document.title = pageTitle ? `${pageTitle} | OCTOM` : 'OCTOM'
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return { name: 'login' }
+    return {
+      name: 'login',
+      query: {
+        redirect: to.fullPath,
+      },
+    }
   }
 
   if (to.meta.guestOnly && authStore.isAuthenticated) {
@@ -124,15 +135,7 @@ router.beforeEach(async (to) => {
     const projectStore = useProjectStore()
     await projectStore.initializeAfterAuth()
 
-    const currentProjectExists = projectStore.currentProjectId
-      ? projectStore.projects.some((project) => project.id === projectStore.currentProjectId)
-      : false
-
-    if (projectStore.currentProjectId && !currentProjectExists) {
-      projectStore.setCurrentProjectId(null)
-    }
-
-    if (to.meta.requiresProject && !projectStore.currentProjectId) {
+    if (to.meta.requiresProject && !projectStore.hasCurrentProject) {
       return { name: 'dashboard', query: to.query, hash: to.hash }
     }
   }

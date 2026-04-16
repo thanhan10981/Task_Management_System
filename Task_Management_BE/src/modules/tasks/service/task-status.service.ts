@@ -9,7 +9,6 @@ import {
   CreateTaskStatusDto,
   UpdateTaskStatusDto,
 } from '../dto/task-status.dto';
-import { TASK_ACTIVITY_ACTIONS } from '../constants/task-actions.constants';
 import { TasksRepository } from '../repository/tasks.repository';
 
 @Injectable()
@@ -49,15 +48,6 @@ export class TaskStatusService {
 
       throw error;
     }
-
-    await this.tasksRepository.createActivityLog({
-      user: { connect: { id: userId } },
-      project: { connect: { id: projectId } },
-      entityType: 'TASK',
-      entityId: createdStatus.id,
-      action: TASK_ACTIVITY_ACTIONS.STATUS_CREATED,
-      description: `Task status ${dto.name} created`,
-    });
 
     return createdStatus;
   }
@@ -101,15 +91,6 @@ export class TaskStatusService {
       throw error;
     }
 
-    await this.tasksRepository.createActivityLog({
-      user: { connect: { id: userId } },
-      project: { connect: { id: projectId } },
-      entityType: 'TASK',
-      entityId: statusId,
-      action: TASK_ACTIVITY_ACTIONS.STATUS_UPDATED,
-      description: `Task status ${updatedStatus.name} updated`,
-    });
-
     return updatedStatus;
   }
 
@@ -128,15 +109,6 @@ export class TaskStatusService {
     }
 
     await this.tasksRepository.deleteTaskStatus(statusId);
-
-    await this.tasksRepository.createActivityLog({
-      user: { connect: { id: userId } },
-      project: { connect: { id: projectId } },
-      entityType: 'TASK',
-      entityId: statusId,
-      action: TASK_ACTIVITY_ACTIONS.STATUS_DELETED,
-      description: `Task status ${status.name} deleted`,
-    });
 
     return { success: true };
   }

@@ -8,10 +8,10 @@ import { Prisma } from '@prisma/client';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import { AssignTaskUserDto } from '../dto/task.dto';
 import {
-  TASK_ACTIVITY_ACTIONS,
   TASK_HISTORY_ACTIONS,
 } from '../constants/task-actions.constants';
 import { TasksRepository } from '../repository/tasks.repository';
+import { buildTaskHistoryMetadata } from '../utils/task-history.util';
 
 @Injectable()
 export class TaskAssigneeService {
@@ -33,7 +33,10 @@ export class TaskAssigneeService {
       throw new NotFoundException('Task not found');
     }
 
-    await this.projectAccessService.ensureProjectMember(userId, task.projectId);
+    await this.projectAccessService.ensureProjectAdminOrOwner(
+      userId,
+      task.projectId,
+    );
     await this.projectAccessService.ensureProjectMember(dto.userId, task.projectId);
 
     const existingAssignment = await this.tasksRepository.findAssignment(
@@ -60,21 +63,13 @@ export class TaskAssigneeService {
             {
               task: { connect: { id: taskId } },
               user: { connect: { id: userId } },
-              action: TASK_HISTORY_ACTIONS.ASSIGNED,
-              newValue: {
-                assigneeId: dto.userId,
-              },
-            },
-            tx,
-          ),
-          this.tasksRepository.createActivityLog(
-            {
-              user: { connect: { id: userId } },
-              project: { connect: { id: task.projectId } },
-              entityType: 'TASK',
-              entityId: taskId,
-              action: TASK_ACTIVITY_ACTIONS.ASSIGNED,
-              description: `Task ${taskId} assigned to ${dto.userId}`,
+              actionType: TASK_HISTORY_ACTIONS.ASSIGNED,
+              metadata: buildTaskHistoryMetadata({
+                assignee: {
+                  old: null,
+                  new: dto.userId,
+                },
+              }),
             },
             tx,
           ),
@@ -103,7 +98,10 @@ export class TaskAssigneeService {
       throw new NotFoundException('Task not found');
     }
 
-    await this.projectAccessService.ensureProjectMember(userId, task.projectId);
+    await this.projectAccessService.ensureProjectAdminOrOwner(
+      userId,
+      task.projectId,
+    );
 
     const existingAssignment = await this.tasksRepository.findAssignment(
       taskId,
@@ -122,21 +120,13 @@ export class TaskAssigneeService {
           {
             task: { connect: { id: taskId } },
             user: { connect: { id: userId } },
-            action: TASK_HISTORY_ACTIONS.UNASSIGNED,
-            oldValue: {
-              assigneeId: assigneeUserId,
-            },
-          },
-          tx,
-        ),
-        this.tasksRepository.createActivityLog(
-          {
-            user: { connect: { id: userId } },
-            project: { connect: { id: task.projectId } },
-            entityType: 'TASK',
-            entityId: taskId,
-            action: TASK_ACTIVITY_ACTIONS.UNASSIGNED,
-            description: `Task ${taskId} unassigned from ${assigneeUserId}`,
+            actionType: TASK_HISTORY_ACTIONS.UNASSIGNED,
+            metadata: buildTaskHistoryMetadata({
+              assignee: {
+                old: assigneeUserId,
+                new: null,
+              },
+            }),
           },
           tx,
         ),

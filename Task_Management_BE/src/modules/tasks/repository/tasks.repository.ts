@@ -51,6 +51,13 @@ export class TasksRepository {
         priority: true,
         startDate: true,
         dueDate: true,
+        parentTaskId: true,
+        status: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   }
@@ -168,8 +175,9 @@ export class TasksRepository {
     });
   }
 
-  listAssignees(taskId: string) {
-    return this.prisma.taskAssignee.findMany({
+  listAssignees(taskId: string, tx?: TxClient) {
+    const client = tx ?? this.prisma;
+    return client.taskAssignee.findMany({
       where: { taskId },
       include: {
         user: true,
@@ -229,11 +237,6 @@ export class TasksRepository {
 
   countTaskHistory(taskId: string) {
     return this.prisma.taskHistory.count({ where: { taskId } });
-  }
-
-  createActivityLog(data: Prisma.ActivityLogCreateInput, tx?: TxClient) {
-    const client = tx ?? this.prisma;
-    return client.activityLog.create({ data });
   }
 
   getTaskDeleteRelationsCount(id: string) {

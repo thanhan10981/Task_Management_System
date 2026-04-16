@@ -16,11 +16,11 @@ import {
   UpdateTaskDto,
 } from '../dto/task.dto';
 import {
-  TASK_ACTIVITY_ACTIONS,
   TASK_HISTORY_ACTIONS,
 } from '../constants/task-actions.constants';
 import { TasksRepository } from '../repository/tasks.repository';
 import { TxClient } from '../repository/tasks.repository';
+import { buildTaskHistoryMetadata } from '../utils/task-history.util';
 
 @Injectable()
 export class TaskService {
@@ -38,6 +38,27 @@ export class TaskService {
     if (!status || status.projectId !== createTaskDto.projectId) {
       throw new NotFoundException('Task status not found in project');
     }
+
+    const assigneeIds = Array.from(
+      new Set(createTaskDto.assigneeIds?.length ? createTaskDto.assigneeIds : [userId]),
+    );
+    const assignsOtherUsers = assigneeIds.some((assigneeId) => assigneeId !== userId);
+
+    if (assignsOtherUsers) {
+      await this.projectAccessService.ensureProjectAdminOrOwner(
+        userId,
+        createTaskDto.projectId,
+      );
+    }
+
+    await Promise.all(
+      assigneeIds.map((assigneeId) =>
+        this.projectAccessService.ensureProjectMember(
+          assigneeId,
+          createTaskDto.projectId,
+        ),
+      ),
+    );
 
     const task = await this.tasksRepository.withTransaction(async (tx) => {
       const createdTask = await this.tasksRepository.createTask(
@@ -62,19 +83,39 @@ export class TaskService {
       await this.recordHistoryAndActivity(
         tx,
         createdTask.id,
-        createdTask.projectId,
         userId,
         TASK_HISTORY_ACTIONS.CREATED,
-        TASK_ACTIVITY_ACTIONS.CREATED,
-        {
-          newValue: {
-            title: createdTask.title,
-            statusId: createdTask.statusId,
-            priority: createdTask.priority,
+        buildTaskHistoryMetadata({
+          task: {
+            old: null,
+            new: {
+              title: createdTask.title,
+              description: createdTask.description,
+              status: status.name,
+              priority: createdTask.priority,
+              startDate: createdTask.startDate,
+              dueDate: createdTask.dueDate,
+            },
           },
-          description: `Task ${createdTask.title} created`,
-        },
+        }),
       );
+
+      for (const assigneeId of assigneeIds) {
+        await this.tasksRepository.assignUser(createdTask.id, assigneeId, userId, tx);
+
+        await this.recordHistoryAndActivity(
+          tx,
+          createdTask.id,
+          userId,
+          TASK_HISTORY_ACTIONS.ASSIGNED,
+          buildTaskHistoryMetadata({
+            assignee: {
+              old: null,
+              new: assigneeId,
+            },
+          }),
+        );
+      }
 
       return createdTask;
     });
@@ -191,57 +232,163 @@ export class TaskService {
 
     await this.projectAccessService.ensureProjectMember(userId, existingTask.projectId);
 
-    if (updateTaskDto.statusId) {
-      const nextStatus = await this.tasksRepository.findStatusById(updateTaskDto.statusId);
+    const { assigneeIds, ...taskPatch } = updateTaskDto;
+
+    let nextStatus = null;
+    if (taskPatch.statusId) {
+      nextStatus = await this.tasksRepository.findStatusById(taskPatch.statusId);
       if (!nextStatus || nextStatus.projectId !== existingTask.projectId) {
         throw new NotFoundException('Task status not found in project');
       }
     }
 
+    if (assigneeIds?.length) {
+      await this.projectAccessService.ensureProjectAdminOrOwner(
+        userId,
+        existingTask.projectId,
+      );
+
+      await Promise.all(
+        assigneeIds.map((assigneeId) =>
+          this.projectAccessService.ensureProjectMember(
+            assigneeId,
+            existingTask.projectId,
+          ),
+        ),
+      );
+    }
+
     const updateData: Prisma.TaskUpdateInput = {
-      ...updateTaskDto,
-      dueDate: updateTaskDto.dueDate ? new Date(updateTaskDto.dueDate) : undefined,
-      startDate: updateTaskDto.startDate
-        ? new Date(updateTaskDto.startDate)
+      ...taskPatch,
+      dueDate: taskPatch.dueDate ? new Date(taskPatch.dueDate) : undefined,
+      startDate: taskPatch.startDate
+        ? new Date(taskPatch.startDate)
         : undefined,
       updatedByUser: { connect: { id: userId } },
     };
 
     const updatedTask = await this.tasksRepository.withTransaction(async (tx) => {
       const task = await this.tasksRepository.updateTask(id, updateData, tx);
+      const updateChanges: Record<string, { old: unknown; new: unknown }> = {};
 
-      const historyAction =
-        updateTaskDto.statusId && updateTaskDto.statusId !== existingTask.statusId
-          ? TASK_HISTORY_ACTIONS.STATUS_CHANGED
-          : TASK_HISTORY_ACTIONS.UPDATED;
+      if (
+        taskPatch.title !== undefined &&
+        taskPatch.title !== existingTask.title
+      ) {
+        updateChanges.title = {
+          old: existingTask.title,
+          new: task.title,
+        };
+      }
 
-      await this.recordHistoryAndActivity(
-        tx,
-        id,
-        task.projectId,
-        userId,
-        historyAction,
-        TASK_ACTIVITY_ACTIONS.UPDATED,
-        {
-          oldValue: {
-            title: existingTask.title,
-            description: existingTask.description,
-            statusId: existingTask.statusId,
-            priority: existingTask.priority,
-            startDate: existingTask.startDate,
-            dueDate: existingTask.dueDate,
-          },
-          newValue: {
-            title: task.title,
-            description: task.description,
-            statusId: task.statusId,
-            priority: task.priority,
-            startDate: task.startDate,
-            dueDate: task.dueDate,
-          },
-          description: `Task ${task.title} updated`,
-        },
-      );
+      if (
+        taskPatch.description !== undefined &&
+        taskPatch.description !== existingTask.description
+      ) {
+        updateChanges.description = {
+          old: existingTask.description,
+          new: task.description,
+        };
+      }
+
+      if (
+        taskPatch.priority !== undefined &&
+        taskPatch.priority !== existingTask.priority
+      ) {
+        updateChanges.priority = {
+          old: existingTask.priority,
+          new: task.priority,
+        };
+      }
+
+      if (taskPatch.startDate !== undefined) {
+        const oldStartDate = existingTask.startDate?.toISOString() ?? null;
+        const newStartDate = task.startDate?.toISOString() ?? null;
+        if (oldStartDate !== newStartDate) {
+          updateChanges.startDate = {
+            old: oldStartDate,
+            new: newStartDate,
+          };
+        }
+      }
+
+      if (taskPatch.dueDate !== undefined) {
+        const oldDueDate = existingTask.dueDate?.toISOString() ?? null;
+        const newDueDate = task.dueDate?.toISOString() ?? null;
+        if (oldDueDate !== newDueDate) {
+          updateChanges.dueDate = {
+            old: oldDueDate,
+            new: newDueDate,
+          };
+        }
+      }
+
+      if (
+        taskPatch.parentTaskId !== undefined &&
+        taskPatch.parentTaskId !== existingTask.parentTaskId
+      ) {
+        updateChanges.parentTaskId = {
+          old: existingTask.parentTaskId,
+          new: task.parentTaskId,
+        };
+      }
+
+      if (Object.keys(updateChanges).length > 0) {
+        await this.recordHistoryAndActivity(
+          tx,
+          id,
+          userId,
+          TASK_HISTORY_ACTIONS.UPDATED,
+          buildTaskHistoryMetadata(updateChanges),
+        );
+      }
+
+      if (
+        nextStatus &&
+        taskPatch.statusId &&
+        taskPatch.statusId !== existingTask.statusId
+      ) {
+        await this.recordHistoryAndActivity(
+          tx,
+          id,
+          userId,
+          TASK_HISTORY_ACTIONS.STATUS_CHANGED,
+          buildTaskHistoryMetadata({
+            status: {
+              old: existingTask.status.name,
+              new: nextStatus.name,
+            },
+          }),
+        );
+      }
+
+      if (assigneeIds?.length) {
+        const existingAssigneeIds = new Set(
+          (await this.tasksRepository.listAssignees(id, tx)).map(
+            (assignee) => assignee.userId,
+          ),
+        );
+
+        for (const assigneeId of assigneeIds) {
+          if (existingAssigneeIds.has(assigneeId)) {
+            continue;
+          }
+
+          await this.tasksRepository.assignUser(id, assigneeId, userId, tx);
+          await this.recordHistoryAndActivity(
+            tx,
+            id,
+            userId,
+            TASK_HISTORY_ACTIONS.ASSIGNED,
+            buildTaskHistoryMetadata({
+              assignee: {
+                old: null,
+                new: assigneeId,
+              },
+            }),
+          );
+        }
+      }
 
       return task;
     });
@@ -273,17 +420,17 @@ export class TaskService {
       await this.recordHistoryAndActivity(
         tx,
         id,
-        task.projectId,
         userId,
         TASK_HISTORY_ACTIONS.DELETED,
-        TASK_ACTIVITY_ACTIONS.DELETED,
-        {
-          oldValue: {
-            title: task.title,
-            description: task.description,
+        buildTaskHistoryMetadata({
+          task: {
+            old: {
+              title: task.title,
+              description: task.description,
+            },
+            new: null,
           },
-          description: `Task ${task.title} soft deleted`,
-        },
+        }),
       );
     });
 
@@ -308,38 +455,18 @@ export class TaskService {
   private async recordHistoryAndActivity(
     tx: TxClient,
     taskId: string,
-    projectId: string,
     actorId: string,
     historyAction: string,
-    activityAction: string,
-    payload: {
-      oldValue?: Record<string, unknown>;
-      newValue?: Record<string, unknown>;
-      description: string;
-    },
+    metadata: Prisma.InputJsonObject,
   ) {
-    await Promise.all([
-      this.tasksRepository.createTaskHistory(
-        {
-          task: { connect: { id: taskId } },
-          user: { connect: { id: actorId } },
-          action: historyAction,
-          oldValue: payload.oldValue as Prisma.InputJsonValue,
-          newValue: payload.newValue as Prisma.InputJsonValue,
-        },
-        tx,
-      ),
-      this.tasksRepository.createActivityLog(
-        {
-          user: { connect: { id: actorId } },
-          project: { connect: { id: projectId } },
-          entityType: 'TASK',
-          entityId: taskId,
-          action: activityAction,
-          description: payload.description,
-        },
-        tx,
-      ),
-    ]);
+    await this.tasksRepository.createTaskHistory(
+      {
+        task: { connect: { id: taskId } },
+        user: { connect: { id: actorId } },
+        actionType: historyAction,
+        metadata,
+      },
+      tx,
+    );
   }
 }

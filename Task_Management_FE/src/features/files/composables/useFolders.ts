@@ -25,7 +25,7 @@ export function useFolders(options: UseFoldersOptions) {
   const expandedFolderPaths = ref<Set<string>>(new Set())
   const loadingFolders = ref(false)
 
-  const folderRows = computed<FolderRow[]>(() => buildFolderRows(folders.value, expandedFolderPaths.value, currentFolder.value))
+  const folderRows = computed<FolderRow[]>(() => buildFolderRows(folders.value, expandedFolderPaths.value))
 
   const folderQuery = useQuery({
     queryKey: computed(() => QUERY_KEYS.files.folders(currentProjectId.value ?? '')),
@@ -159,7 +159,7 @@ export function useFolders(options: UseFoldersOptions) {
   }
 }
 
-function buildFolderRows(allFolders: CloudinaryFolder[], expandedPaths: Set<string>, currentFolder: string): FolderRow[] {
+function buildFolderRows(allFolders: CloudinaryFolder[], expandedPaths: Set<string>): FolderRow[] {
   const childrenByParent = new Map<string, CloudinaryFolder[]>()
   for (const folder of allFolders) {
     if (!folder.path) continue
@@ -178,7 +178,7 @@ function buildFolderRows(allFolders: CloudinaryFolder[], expandedPaths: Set<stri
     for (const folder of childrenByParent.get(parentPath) ?? []) {
       const hasChildren = (childrenByParent.get(folder.path)?.length ?? 0) > 0
       rows.push({ ...folder, depth, hasChildren })
-      if (hasChildren && (expandedPaths.has(folder.path) || currentFolder === folder.path)) {
+      if (hasChildren && expandedPaths.has(folder.path)) {
         walk(folder.path, depth + 1)
       }
     }

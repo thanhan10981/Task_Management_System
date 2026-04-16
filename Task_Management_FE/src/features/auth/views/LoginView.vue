@@ -121,11 +121,12 @@ import { useApiError } from '@/composables/useApiError'
 import { useAuthStore } from '@/stores/auth.store'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useLoginMutation } from '../composables/useAuthMutations'
 import { loginSchema } from '../schemas/auth.schema'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const { apiError, handleError, clearError } = useApiError()
 const loginMutation = useLoginMutation()
@@ -143,7 +144,14 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     const response = await loginMutation.mutateAsync(values)
     authStore.setAuth(null, response.data.user)
-    router.push({ name: 'dashboard' })
+
+    const redirectTarget = typeof route.query.redirect === 'string' ? route.query.redirect : null
+    if (redirectTarget?.startsWith('/')) {
+      await router.replace(redirectTarget)
+      return
+    }
+
+    await router.replace({ name: 'dashboard' })
   } catch (err) {
     handleError(err)
   }

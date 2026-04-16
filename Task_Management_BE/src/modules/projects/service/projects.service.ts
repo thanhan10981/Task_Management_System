@@ -306,7 +306,6 @@ export class ProjectsService {
       projectId,
       memberUserId,
       dto.role,
-      userId,
     );
 
     this.logger.log(
@@ -335,7 +334,7 @@ export class ProjectsService {
       throw new NotFoundException('Project member not found');
     }
 
-    await this.projectsRepository.removeProjectMember(projectId, memberUserId, userId);
+    await this.projectsRepository.removeProjectMember(projectId, memberUserId);
 
     this.logger.log(
       `User ${memberUserId} removed from project ${projectId} by ${userId}`,

@@ -66,6 +66,7 @@
     <span
       v-if="showText"
       :class="['font-extrabold tracking-tight select-none', textClass]"
+      :style="textStyle"
     >
       OCTOM<span class="text-[#5046E5]">.</span>
     </span>
@@ -86,7 +87,7 @@ const props = withDefaults(
     size: "md",
     showText: true,
     orientation: "row",
-    textColor: "text-white",
+    textColor: "",
   },
 );
 
@@ -101,7 +102,15 @@ const textClass = computed(() => {
     lg: "text-3xl ml-1",
     xl: "text-5xl mt-0",
   };
-  return `${sizeMap[props.size]} ${props.textColor}`;
+  return `${sizeMap[props.size]} ${props.textColor || ""}`;
+});
+
+const textStyle = computed(() => {
+  if (props.textColor) {
+    return undefined;
+  }
+
+  return { color: "var(--text-heading)" };
 });
 
 const orientationClass = computed(() => {

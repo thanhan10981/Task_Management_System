@@ -217,6 +217,11 @@ export class TasksRepository {
     return client.taskHistory.create({ data });
   }
 
+  createNotification(data: Prisma.NotificationCreateInput, tx?: TxClient) {
+    const client = tx ?? this.prisma;
+    return client.notification.create({ data });
+  }
+
   listTaskHistory(taskId: string, skip: number, take: number) {
     return this.prisma.taskHistory.findMany({
       where: { taskId },

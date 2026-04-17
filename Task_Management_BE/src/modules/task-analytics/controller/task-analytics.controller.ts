@@ -33,7 +33,6 @@ export class TaskAnalyticsController {
     description: 'Chart filter period',
   })
   @ApiResponse({
-    status: HttpStatus.OK,
     description: 'Task chart data retrieved successfully',
   })
   getTaskChart(@Request() req, @Query() queryDto: TaskChartQueryDto) {

@@ -20,12 +20,10 @@
       <!-- Back button -->
       <RouterLink
         to="/"
-        class="nf-btn mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white text-sm font-semibold no-underline transition-all duration-[180ms] max-[480px]:px-5 max-[480px]:py-2.5 max-[480px]:text-[0.8125rem]"
+        class="nf-btn gradient-btn mt-2 no-underline px-6 py-3 max-[480px]:px-5 max-[480px]:py-2.5 max-[480px]:text-[0.8125rem]"
         style="box-shadow: 0 4px 14px rgba(99,102,241,0.35);"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <path d="M19 12H5" /><polyline points="12 19 5 12 12 5" />
-        </svg>
+        <img :src="arrowLeftIcon" alt="" width="16" height="16" aria-hidden="true">
         Go back home
       </RouterLink>
     </div>
@@ -33,6 +31,7 @@
 </template>
 
 <script setup lang="ts">
+import arrowLeftIcon from '@/assets/icons/arrow-left.svg?url'
 </script>
 
 <style scoped>

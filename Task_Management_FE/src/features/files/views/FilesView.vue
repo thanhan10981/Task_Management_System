@@ -10,7 +10,7 @@
       <div class="flex items-center gap-2.5 flex-wrap max-[480px]:w-full">
         <!-- Outline button -->
         <button
-          class="fv-btn-outline inline-flex items-center gap-[7px] px-[18px] py-2.5 rounded-xl text-[13px] font-semibold cursor-pointer transition-all duration-200 max-[480px]:flex-1 max-[480px]:justify-center"
+          class="fv-btn-outline outline-btn max-[480px]:flex-1 max-[480px]:justify-center"
           style="background: var(--btn-bg); border: 1.5px solid var(--border-medium); color: var(--text-secondary); box-shadow: 0 1px 4px rgba(0,0,0,0.04);"
           @click="showCreateFolder = true"
         >
@@ -22,7 +22,7 @@
         </button>
         <!-- Primary button -->
         <button
-          class="fv-btn-primary inline-flex items-center gap-[7px] px-5 py-2.5 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white text-[13px] font-semibold border-none cursor-pointer transition-all duration-200 max-[480px]:flex-1 max-[480px]:justify-center"
+          class="fv-btn-primary gradient-btn max-[480px]:flex-1 max-[480px]:justify-center"
           style="box-shadow: 0 4px 14px rgba(99,102,241,0.35);"
           @click="triggerUploader"
         >
@@ -42,7 +42,7 @@
       <div class="flex flex-col gap-5 max-[900px]:gap-3.5">
 
         <!-- Folders card -->
-        <div class="rounded-[20px] border p-5 max-[900px]:p-4 max-[900px]:rounded-2xl" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+        <div class="page-card max-[900px]:p-4 max-[900px]:rounded-2xl" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
           <div class="flex items-center justify-between mb-[18px] max-[768px]:items-start max-[768px]:gap-2">
             <div class="flex items-center gap-2.5">
               <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white bg-gradient-to-br from-indigo-500 to-violet-500">
@@ -50,10 +50,7 @@
               </div>
               <span class="text-[15px] font-bold" style="color: var(--text-primary);">All Files</span>
             </div>
-            <button
-              class="fv-show-btn inline-flex items-center gap-1 text-xs font-semibold text-indigo-500 bg-transparent border-none cursor-pointer px-2.5 py-1 rounded-lg transition-colors duration-150 max-[768px]:px-2"
-              @click="refreshAll"
-            >
+            <button class="fv-show-btn" @click="refreshAll">
               Show All
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
@@ -65,7 +62,7 @@
           </div>
 
           <!-- Empty -->
-          <div v-else-if="folderRows.length === 0" class="flex flex-col items-center py-10 gap-2.5 text-[13px] rounded-[14px] border-[1.5px] border-dashed" style="color: var(--text-subtle); border-color: var(--border-medium);">
+          <div v-else-if="folderRows.length === 0" class="empty-placeholder" style="color: var(--text-subtle); border-color: var(--border-medium);">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             <p>No folders found</p>
           </div>
@@ -104,7 +101,7 @@
         </div>
 
         <!-- Recent Files card -->
-        <div class="rounded-[20px] border p-5 max-[900px]:p-4 max-[900px]:rounded-2xl" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+        <div class="page-card max-[900px]:p-4 max-[900px]:rounded-2xl" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
           <div class="flex items-center justify-between mb-[18px] max-[768px]:items-start max-[768px]:gap-2">
             <div class="flex items-center gap-2.5">
               <span class="text-[15px] font-bold" style="color: var(--text-primary);">Recent Files</span>
@@ -113,10 +110,7 @@
                 {{ displayFolderName(currentFolder) }}
               </span>
             </div>
-            <button
-              class="fv-show-btn inline-flex items-center gap-1 text-xs font-semibold text-indigo-500 bg-transparent border-none cursor-pointer px-2.5 py-1 rounded-lg transition-colors duration-150 max-[768px]:px-2"
-              @click="loadFiles"
-            >
+            <button class="fv-show-btn" @click="loadFiles">
               Reload
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/></svg>
             </button>
@@ -128,7 +122,7 @@
           </div>
 
           <!-- Empty -->
-          <div v-else-if="recentFiles.length === 0" class="flex flex-col items-center py-10 gap-2.5 text-[13px] rounded-[14px] border-[1.5px] border-dashed" style="color: var(--text-subtle); border-color: var(--border-medium);">
+          <div v-else-if="recentFiles.length === 0" class="empty-placeholder" style="color: var(--text-subtle); border-color: var(--border-medium);">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <p>No files in this folder</p>
           </div>
@@ -138,16 +132,16 @@
             <table class="file-table w-full border-collapse min-w-[560px] max-[768px]:min-w-0 max-[768px]:border-separate max-[768px]:border-spacing-y-2.5">
               <thead class="max-[768px]:hidden">
                 <tr>
-                  <th class="px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-left whitespace-nowrap border-b-[1.5px]" style="color: var(--text-subtle); border-color: var(--border-base);">
+                  <th class="fv-th" style="color: var(--text-subtle); border-color: var(--border-base);">
                     Name <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block align-middle"><polyline points="6 9 12 15 18 9"/></svg>
                   </th>
-                  <th class="px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-left whitespace-nowrap border-b-[1.5px]" style="color: var(--text-subtle); border-color: var(--border-base);">
+                  <th class="fv-th" style="color: var(--text-subtle); border-color: var(--border-base);">
                     Size <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block align-middle"><polyline points="6 9 12 15 18 9"/></svg>
                   </th>
-                  <th class="px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-left whitespace-nowrap border-b-[1.5px]" style="color: var(--text-subtle); border-color: var(--border-base);">
+                  <th class="fv-th" style="color: var(--text-subtle); border-color: var(--border-base);">
                     Last Modified <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block align-middle"><polyline points="6 9 12 15 18 9"/></svg>
                   </th>
-                  <th class="px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-left whitespace-nowrap border-b-[1.5px]" style="color: var(--text-subtle); border-color: var(--border-base);">
+                  <th class="fv-th" style="color: var(--text-subtle); border-color: var(--border-base);">
                     Members <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="inline-block align-middle"><polyline points="6 9 12 15 18 9"/></svg>
                   </th>
                   <th class="border-b-[1.5px]" style="border-color: var(--border-base);" />
@@ -155,7 +149,7 @@
               </thead>
               <tbody>
                 <tr v-for="file in recentFiles" :key="file.publicId" class="file-row transition-colors duration-150 max-[768px]:block max-[768px]:border max-[768px]:rounded-[14px] max-[768px]:overflow-hidden" style="border-color: var(--border-medium);">
-                  <td class="px-3.5 py-3 text-[13px] border-b align-middle max-[768px]:block max-[768px]:w-full max-[768px]:px-3 max-[768px]:py-2.5" style="color: var(--text-primary); border-color: var(--border-soft);" data-label="Name">
+                  <td class="fv-td" style="color: var(--text-primary); border-color: var(--border-soft);" data-label="Name">
                     <div class="flex items-center gap-2.5">
                       <span class="inline-flex items-center justify-center min-w-[38px] h-7 px-1.5 rounded-lg text-[10px] font-[800] tracking-[0.03em] whitespace-nowrap flex-shrink-0" :style="{ background: fileTypeBg(file.format) }" style="color: var(--text-heading);">
                         {{ getFileIconText(file.format) }}
@@ -163,10 +157,10 @@
                       <span class="font-semibold max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap max-[768px]:max-w-[calc(100vw-180px)]" style="color: var(--text-heading);">{{ file.fileName || fileName(file.publicId) }}</span>
                     </div>
                   </td>
-                  <td class="px-3.5 py-3 text-[13px] border-b align-middle max-[768px]:block max-[768px]:w-full max-[768px]:px-3 max-[768px]:py-2.5" style="color: var(--text-secondary); border-color: var(--border-soft);" data-label="Size">{{ formatBytes(file.bytes) }}</td>
-                  <td class="px-3.5 py-3 text-[13px] border-b align-middle max-[768px]:block max-[768px]:w-full max-[768px]:px-3 max-[768px]:py-2.5" style="color: var(--text-secondary); border-color: var(--border-soft);" data-label="Last Modified">{{ formatDate(file.createdAt) }}</td>
+                  <td class="fv-td" style="color: var(--text-secondary); border-color: var(--border-soft);" data-label="Size">{{ formatBytes(file.bytes) }}</td>
+                  <td class="fv-td" style="color: var(--text-secondary); border-color: var(--border-soft);" data-label="Last Modified">{{ formatDate(file.createdAt) }}</td>
                   <!-- Members -->
-                  <td class="px-3.5 py-3 text-[13px] border-b align-middle max-[768px]:block max-[768px]:w-full max-[768px]:px-3 max-[768px]:py-2.5" style="border-color: var(--border-soft);" data-label="Members">
+                  <td class="fv-td" style="border-color: var(--border-soft);" data-label="Members">
                     <div class="flex items-center py-0.5">
                       <template v-if="file.shared_with && file.shared_with.length">
                         <div
@@ -192,7 +186,7 @@
                     </div>
                   </td>
                   <!-- Actions -->
-                  <td class="px-3.5 py-3 text-[13px] border-b align-middle max-[768px]:block max-[768px]:w-full max-[768px]:px-3 max-[768px]:py-2.5 max-[768px]:border-b-0" style="border-color: var(--border-soft);" data-label="Actions">
+                  <td class="fv-td max-[768px]:border-b-0" style="border-color: var(--border-soft);" data-label="Actions">
                     <div class="flex items-center justify-end max-[768px]:justify-start">
                       <div class="relative inline-flex">
                         <button
@@ -241,7 +235,7 @@
       <aside class="flex flex-col gap-5 max-[900px]:gap-3.5">
 
         <!-- Storage Donut card -->
-        <div class="rounded-[20px] border p-5 max-[900px]:p-4 max-[900px]:rounded-2xl" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+        <div class="page-card max-[900px]:p-4 max-[900px]:rounded-2xl" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
           <h3 class="text-base font-bold m-0 mb-[18px]" style="color: var(--text-heading);">Available Storage</h3>
           <!-- Donut -->
           <div class="relative w-[110px] h-[110px] mx-auto mb-2.5">
@@ -282,7 +276,7 @@
         </div>
 
         <!-- Uploader card -->
-        <div ref="uploaderRef" class="rounded-[20px] border p-5 pl-8 max-[900px]:p-4" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+        <div ref="uploaderRef" class="page-card pl-8 max-[900px]:p-4" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
           <h3 class="text-base font-bold m-0 mb-[18px]" style="color: var(--text-heading);">Upload Files</h3>
           <CloudinaryUploader :folder="currentFolder" @uploaded="handleUploaded" />
         </div>
@@ -292,10 +286,10 @@
     <!-- ── Create Folder Modal ──────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="modal-fade">
-        <div v-if="showCreateFolder" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 backdrop-blur-[6px] px-4" @click.self="showCreateFolder = false">
-          <div class="w-full max-w-[420px] rounded-3xl border p-8 text-center max-[480px]:px-5 max-[480px]:py-6 max-[480px]:rounded-[18px]" style="background: var(--modal-bg); border-color: var(--modal-border); box-shadow: 0 24px 64px rgba(0,0,0,0.18);">
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-100 to-violet-200 flex items-center justify-center mx-auto mb-[18px] text-indigo-500">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+        <div v-if="showCreateFolder" class="modal-overlay" @click.self="showCreateFolder = false">
+          <div class="modal-panel" style="background: var(--modal-bg); border-color: var(--modal-border); box-shadow: 0 24px 64px rgba(0,0,0,0.18);">
+            <div class="modal-icon bg-gradient-to-br from-violet-100 to-violet-200 text-indigo-500">
+              <img :src="folderPlusIcon" alt="" width="24" height="24" aria-hidden="true">
             </div>
             <h3 class="text-lg font-[800] m-0 mb-1.5" style="color: var(--text-heading);">Create New Folder</h3>
             <p class="text-[13px] m-0 mb-5" style="color: var(--text-secondary);">Enter a path like <code class="rounded px-1.5 text-xs text-indigo-500" style="background: var(--bg-surface-3);">tasks/attachments/design</code></p>
@@ -310,7 +304,7 @@
             <div class="flex gap-2.5">
               <button class="fv-btn-ghost flex-1 justify-center px-5 py-2.5 rounded-xl border-[1.5px] text-[13px] font-semibold cursor-pointer transition-colors duration-150" style="border-color: var(--border-medium); color: var(--text-muted); background: transparent;" @click="showCreateFolder = false">Cancel</button>
               <button
-                class="fv-btn-primary-sm flex-1 inline-flex items-center justify-center gap-[7px] px-5 py-2.5 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white text-[13px] font-semibold border-none cursor-pointer transition-all duration-[180ms] disabled:opacity-55 disabled:cursor-not-allowed"
+                class="fv-btn-primary-sm gradient-btn flex-1"
                 :disabled="creatingFolder || !newFolderName.trim()"
                 @click="createFolder"
               >
@@ -326,10 +320,10 @@
     <!-- ── Delete File Modal ───────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="modal-fade">
-        <div v-if="showDeleteConfirm" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 backdrop-blur-[6px] px-4" @click.self="closeDeleteConfirm">
-          <div class="w-full max-w-[420px] rounded-3xl border p-8 text-center max-[480px]:px-5 max-[480px]:py-6 max-[480px]:rounded-[18px]" style="background: var(--modal-bg); border-color: var(--modal-border); box-shadow: 0 24px 64px rgba(0,0,0,0.18);">
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center mx-auto mb-[18px] text-red-600">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="closeDeleteConfirm">
+          <div class="modal-panel" style="background: var(--modal-bg); border-color: var(--modal-border); box-shadow: 0 24px 64px rgba(0,0,0,0.18);">
+            <div class="modal-icon bg-gradient-to-br from-red-100 to-red-200 text-red-600">
+              <img :src="trashIcon" alt="" width="24" height="24" aria-hidden="true">
             </div>
             <h3 class="text-lg font-[800] m-0 mb-1.5" style="color: var(--text-heading);">Delete File</h3>
             <p class="text-[13px] m-0 mb-5" style="color: var(--text-secondary);">
@@ -357,6 +351,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CloudinaryUploader from '../components/CloudinaryUploader.vue'
+import folderPlusIcon from '@/assets/icons/folder-plus.svg?url'
+import trashIcon from '@/assets/icons/trash.svg?url'
 import {
   createCloudinaryFolder,
   normalizeFolderPath,

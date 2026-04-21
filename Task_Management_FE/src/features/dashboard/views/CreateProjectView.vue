@@ -8,8 +8,8 @@
 
       <form class="mt-6 flex flex-col gap-[18px]" @submit.prevent="submit">
         <!-- Project name -->
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[0.8125rem] font-semibold text-slate-600" for="project-name">Project name</label>
+        <div class="cpv-field">
+          <label class="cpv-label" for="project-name">Project name</label>
           <input
             id="project-name"
             v-model.trim="form.name"
@@ -22,8 +22,8 @@
         </div>
 
         <!-- Description -->
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[0.8125rem] font-semibold text-slate-600" for="project-description">Description</label>
+        <div class="cpv-field">
+          <label class="cpv-label" for="project-description">Description</label>
           <textarea
             id="project-description"
             v-model.trim="form.description"
@@ -43,7 +43,7 @@
         <div class="flex justify-end pt-1 max-[480px]:justify-stretch">
           <button
             type="submit"
-            class="inline-flex items-center justify-center gap-2 px-7 py-[11px] rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white text-sm font-semibold border-none cursor-pointer shadow-[0_4px_14px_rgba(99,102,241,0.3)] transition-all duration-[180ms] disabled:opacity-55 disabled:cursor-not-allowed max-[480px]:w-full hover:not-disabled:opacity-[0.88] hover:not-disabled:-translate-y-px"
+            class="gradient-btn px-7 py-[11px] shadow-[0_4px_14px_rgba(99,102,241,0.3)] max-[480px]:w-full"
             :disabled="loading || !form.name"
           >
             <svg v-if="loading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="cpv-spin">
@@ -113,13 +113,11 @@ function extractErrorMessage(error: unknown) {
 </script>
 
 <style scoped>
-/* Focus ring dùng CSS variable — không thể làm với Tailwind thuần */
 .cpv-input:focus {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-/* @keyframes không thể inline với Tailwind */
 .cpv-spin { animation: cpv-spin 0.9s linear infinite; }
 @keyframes cpv-spin { to { transform: rotate(360deg); } }
 </style>

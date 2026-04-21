@@ -3,14 +3,14 @@
     <!-- ── Header ──────────────────────────────────────────────────── -->
     <div class="flex items-start justify-between">
       <div>
-        <h2 class="text-2xl font-bold m-0" style="color: var(--text-heading);">Dashboard</h2>
-        <p class="mt-1 text-sm m-0" style="color: var(--text-subtle);">Manage your workspace and project context from one place.</p>
+        <h2 class="page-title" style="color: var(--text-heading);">Dashboard</h2>
+        <p class="page-subtitle" style="color: var(--text-subtle);">Manage your workspace and project context from one place.</p>
       </div>
     </div>
 
     <!-- ── Resolving state ──────────────────────────────────────────── -->
     <div v-if="showProjectResolvingState" class="db-empty card">
-      <div class="db-spinner" />
+      <div class="db-spinner"/>
       <h3 class="text-2xl font-bold tracking-tight m-0" style="color: var(--text-heading);">Restoring your last workspace...</h3>
       <p class="text-[0.95rem] leading-[1.7] max-w-[460px] m-0" style="color: var(--text-subtle);">We are checking your most recent project and access permissions.</p>
     </div>
@@ -23,7 +23,7 @@
         You have not joined any project yet. Create your first project to start tracking tasks.
       </p>
       <button
-        class="relative z-10 mt-2 inline-flex items-center justify-center px-[18px] py-3 rounded-xl border border-indigo-400/30 bg-gradient-to-br from-indigo-500 to-violet-600 text-white text-sm font-bold cursor-pointer transition-all duration-[180ms] hover:-translate-y-px hover:brightness-105"
+        class="gradient-btn relative z-10 mt-2 px-[18px] py-3 border border-indigo-400/30 hover:-translate-y-px hover:brightness-105"
         style="box-shadow: 0 12px 28px rgba(99,102,241,0.18);"
         @click="goToCreateProject"
       >
@@ -174,9 +174,18 @@
             :key="task.id"
             class="db-task-row flex items-center gap-4 rounded-[14px] px-5 py-4 border transition-all duration-200 flex-wrap max-[640px]:px-3.5 max-[640px]:py-3 max-[640px]:gap-2.5"
             style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);"
+            role="button"
+            tabindex="0"
+            @click="openTask(task.id)"
+            @keydown.enter.prevent="openTask(task.id)"
+            @keydown.space.prevent="openTask(task.id)"
           >
             <!-- Play icon -->
-            <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-500 to-indigo-400" style="box-shadow: 0 2px 8px rgba(99,102,241,0.30);">
+            <div
+              class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+              :class="getStatusIconClass(task.status)"
+              :style="getStatusIconStyle(task.status)"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
             </div>
 
@@ -193,13 +202,29 @@
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold mb-1.5 m-0 whitespace-nowrap overflow-hidden text-ellipsis" style="color: var(--text-primary);">{{ task.title }}</p>
               <div class="flex items-center gap-3 flex-wrap min-w-0">
-                <span class="flex items-center gap-1 text-[0.6875rem] text-sky-400 min-w-0 max-w-full whitespace-nowrap overflow-hidden text-ellipsis">
+                <button
+                  type="button"
+                  class="flex items-center gap-1 text-[0.6875rem] text-sky-400 min-w-0 max-w-full whitespace-nowrap overflow-hidden text-ellipsis border-none bg-transparent p-0 cursor-pointer"
+                  @click.stop="copyTaskLink(task.id)"
+                >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
-                  task-link.example.com
-                </span>
-                <span class="flex items-center gap-1 text-[0.6875rem] min-w-0 max-w-full whitespace-nowrap overflow-hidden text-ellipsis" style="color: var(--text-muted);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                  comments unavailable
+                  {{ getTaskRouteLabel(task.id) }}
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-1 text-[0.6875rem] min-w-0 max-w-full whitespace-nowrap overflow-hidden text-ellipsis border-none bg-transparent p-0 cursor-pointer"
+                  style="color: var(--text-muted);"
+                  @click.stop="goToBoard"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>
+                  {{ currentProjectName }}
+                </button>
+                <span
+                  class="flex items-center gap-1 text-[0.6875rem] min-w-0 max-w-full whitespace-nowrap overflow-hidden text-ellipsis"
+                  :style="{ color: getReminderMeta(task).tone }"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7V3m8 4V3m-9 8h10m-12 9h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2Z"/></svg>
+                  {{ getReminderMeta(task).label }}
                 </span>
               </div>
             </div>
@@ -216,11 +241,56 @@
               </div>
             </div>
 
-            <!-- Reminder -->
-            <button class="db-reminder-btn flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] border border-indigo-400/30 bg-indigo-500/[0.14] text-indigo-300 text-xs font-semibold cursor-pointer whitespace-nowrap flex-shrink-0 transition-all duration-150">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-              Reminder
-            </button>
+            <!-- Actions -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <!-- Reminder controls: owner only -->
+              <template v-if="isCurrentProjectOwner">
+                <label
+                  class="flex items-center gap-2 px-3.5 py-2 rounded-[10px] border text-xs"
+                  style="border-color: var(--border-medium); background: var(--bg-surface-2); color: var(--text-secondary);"
+                  title="Choose how long before the deadline to send the reminder email"
+                  @click.stop
+                >
+                  <span>Before</span>
+                  <select
+                    class="border-none bg-transparent text-xs font-semibold outline-none cursor-pointer"
+                    style="color: var(--text-primary);"
+                    :value="getReminderThreshold(task.id)"
+                    :disabled="remindingTaskId === task.id"
+                    @click.stop
+                    @change="setReminderThreshold(task.id, Number(($event.target as HTMLSelectElement).value))"
+                  >
+                    <option
+                      v-for="option in reminderThresholdOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </label>
+              </template>
+              <button
+                type="button"
+                class="db-action-btn flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] border text-xs font-semibold cursor-pointer whitespace-nowrap flex-shrink-0 transition-all duration-150"
+                style="border-color: var(--border-medium); background: var(--bg-surface-2); color: var(--text-secondary);"
+                @click.stop="openTask(task.id)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v7H3V3h7"/></svg>
+                Open
+              </button>
+              <button
+                v-if="isCurrentProjectOwner"
+                type="button"
+                class="db-reminder-btn flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] border border-indigo-400/30 bg-indigo-500/[0.14] text-indigo-300 text-xs font-semibold cursor-pointer whitespace-nowrap flex-shrink-0 transition-all duration-150"
+                title="Send reminder mail to task assignees"
+                :disabled="remindingTaskId === task.id"
+                @click.stop="setReminder(task)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                {{ remindingTaskId === task.id ? 'Sending...' : 'Send reminder' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -229,8 +299,11 @@
 </template>
 
 <script setup lang="ts">
+import { post } from '@/api/client'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useToast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useTasksQuery } from '@/features/tasks/composables/useTasksQuery'
 import { useRouter } from 'vue-router'
@@ -247,13 +320,16 @@ import {
 } from 'chart.js'
 import { useTaskAnalyticsChartQuery } from '@/features/dashboard/composables/useTaskAnalyticsChartQuery'
 import type { TaskChartPeriod } from '@/features/dashboard/schemas/task-chart.schema'
+import type { Task } from '@/features/tasks/schemas/task.schema'
 
 Chart.register(LineController, LineElement, LinearScale, CategoryScale, PointElement, Tooltip, Filler)
 
 const router = useRouter()
+const toast = useToast()
+const authStore = useAuthStore()
 
 const projectStore = useProjectStore()
-const { currentProjectId, hasProjects, loadingProjects, initialized, projectContextResolved } =
+const { currentProjectId, hasProjects, loadingProjects, initialized, projectContextResolved, currentProject } =
   storeToRefs(projectStore)
 
 const showProjectResolvingState = computed(
@@ -273,6 +349,19 @@ const {
 })
 
 const taskList = computed(() => tasksData.value?.data ?? [])
+const currentProjectName = computed(() => currentProject.value?.name ?? 'Current project')
+const remindingTaskId = ref<string | null>(null)
+const selectedReminderThresholds = ref<Record<string, number>>({})
+const reminderThresholdOptions = [
+  { label: '15 min', value: 15 },
+  { label: '30 min', value: 30 },
+  { label: '1 hour', value: 60 },
+  { label: '2 hours', value: 120 },
+  { label: '1 day', value: 1440 },
+] as const
+const isCurrentProjectOwner = computed(
+  () => Boolean(authStore.user?.id) && currentProject.value?.createdBy === authStore.user?.id,
+)
 const chartSummary = computed(() => taskChartResponse.value?.data?.summary)
 const activeTabLabel = computed(
   () => chartTabs.find((tab) => tab.value === activeTab.value)?.label ?? 'Selected'
@@ -482,10 +571,199 @@ function getProgress(status: string): number {
 
 function getProgressClass(status: string): string {
   switch (status) {
-    case 'done': return 'bg-gradient-to-r from-indigo-500 to-indigo-400'
-    case 'in_progress': return 'bg-gradient-to-r from-indigo-500 to-indigo-300'
-    case 'todo': return 'bg-gradient-to-r from-cyan-500 to-cyan-300'
+    case 'done': return 'bg-gradient-to-r from-indigo-500 to-violet-500'
+    case 'in_progress': return 'bg-gradient-to-r from-cyan-500 to-cyan-400'
+    case 'todo': return 'bg-gradient-to-r from-amber-400 to-amber-300'
     default: return 'bg-slate-300'
+  }
+}
+
+function getStatusIconClass(status: string): string {
+  switch (status) {
+    case 'done': return 'bg-gradient-to-br from-indigo-500 to-violet-500'
+    case 'in_progress': return 'bg-gradient-to-br from-cyan-500 to-cyan-400'
+    case 'todo': return 'bg-gradient-to-br from-amber-400 to-amber-500'
+    case 'cancelled': return 'bg-gradient-to-br from-slate-400 to-slate-500'
+    default: return 'bg-gradient-to-br from-indigo-500 to-indigo-400'
+  }
+}
+
+function getStatusIconStyle(status: string): string {
+  switch (status) {
+    case 'done': return 'box-shadow: 0 2px 8px rgba(99,102,241,0.35);'
+    case 'in_progress': return 'box-shadow: 0 2px 8px rgba(6,182,212,0.35);'
+    case 'todo': return 'box-shadow: 0 2px 8px rgba(251,191,36,0.35);'
+    case 'cancelled': return 'box-shadow: 0 2px 8px rgba(100,116,139,0.25);'
+    default: return 'box-shadow: 0 2px 8px rgba(99,102,241,0.30);'
+  }
+}
+
+function buildTaskRoute(taskId: string) {
+  return router.resolve({
+    name: 'task-detail',
+    params: { id: taskId },
+  })
+}
+
+function getTaskRouteLabel(taskId: string) {
+  return buildTaskRoute(taskId).href
+}
+
+async function copyTaskLink(taskId: string) {
+  const resolved = buildTaskRoute(taskId)
+  const taskUrl = new URL(resolved.href, window.location.origin).toString()
+
+  try {
+    await navigator.clipboard.writeText(taskUrl)
+    toast.success('Task link copied')
+  } catch {
+    toast.error('Unable to copy task link')
+  }
+}
+
+function openTask(taskId: string) {
+  void router.push({
+    name: 'task-detail',
+    params: { id: taskId },
+  })
+}
+
+function goToBoard() {
+  void router.push({ name: 'board' })
+}
+
+function getReminderThreshold(taskId: string) {
+  return selectedReminderThresholds.value[taskId] ?? 60
+}
+
+function setReminderThreshold(taskId: string, thresholdMinutes: number) {
+  selectedReminderThresholds.value = {
+    ...selectedReminderThresholds.value,
+    [taskId]: thresholdMinutes,
+  }
+}
+
+function getReminderMeta(task: Task) {
+  if (!task.dueDate) {
+    return {
+      label: 'No due date yet',
+      tone: 'var(--text-subtle)',
+    }
+  }
+
+  const dueDate = new Date(task.dueDate)
+  if (Number.isNaN(dueDate.getTime())) {
+    return {
+      label: 'Reminder unavailable',
+      tone: '#f59e0b',
+    }
+  }
+
+  const diff = dueDate.getTime() - Date.now()
+  const diffMinutes = Math.round(diff / 60000)
+
+  if (diffMinutes <= 0) {
+    return {
+      label: `Due ${formatReminderDueDate(task.dueDate)}`,
+      tone: '#f43f5e',
+    }
+  }
+
+  if (diffMinutes < 60) {
+    return {
+      label: `Due in ${diffMinutes} min`,
+      tone: '#f59e0b',
+    }
+  }
+
+  const diffHours = Math.round(diffMinutes / 60)
+  if (diffHours < 24) {
+    return {
+      label: `Due in ${diffHours} hr`,
+      tone: '#38bdf8',
+    }
+  }
+
+  const diffDays = Math.round(diffHours / 24)
+  return {
+    label: `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`,
+    tone: 'var(--text-muted)',
+  }
+}
+
+function formatReminderDueDate(dateStr: string) {
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) {
+    return 'soon'
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
+
+async function setReminder(task: Task) {
+  if (!isCurrentProjectOwner.value) {
+    toast.warn('Only project owner can send reminder emails')
+    return
+  }
+
+  if (!task.dueDate) {
+    toast.warn('Task needs a due date before setting a reminder')
+    return
+  }
+
+  const dueDate = new Date(task.dueDate)
+  if (Number.isNaN(dueDate.getTime())) {
+    toast.error('Task due date is invalid')
+    return
+  }
+
+  remindingTaskId.value = task.id
+  const thresholdMinutes = getReminderThreshold(task.id)
+
+  try {
+    const response = await post<{
+      message: string
+      data?: {
+        sentCount?: number
+        skippedCount?: number
+      }
+    }>(`/reminders/tasks/${task.id}/send`, {
+      thresholdMinutes,
+    })
+
+    const sentCount = response.data?.sentCount ?? 0
+    const skippedCount = response.data?.skippedCount ?? 0
+
+    if (sentCount > 0 && skippedCount > 0) {
+      toast.success(
+        `Sent ${sentCount} reminder email(s) for ${thresholdMinutes} min before deadline, skipped ${skippedCount} duplicate reminder(s)`,
+      )
+      return
+    }
+
+    if (sentCount > 0) {
+      toast.success(`Reminder email sent for ${task.title} at ${thresholdMinutes} min before deadline`)
+      return
+    }
+
+    toast.info(response.message || 'Reminder mail was already sent for this task due date')
+  } catch (error) {
+    const message =
+      error &&
+      typeof error === 'object' &&
+      'response' in error &&
+      typeof (error as { response?: { data?: { message?: unknown } } }).response?.data?.message === 'string'
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message as string)
+        : 'Unable to send reminder email'
+
+    toast.error(message)
+  } finally {
+    remindingTaskId.value = null
   }
 }
 
@@ -552,6 +830,16 @@ async function goToCreateProject() {
 .db-reminder-btn:hover {
   background: rgba(99,102,241,0.22);
   box-shadow: 0 2px 8px rgba(99,102,241,0.15);
+}
+
+.db-reminder-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.db-action-btn:hover {
+  background: var(--bg-hover) !important;
+  box-shadow: var(--shadow-sm);
 }
 
 /* 5. Spinner — @keyframes */

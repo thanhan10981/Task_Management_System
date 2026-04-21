@@ -1,19 +1,19 @@
 <template>
-  <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
-    <div class="mb-8">
-      <h2 class="text-2xl font-bold text-white">Set new password</h2>
-      <p class="mt-1 text-sm text-slate-400">Create your new password to continue.</p>
+  <div class="auth-card">
+    <div class="auth-header">
+      <h2 class="auth-title">Set new password</h2>
+      <p class="auth-subtitle">Create your new password to continue.</p>
     </div>
 
     <!-- Token error -->
-    <div v-if="tokenError" class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+    <div v-if="tokenError" class="auth-api-error">
       {{ tokenError }}
     </div>
 
     <form v-else-if="!isSuccess" @submit="onSubmit" novalidate class="space-y-5">
       <!-- New password -->
       <div>
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5" for="newPassword">New password</label>
+        <label class="auth-label" for="newPassword">New password</label>
         <div class="relative">
           <input
             id="newPassword"
@@ -21,14 +21,12 @@
             v-bind="newPasswordAttrs"
             :type="showNewPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            class="w-full rounded-xl border bg-white/5 px-4 py-3 pr-10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            :class="errors.newPassword
-              ? 'border-red-500/60 focus:ring-red-500/60 focus:border-red-500/50'
-              : 'border-white/10 focus:ring-sky-500/60 focus:border-sky-500/50'"
+            class="auth-input-toggle"
+            :class="errors.newPassword ? 'auth-input-invalid' : 'auth-input-valid'"
           />
           <button
             type="button"
-            class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+            class="auth-toggle-btn"
             :aria-label="showNewPassword ? 'Hide password' : 'Show password'"
             @click="showNewPassword = !showNewPassword"
           >
@@ -41,12 +39,12 @@
             </svg>
           </button>
         </div>
-        <p v-if="errors.newPassword" class="mt-1.5 text-xs text-red-400">{{ errors.newPassword }}</p>
+        <p v-if="errors.newPassword" class="auth-field-error">{{ errors.newPassword }}</p>
       </div>
 
       <!-- Confirm password -->
       <div>
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5" for="confirmPassword">Confirm new password</label>
+        <label class="auth-label" for="confirmPassword">Confirm new password</label>
         <div class="relative">
           <input
             id="confirmPassword"
@@ -54,14 +52,12 @@
             v-bind="confirmPasswordAttrs"
             :type="showConfirmPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            class="w-full rounded-xl border bg-white/5 px-4 py-3 pr-10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            :class="errors.confirmPassword
-              ? 'border-red-500/60 focus:ring-red-500/60 focus:border-red-500/50'
-              : 'border-white/10 focus:ring-sky-500/60 focus:border-sky-500/50'"
+            class="auth-input-toggle"
+            :class="errors.confirmPassword ? 'auth-input-invalid' : 'auth-input-valid'"
           />
           <button
             type="button"
-            class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+            class="auth-toggle-btn"
             :aria-label="showConfirmPassword ? 'Hide password' : 'Show password'"
             @click="showConfirmPassword = !showConfirmPassword"
           >
@@ -74,18 +70,18 @@
             </svg>
           </button>
         </div>
-        <p v-if="errors.confirmPassword" class="mt-1.5 text-xs text-red-400">{{ errors.confirmPassword }}</p>
+        <p v-if="errors.confirmPassword" class="auth-field-error">{{ errors.confirmPassword }}</p>
       </div>
 
       <!-- API Error -->
-      <div v-if="apiError" class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+      <div v-if="apiError" class="auth-api-error">
         {{ apiError }}
       </div>
 
       <!-- Submit -->
       <button
         type="submit"
-        class="w-full py-3 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-[0.98] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500/50 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+        class="auth-btn"
         :disabled="resetPasswordMutation.isPending.value"
       >
         <span v-if="resetPasswordMutation.isPending.value">Resetting password...</span>
@@ -94,14 +90,11 @@
     </form>
 
     <!-- Success -->
-    <div v-else class="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-300">
+    <div v-else class="auth-success-banner">
       Password has been reset successfully. Please sign in with your new password.
     </div>
 
-    <RouterLink
-      to="/auth/login"
-      class="mt-6 flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm text-slate-300 font-medium hover:bg-white/10 hover:text-white transition-all duration-200"
-    >
+    <RouterLink to="/auth/login" class="auth-secondary-link mt-6">
       Go to login
     </RouterLink>
   </div>

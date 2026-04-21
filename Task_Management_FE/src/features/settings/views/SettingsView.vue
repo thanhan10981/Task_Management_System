@@ -5,10 +5,7 @@
     <div class="h-[172px] rounded-[18px] relative overflow-hidden flex-shrink-0" :style="coverStyle">
       <label class="sp-cover-upload absolute bottom-3 right-3.5 inline-flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] text-xs font-semibold text-gray-700 cursor-pointer transition-colors duration-[180ms] border border-white/60" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);">
         <input type="file" accept="image/*" hidden @change="onCoverChange">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
+        <img :src="uploadCloudIcon" alt="" width="16" height="16" aria-hidden="true">
         Change cover
       </label>
     </div>
@@ -23,12 +20,9 @@
           <span v-else class="text-[1.6rem] font-bold text-white leading-none">{{ initials }}</span>
         </div>
         <div class="sp-avatar-overlay absolute bottom-0.5 right-0.5 w-6 h-6 rounded-full flex items-center justify-center text-indigo-500 transition-colors duration-150" style="background: var(--bg-surface); border: 2px solid var(--bg-app); box-shadow: 0 1px 4px rgba(0,0,0,0.18);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/>
-          </svg>
+          <img :src="pencilEditIcon" alt="" width="14" height="14" aria-hidden="true">
         </div>
       </label>
-
       <div class="flex-1 min-w-0 pt-9">
         <h2 class="text-[1.375rem] font-[800] m-0 tracking-[-0.01em]" style="color: var(--text-heading);">Profile Settings</h2>
         <p class="text-[0.8125rem] mt-0.5 m-0" style="color: var(--text-muted);">{{ preview.fullName || 'Your Name' }} · {{ preview.jobTitle || 'Your role' }}</p>
@@ -36,13 +30,13 @@
 
       <div class="flex gap-2.5 items-center mt-9">
         <button
-          class="sp-btn-secondary h-[38px] px-[18px] rounded-[10px] border-[1.5px] text-sm font-semibold cursor-pointer font-[inherit] transition-all duration-[180ms] disabled:opacity-40 disabled:cursor-not-allowed"
+          class="sp-btn-secondary"
           style="border-color: var(--border-medium); background: var(--bg-surface); color: var(--text-muted);"
           :disabled="!isDirty || saving"
           @click="handleCancel"
         >Cancel</button>
         <button
-          class="sp-btn-primary h-[38px] px-5 rounded-[10px] border-none bg-gradient-to-br from-indigo-500 to-violet-500 text-white text-sm font-semibold cursor-pointer font-[inherit] inline-flex items-center gap-2 transition-all duration-[180ms] disabled:opacity-40 disabled:cursor-not-allowed"
+          class="sp-btn-primary"
           style="box-shadow: 0 2px 10px rgba(99,102,241,0.30);"
           :disabled="!isDirty || saving"
           @click="handleSave"
@@ -58,7 +52,7 @@
       <button
         v-for="tab in tabs"
         :key="tab.id"
-        class="sp-tab px-[18px] pt-2.5 pb-3 border-none bg-transparent text-sm font-medium cursor-pointer font-[inherit] relative transition-colors duration-[180ms] whitespace-nowrap"
+        class="sp-tab"
         :class="activeTab === tab.id ? 'sp-tab--active text-indigo-500 font-bold' : ''"
         :style="activeTab !== tab.id ? `color: var(--text-subtle)` : ''"
         @click="activeTab = tab.id"
@@ -72,58 +66,54 @@
       <div>
         <!-- My Details -->
         <template v-if="activeTab === 'my-details'">
-          <section class="rounded-[18px] border-[1.5px] p-7 flex flex-col gap-[18px]" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+          <section class="settings-section" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
             <div>
-              <h3 class="text-base font-bold m-0" style="color: var(--text-heading);">Personal information</h3>
-              <p class="text-[0.8125rem] m-0 mt-0.5 leading-relaxed" style="color: var(--text-subtle);">Update your photo and personal details.</p>
+              <h3 class="section-title" style="color: var(--text-heading);">Personal information</h3>
+              <p class="section-subtitle" style="color: var(--text-subtle);">Update your photo and personal details.</p>
             </div>
 
             <!-- Full name -->
             <div class="grid grid-cols-2 gap-4 max-[540px]:grid-cols-1">
               <div class="flex flex-col gap-1.5">
-                <label class="text-[0.8125rem] font-semibold flex items-center gap-2" style="color: var(--text-secondary);" for="firstName">First name</label>
-                <input id="firstName" v-model="form.firstName" class="sp-input h-[42px] rounded-[10px] border-[1.5px] px-3.5 text-sm font-[inherit] outline-none transition-all duration-[180ms]" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="text" placeholder="John">
+                <label class="sp-label flex items-center gap-2" style="color: var(--text-secondary);" for="firstName">First name</label>
+                <input id="firstName" v-model="form.firstName" class="sp-input" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="text" placeholder="John">
               </div>
               <div class="flex flex-col gap-1.5">
-                <label class="text-[0.8125rem] font-semibold flex items-center gap-2" style="color: var(--text-secondary);" for="lastName">Last name</label>
-                <input id="lastName" v-model="form.lastName" class="sp-input h-[42px] rounded-[10px] border-[1.5px] px-3.5 text-sm font-[inherit] outline-none transition-all duration-[180ms]" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="text" placeholder="Doe">
+                <label class="sp-label flex items-center gap-2" style="color: var(--text-secondary);" for="lastName">Last name</label>
+                <input id="lastName" v-model="form.lastName" class="sp-input" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="text" placeholder="Doe">
               </div>
             </div>
 
             <!-- Email (readonly) -->
             <div class="flex flex-col gap-1.5">
-              <label class="text-[0.8125rem] font-semibold flex items-center gap-2" style="color: var(--text-secondary);" for="email">
+              <label class="sp-label flex items-center gap-2" style="color: var(--text-secondary);" for="email">
                 Email address
                 <span class="text-[0.65rem] font-semibold uppercase px-1.5 py-0.5 rounded-md" style="color: var(--text-subtle); background: var(--bg-surface-3);">read-only</span>
               </label>
               <div class="relative">
-                <svg class="absolute left-[13px] top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                </svg>
-                <input id="email" :value="form.email" class="sp-input sp-input--disabled w-full h-[42px] rounded-[10px] border-[1.5px] pl-[38px] pr-3.5 text-sm font-[inherit] outline-none" style="background: var(--input-disabled); border-color: var(--input-border); color: var(--text-subtle); cursor: not-allowed;" type="email" disabled>
+                <img :src="emailIcon" alt="" width="15" height="15" class="absolute left-[13px] top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
+                <input id="email" :value="form.email" class="sp-input sp-input--disabled w-full pl-[38px] pr-3.5" style="background: var(--input-disabled); border-color: var(--input-border); color: var(--text-subtle); cursor: not-allowed;" type="email" disabled>
               </div>
             </div>
 
             <!-- Job title + Phone -->
             <div class="grid grid-cols-2 gap-4 max-[540px]:grid-cols-1">
               <div class="flex flex-col gap-1.5">
-                <label class="text-[0.8125rem] font-semibold" style="color: var(--text-secondary);" for="jobTitle">Job title</label>
-                <input id="jobTitle" v-model="form.jobTitle" class="sp-input h-[42px] rounded-[10px] border-[1.5px] px-3.5 text-sm font-[inherit] outline-none transition-all duration-[180ms]" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="text" placeholder="Product Designer">
+                <label class="sp-label" style="color: var(--text-secondary);" for="jobTitle">Job title</label>
+                <input id="jobTitle" v-model="form.jobTitle" class="sp-input" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="text" placeholder="Product Designer">
               </div>
               <div class="flex flex-col gap-1.5">
-                <label class="text-[0.8125rem] font-semibold" style="color: var(--text-secondary);" for="phone">Phone</label>
+                <label class="sp-label" style="color: var(--text-secondary);" for="phone">Phone</label>
                 <div class="relative">
-                  <svg class="absolute left-[13px] top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.91-1.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-                  </svg>
-                  <input id="phone" v-model="form.phone" class="sp-input w-full h-[42px] rounded-[10px] border-[1.5px] pl-[38px] pr-3.5 text-sm font-[inherit] outline-none transition-all duration-[180ms]" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="tel" placeholder="+1 234 567 8900">
+                  <img :src="phoneIcon" alt="" width="14" height="14" class="absolute left-[13px] top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
+                  <input id="phone" v-model="form.phone" class="sp-input w-full pl-[38px] pr-3.5" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="tel" placeholder="+1 234 567 8900">
                 </div>
               </div>
             </div>
 
             <!-- Bio -->
             <div class="flex flex-col gap-1.5">
-              <label class="text-[0.8125rem] font-semibold flex items-center gap-2" style="color: var(--text-secondary);" for="bio">
+              <label class="sp-label flex items-center gap-2" style="color: var(--text-secondary);" for="bio">
                 Bio
                 <span class="ml-auto text-xs font-medium text-slate-400 transition-colors duration-[180ms]" :class="form.bio.length > 180 ? 'text-amber-500' : ''">
                   {{ form.bio.length }}/200
@@ -132,7 +122,7 @@
               <textarea
                 id="bio"
                 v-model="form.bio"
-                class="sp-input rounded-[10px] border-[1.5px] px-3.5 py-3 text-sm font-[inherit] outline-none transition-all duration-[180ms] resize-y leading-[1.55]"
+                class="sp-input rounded-[10px] border-[1.5px] px-3.5 py-3 h-auto resize-y leading-[1.55]"
                 style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);"
                 rows="4"
                 maxlength="200"
@@ -144,13 +134,13 @@
 
         <!-- Preferences -->
         <template v-else-if="activeTab === 'preferences'">
-          <section class="rounded-[18px] border-[1.5px] p-7 flex flex-col gap-[18px]" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+          <section class="settings-section" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
             <div>
-              <h3 class="text-base font-bold m-0" style="color: var(--text-heading);">App preferences</h3>
-              <p class="text-[0.8125rem] m-0 mt-0.5 leading-relaxed" style="color: var(--text-subtle);">Customize your theme.</p>
+              <h3 class="section-title" style="color: var(--text-heading);">App preferences</h3>
+              <p class="section-subtitle" style="color: var(--text-subtle);">Customize your theme.</p>
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="text-[0.8125rem] font-semibold" style="color: var(--text-secondary);">Theme</label>
+              <label class="sp-label" style="color: var(--text-secondary);">Theme</label>
               <div class="flex gap-2 flex-wrap">
                 <button
                   v-for="t in themes"
@@ -172,28 +162,28 @@
 
         <!-- Password -->
         <template v-else-if="activeTab === 'password'">
-          <section class="rounded-[18px] border-[1.5px] p-7 flex flex-col gap-[18px]" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+          <section class="settings-section" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
             <div>
-              <h3 class="text-base font-bold m-0" style="color: var(--text-heading);">Change password</h3>
-              <p class="text-[0.8125rem] m-0 mt-0.5 leading-relaxed" style="color: var(--text-subtle);">Use a strong password you don't use elsewhere.</p>
+              <h3 class="section-title" style="color: var(--text-heading);">Change password</h3>
+              <p class="section-subtitle" style="color: var(--text-subtle);">Use a strong password you don't use elsewhere.</p>
             </div>
 
             <div class="flex flex-col gap-1.5">
-              <label class="text-[0.8125rem] font-semibold" style="color: var(--text-secondary);" for="currentPw">Current password</label>
-              <input id="currentPw" v-model="pwForm.current" class="sp-input h-[42px] rounded-[10px] border-[1.5px] px-3.5 text-sm font-[inherit] outline-none transition-all duration-[180ms]" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="password" placeholder="••••••••">
+              <label class="sp-label" style="color: var(--text-secondary);" for="currentPw">Current password</label>
+              <input id="currentPw" v-model="pwForm.current" class="sp-input" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="password" placeholder="••••••••">
             </div>
 
             <div class="grid grid-cols-2 gap-4 max-[540px]:grid-cols-1">
               <div class="flex flex-col gap-1.5">
-                <label class="text-[0.8125rem] font-semibold" style="color: var(--text-secondary);" for="newPw">New password</label>
-                <input id="newPw" v-model="pwForm.newPw" class="sp-input h-[42px] rounded-[10px] border-[1.5px] px-3.5 text-sm font-[inherit] outline-none transition-all duration-[180ms]" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="password" placeholder="••••••••">
+                <label class="sp-label" style="color: var(--text-secondary);" for="newPw">New password</label>
+                <input id="newPw" v-model="pwForm.newPw" class="sp-input" style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);" type="password" placeholder="••••••••">
               </div>
               <div class="flex flex-col gap-1.5">
-                <label class="text-[0.8125rem] font-semibold" style="color: var(--text-secondary);" for="confirmPw">Confirm new password</label>
+                <label class="sp-label" style="color: var(--text-secondary);" for="confirmPw">Confirm new password</label>
                 <input
                   id="confirmPw"
                   v-model="pwForm.confirm"
-                  class="sp-input h-[42px] rounded-[10px] border-[1.5px] px-3.5 text-sm font-[inherit] outline-none transition-all duration-[180ms]"
+                  class="sp-input"
                   :style="pwMismatch
                     ? 'background: var(--input-bg); border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.10); color: var(--text-primary);'
                     : 'background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);'"
@@ -224,10 +214,10 @@
 
         <!-- Notifications -->
         <template v-else-if="activeTab === 'notifications'">
-          <section class="rounded-[18px] border-[1.5px] p-7 flex flex-col gap-[18px]" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
+          <section class="settings-section" style="background: var(--bg-surface); border-color: var(--border-base); box-shadow: var(--shadow-sm);">
             <div>
-              <h3 class="text-base font-bold m-0" style="color: var(--text-heading);">Notification preferences</h3>
-              <p class="text-[0.8125rem] m-0 mt-0.5 leading-relaxed" style="color: var(--text-subtle);">Choose what you want to be notified about.</p>
+              <h3 class="section-title" style="color: var(--text-heading);">Notification preferences</h3>
+              <p class="section-subtitle" style="color: var(--text-subtle);">Choose what you want to be notified about.</p>
             </div>
             <div class="flex flex-col gap-0 rounded-xl overflow-hidden border-[1.5px]" style="border-color: var(--border-base);">
               <div
@@ -241,7 +231,7 @@
                 </div>
                 <label class="relative inline-flex cursor-pointer flex-shrink-0">
                   <input v-model="n.enabled" type="checkbox" class="toggle-input absolute opacity-0 w-0 h-0">
-                  <span class="toggle-track block w-11 h-6 rounded-full relative transition-colors duration-[220ms]" style="background: var(--border-medium);">
+                  <span class="toggle-track block w-11 h-6 rounded-full relative transition-colors duration-[220ms]">
                     <span class="toggle-thumb absolute top-[3px] left-[3px] w-[18px] h-[18px] rounded-full bg-white transition-transform duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]" style="box-shadow: 0 1px 4px rgba(0,0,0,0.20);" />
                   </span>
                 </label>
@@ -295,7 +285,7 @@
     <!-- ── Save toast ─────────────────────────────────────────────────── -->
     <Transition name="toast">
       <div v-if="saveSuccess" class="fixed bottom-7 right-7 inline-flex items-center gap-2 px-5 py-3 rounded-xl border-[1.5px] border-green-200 text-sm font-semibold text-green-700 z-[9999]" style="background: var(--bg-surface); box-shadow: var(--shadow-lg);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+        <img :src="checkIcon" alt="" width="16" height="16" aria-hidden="true">
         Profile saved successfully!
       </div>
     </Transition>
@@ -306,6 +296,11 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
 import { useTheme } from '@/composables/useTheme'
+import uploadCloudIcon from '@/assets/icons/upload-cloud.svg?url'
+import pencilEditIcon from '@/assets/icons/pencil-edit.svg?url'
+import emailIcon from '@/assets/icons/email.svg?url'
+import phoneIcon from '@/assets/icons/phone.svg?url'
+import checkIcon from '@/assets/icons/check.svg?url'
 import {
   useSaveUserSettingsMutation,
   useUserSettingsQuery,
@@ -515,7 +510,8 @@ function applyTheme(theme: UserSettings['theme']) { settings.theme = theme; setT
 /* 7. Notification row hover — CSS var */
 .notif-row:hover { background: var(--bg-surface-2); }
 
-/* 8. Toggle switch — :checked state on sibling track/thumb */
+/* 8. Toggle switch — default + :checked state */
+.toggle-track { background: var(--border-medium); }
 .toggle-input:checked ~ .toggle-track { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
 .toggle-input:checked ~ .toggle-track .toggle-thumb { transform: translateX(20px); }
 

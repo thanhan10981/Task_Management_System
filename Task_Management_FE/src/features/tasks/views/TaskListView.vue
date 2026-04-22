@@ -18,11 +18,9 @@
             <div class="flex items-center -space-x-2">
               <button
                 v-for="m in store.members.slice(0, visibleAvatarCount)" :key="m.id"
-                class="kb-avatar-lg text-[11px] ring-2 ring-[var(--bg-app)] transition-all duration-150 cursor-pointer"
-                :class="filterMembers.includes(m.id) ? 'ring-indigo-500 scale-110' : 'opacity-90 hover:opacity-100 hover:scale-105'"
+                class="kb-avatar-lg text-[11px] ring-2 ring-[var(--bg-app)] opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-150 cursor-default"
                 :style="{ background: m.color }"
                 :title="m.name"
-                @click.stop="toggleFilterMember(m.id)"
               >{{ m.initials }}</button>
 
               <!-- Overflow badge -->
@@ -31,7 +29,7 @@
                 class="kb-avatar-lg text-[10px] ring-2 ring-[var(--bg-app)] cursor-pointer hover:scale-105 transition-transform"
                 style="background:var(--bg-surface-3);color:var(--text-muted)"
                 title="Show all members"
-                @click.stop="memberPickerOpen = true"
+                @click.stop="openMemberPicker()"
               >+{{ store.members.length - visibleAvatarCount }}</button>
             </div>
 
@@ -40,7 +38,7 @@
               class="mp-add-btn"
               :class="{ 'mp-add-btn--open': memberPickerOpen }"
               title="Manage members"
-              @click.stop="memberPickerOpen = !memberPickerOpen"
+              @click.stop="memberPickerOpen ? (memberPickerOpen = false) : openMemberPicker()"
             >
               <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
                 <line x1="10" y1="4" x2="10" y2="16"/>
@@ -54,15 +52,8 @@
             <div v-if="memberPickerOpen" class="mp-dropdown" @click.stop>
               <!-- Header -->
               <div class="mp-dropdown-head">
-                <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Board Members</span>
+                <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Project Members</span>
                 <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
-              </div>
-
-              <!-- Filter active notice -->
-              <div v-if="filterMembers.length" class="mp-filter-notice">
-                <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 10 13 17 6"/></svg>
-                Filtering by {{ filterMembers.length }} member{{ filterMembers.length > 1 ? 's' : '' }}
-                <button class="mp-clear" @click="filterMembers = []">Clear</button>
               </div>
 
               <!-- Search -->
@@ -71,7 +62,7 @@
                 <input
                   v-model="memberSearch"
                   class="mp-search"
-                  placeholder="Search member…"
+                  placeholder="Search user to add…"
                   ref="memberSearchInput"
                 />
               </div>
@@ -81,24 +72,54 @@
                 <div
                   v-for="m in filteredPickerMembers" :key="m.id"
                   class="mp-item"
-                  :class="{ 'mp-item--on': filterMembers.includes(m.id) }"
-                  @click="toggleFilterMember(m.id)"
                 >
                   <div class="mp-item-avatar" :style="{ background: m.color }">{{ m.initials }}</div>
                   <div class="mp-item-info">
                     <span class="mp-item-name">{{ m.name }}</span>
                   </div>
-                  <!-- Checkmark -->
-                  <svg
-                    v-if="filterMembers.includes(m.id)"
-                    class="mp-item-check"
-                    width="14" height="14" viewBox="0 0 20 20"
-                    fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round"
-                  ><polyline points="4 10 8 14 16 6"/></svg>
                 </div>
 
-                <!-- Empty state -->
-                <div v-if="filteredPickerMembers.length === 0" class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
+                <div v-if="memberSearch.trim()" class="mp-dropdown-head">
+                  <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Search Results</span>
+                  <span class="text-[10px]" style="color:var(--text-subtle)">{{ searchedUsers.length }} available</span>
+                </div>
+
+                <button
+                  v-for="user in searchedUsers"
+                  :key="user.id"
+                  type="button"
+                  class="mp-item w-full text-left"
+                  :disabled="addingMemberId === user.id"
+                  @click="addMemberFromPicker(user)"
+                >
+                  <div class="mp-item-avatar" :style="{ background: userAvatarColor(user) }">
+                    {{ userInitials(user) }}
+                  </div>
+                  <div class="mp-item-info">
+                    <span class="mp-item-name">{{ user.fullName || user.email }}</span>
+                  </div>
+                  <span class="mp-item-check" style="color:#6366f1;font-size:11px">
+                    {{ addingMemberId === user.id ? 'Adding...' : 'Add' }}
+                  </span>
+                </button>
+
+                <div
+                  v-if="assignableUsersQuery.isPending.value && memberSearch.trim()"
+                  class="py-4 text-center text-[12px]"
+                  style="color:var(--text-subtle)"
+                >
+                  Searching users...
+                </div>
+
+                <div
+                  v-else-if="memberSearch.trim() && searchedUsers.length === 0"
+                  class="py-4 text-center text-[12px]"
+                  style="color:var(--text-subtle)"
+                >
+                  No users available to add
+                </div>
+
+                <div v-else-if="filteredPickerMembers.length === 0" class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
                   No members found
                 </div>
               </div>
@@ -107,8 +128,8 @@
               <div class="mp-footer">
                 <button
                   class="mp-footer-btn mp-footer-btn--ghost"
-                  @click="filterMembers = []; memberPickerOpen = false"
-                >Reset filter</button>
+                  @click="memberSearch = ''"
+                >Clear search</button>
                 <button
                   class="mp-footer-btn mp-footer-btn--primary"
                   @click="memberPickerOpen = false"
@@ -147,6 +168,7 @@
           :style="sidebarOpen ? '' : 'min-width:max-content;'"
           :animation="200"
           ghost-class="kb-col-ghost"
+          @change="onColumnChange"
         >
           <template #item="{ element: col }">
             <div class="kb-col group">
@@ -390,8 +412,8 @@
               </div>
             </div>
 
-            <button class="fp-submit" :disabled="!newTask.title.trim()" @click="addTask">
-              Create Task
+            <button class="fp-submit" :disabled="!newTask.title.trim() || submittingTask" @click="addTask">
+              {{ submittingTask ? 'Creating...' : 'Create Task' }}
             </button>
           </template>
 
@@ -452,8 +474,8 @@
               </div>
             </div>
 
-            <button class="fp-submit" :disabled="!newStatus.title.trim()" @click="addStatus">
-              Create Column
+            <button class="fp-submit" :disabled="!newStatus.title.trim() || submittingStatus" @click="addStatus">
+              {{ submittingStatus ? 'Creating...' : 'Create Column' }}
             </button>
           </template>
 
@@ -471,42 +493,87 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import draggable from 'vuedraggable'
+import { useToast } from '@/composables/useToast'
+import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
+import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
+import type { User } from '@/types/user.types'
 import type { Task, Column } from '@/stores/task.store'
 import TaskDetailModal from './TaskDetailModal.vue'
 
 const store = useTaskStore()
+const projectStore = useProjectStore()
+const { currentProjectId } = storeToRefs(projectStore)
+const toast = useToast()
 
 // ── Sidebar / panel ────────────────────────────────────────────────────────────────────
 const sidebarOpen = ref(false)
 const activeTab = ref<'task' | 'status'>('task')
 
 // ── Member picker ────────────────────────────────────────────────────────────────────
-const memberPickerOpen  = ref(false)
-const memberSearch      = ref('')
-const memberPickerRef   = ref<HTMLElement | null>(null)
+const memberPickerOpen = ref(false)
+const memberSearch = ref('')
+const memberPickerRef = ref<HTMLElement | null>(null)
 const memberSearchInput = ref<HTMLInputElement | null>(null)
-const filterMembers     = ref<string[]>([])          // ids to filter tasks by
-const visibleAvatarCount = 4                          // how many to show before +N
+const visibleAvatarCount = 4
+const addingMemberId = ref<string | null>(null)
+const assignableUsersQuery = useUsersQuery(memberSearch, {
+  enabled: computed(() => Boolean(memberPickerOpen.value && currentProjectId.value)),
+})
 
 const filteredPickerMembers = computed(() => {
   const q = memberSearch.value.trim().toLowerCase()
   if (!q) return store.members
-  return store.members.filter(m => m.name.toLowerCase().includes(q))
+  return store.members.filter((m) => m.name.toLowerCase().includes(q))
 })
 
-function toggleFilterMember(id: string) {
-  const idx = filterMembers.value.indexOf(id)
-  if (idx >= 0) filterMembers.value.splice(idx, 1)
-  else filterMembers.value.push(id)
+const selectedProjectMemberIds = computed(() => new Set(store.members.map((member) => member.id)))
+const searchedUsers = computed(() =>
+  (assignableUsersQuery.data.value ?? [])
+    .filter((user) => !selectedProjectMemberIds.value.has(user.id))
+    .slice(0, 8),
+)
+
+function userInitials(user: User) {
+  const raw = (user.fullName || user.email).trim()
+  return raw
+    .split(/\s+/)
+    .map((part) => part.charAt(0))
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
+function userAvatarColor(user: User) {
+  const seed = user.id || user.email
+  const palette = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#ef4444', '#f97316']
+  const hash = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return palette[hash % palette.length]
 }
 
 async function openMemberPicker() {
   memberPickerOpen.value = true
   await nextTick()
   memberSearchInput.value?.focus()
+}
+
+async function addMemberFromPicker(user: User) {
+  if (!currentProjectId.value || addingMemberId.value) return
+
+  addingMemberId.value = user.id
+
+  try {
+    await store.addMemberToProject(currentProjectId.value, user.id)
+    memberSearch.value = ''
+    toast.success(`Added ${user.fullName || user.email} to this project`)
+  } catch (_error) {
+    toast.error('Cannot add member to this project')
+  } finally {
+    addingMemberId.value = null
+  }
 }
 
 function onDocClick(e: MouseEvent) {
@@ -536,10 +603,27 @@ function onTasksReorder(_colId: string, _newList: Task[]) {
   // vuedraggable v4: cross-column moves handled by @change
 }
 
-function onTaskChange(evt: { added?: { element: Task } }, toColId: string) {
+async function onColumnChange(evt: { moved?: { element: Column; newIndex: number } }) {
+  const moved = evt.moved
+  if (!moved || !currentProjectId.value) return
+
+  try {
+    await store.updateStatusPosition(currentProjectId.value, moved.element.id, moved.newIndex + 1)
+  } catch (_error) {
+    toast.error('Cannot update status order')
+    await syncProjectTasks(currentProjectId.value)
+  }
+}
+
+async function onTaskChange(evt: { added?: { element: Task } }, toColId: string) {
   // Fires when a task is dropped into this column from another
-  if (evt.added) {
-    store.moveTask(evt.added.element.id, toColId)
+  if (!evt.added || !currentProjectId.value) return
+
+  try {
+    await store.moveTaskToStatus(currentProjectId.value, evt.added.element.id, toColId)
+  } catch (_error) {
+    toast.error('Cannot update task status')
+    await syncProjectTasks(currentProjectId.value)
   }
 }
 
@@ -558,29 +642,49 @@ const newTask = ref({
   label: '', due: '', sprint: '', assigneeIds: [] as string[],
 })
 
+const defaultStatusId = computed(() => store.columns[0]?.id ?? 'backlog')
+const submittingTask = ref(false)
+const submittingStatus = ref(false)
+
 function toggleNewAssignee(id: string) {
   const idx = newTask.value.assigneeIds.indexOf(id)
   if (idx >= 0) newTask.value.assigneeIds.splice(idx, 1)
   else newTask.value.assigneeIds.push(id)
 }
 
-function addTask() {
+async function addTask() {
   if (!newTask.value.title.trim()) return
-  const assignees = store.members.filter(m => newTask.value.assigneeIds.includes(m.id))
-  store.addTask({
-    title: newTask.value.title,
-    description: newTask.value.description,
-    status: newTask.value.status,
-    priority: newTask.value.priority,
-    label: newTask.value.label,
-    labelBg: '',
-    labelColor: '',
-    due: newTask.value.due,
-    sprint: newTask.value.sprint,
-    assignees,
-  })
-  newTask.value = { title: '', description: '', status: 'backlog', priority: 'medium', label: '', due: '', sprint: '', assigneeIds: [] }
-  sidebarOpen.value = false
+  if (!currentProjectId.value) {
+    toast.error('Please select a project first')
+    return
+  }
+
+  if (!newTask.value.status) {
+    toast.error('Please select a status for the task')
+    return
+  }
+
+  submittingTask.value = true
+
+  try {
+    await store.createTaskInProject({
+      projectId: currentProjectId.value,
+      title: newTask.value.title.trim(),
+      description: newTask.value.description.trim(),
+      statusId: newTask.value.status,
+      priority: newTask.value.priority,
+      dueDate: newTask.value.due || undefined,
+      assigneeIds: newTask.value.assigneeIds,
+    })
+
+    newTask.value = { title: '', description: '', status: defaultStatusId.value, priority: 'medium', label: '', due: '', sprint: '', assigneeIds: [] }
+    sidebarOpen.value = false
+    toast.success('Task created successfully')
+  } catch (_error) {
+    toast.error('Cannot create task')
+  } finally {
+    submittingTask.value = false
+  }
 }
 
 // ── New Status form ────────────────────────────────────────────────────────────────────
@@ -607,11 +711,33 @@ const iconOptions: IconOption[] = [
 ]
 const newStatus = ref({ title: '', color: '#6366f1', iconId: 'list' })
 
-function addStatus() {
+async function addStatus() {
   if (!newStatus.value.title.trim()) return
-  store.addColumn({ title: newStatus.value.title, icon: newStatus.value.iconId, color: newStatus.value.color })
-  newStatus.value = { title: '', color: '#6366f1', iconId: 'list' }
-  activeTab.value = 'task'
+  if (!currentProjectId.value) {
+    toast.error('Please select a project first')
+    return
+  }
+
+  submittingStatus.value = true
+
+  try {
+    await store.createStatusInProject({
+      projectId: currentProjectId.value,
+      title: newStatus.value.title.trim(),
+      color: newStatus.value.color,
+    })
+
+    newStatus.value = { title: '', color: '#6366f1', iconId: 'list' }
+    activeTab.value = 'task'
+    if (!newTask.value.status) {
+      newTask.value.status = defaultStatusId.value
+    }
+    toast.success('Status created successfully')
+  } catch (_error) {
+    toast.error('Cannot create status')
+  } finally {
+    submittingStatus.value = false
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -619,6 +745,32 @@ function formatDate(d: string) {
   if (!d) return ''
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+
+async function syncProjectTasks(projectId: string | null) {
+  if (!projectId) {
+    store.resetProjectBoard()
+    newTask.value.status = defaultStatusId.value
+    return
+  }
+
+  try {
+    await store.loadProjectBoard(projectId)
+
+    if (!store.columns.some((col) => col.id === newTask.value.status)) {
+      newTask.value.status = defaultStatusId.value
+    }
+  } catch (error) {
+    toast.error('Cannot load tasks for the current project')
+  }
+}
+
+watch(
+  currentProjectId,
+  (projectId) => {
+    void syncProjectTasks(projectId)
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>

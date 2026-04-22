@@ -258,12 +258,25 @@ export class TaskService {
       );
     }
 
+    const {
+      statusId,
+      parentTaskId,
+      dueDate,
+      startDate,
+      ...taskScalarPatch
+    } = taskPatch;
+
     const updateData: Prisma.TaskUpdateInput = {
-      ...taskPatch,
-      dueDate: taskPatch.dueDate ? new Date(taskPatch.dueDate) : undefined,
-      startDate: taskPatch.startDate
-        ? new Date(taskPatch.startDate)
-        : undefined,
+      ...taskScalarPatch,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      startDate: startDate ? new Date(startDate) : undefined,
+      status: statusId ? { connect: { id: statusId } } : undefined,
+      parentTask:
+        parentTaskId === undefined
+          ? undefined
+          : parentTaskId
+            ? { connect: { id: parentTaskId } }
+            : { disconnect: true },
       updatedByUser: { connect: { id: userId } },
     };
 

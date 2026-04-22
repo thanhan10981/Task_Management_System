@@ -28,7 +28,10 @@ export const createTaskSchema = taskSchema.pick({
   description: true,
   priority: true,
   dueDate: true,
-  assigneeId: true,
+}).extend({
+  projectId: z.string().uuid(),
+  statusId: z.string().uuid(),
+  assigneeIds: z.array(z.string().uuid()).optional(),
 })
 
 export const updateTaskSchema = createTaskSchema.partial()

@@ -113,6 +113,11 @@ export class TasksRepository {
         createdByUser: true,
         status: true,
         project: true,
+        assignees: {
+          include: {
+            user: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -269,13 +274,23 @@ export class TasksRepository {
     const safePosition = Math.max(1, Math.min(newPosition, filtered.length + 1));
     filtered.splice(safePosition - 1, 0, target);
 
+    const tempPositionOffset = statuses.length + 1000;
+
     await this.prisma.$transaction(
-      filtered.map((status, index) =>
-        this.prisma.taskStatus.update({
-          where: { id: status.id },
-          data: { position: index + 1 },
-        }),
-      ),
+      [
+        ...filtered.map((status, index) =>
+          this.prisma.taskStatus.update({
+            where: { id: status.id },
+            data: { position: tempPositionOffset + index + 1 },
+          }),
+        ),
+        ...filtered.map((status, index) =>
+          this.prisma.taskStatus.update({
+            where: { id: status.id },
+            data: { position: index + 1 },
+          }),
+        ),
+      ],
     );
 
     return this.listProjectStatuses(projectId);

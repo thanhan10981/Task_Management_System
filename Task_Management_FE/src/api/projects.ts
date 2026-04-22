@@ -55,3 +55,14 @@ export async function createProject(payload: CreateProjectPayload): Promise<Proj
   const response = await post<ProjectSummary | ApiEnvelope<ProjectSummary>>('/projects', payload)
   return unwrapApiPayload(response)
 }
+
+export async function listProjectMembers(projectId: string): Promise<unknown[]> {
+  const response = await get<unknown[] | ApiEnvelope<unknown[]>>(`/projects/${projectId}/members`)
+  const payload = unwrapApiPayload(response)
+  return Array.isArray(payload) ? payload : []
+}
+
+export async function addProjectMember(projectId: string, userId: string, role = 'MEMBER'): Promise<unknown> {
+  const response = await post(`/projects/${projectId}/members`, { userId, role })
+  return unwrapApiPayload(response)
+}

@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import {
@@ -263,12 +263,36 @@ export class ProjectsService {
       throw new ConflictException('User is already a member of this project');
     }
 
-    const createdMember = await this.projectsRepository.addProjectMember(
-      projectId,
-      dto.userId,
-      dto.role || 'MEMBER',
-      userId,
-    );
+    const createdMember = await this.projectsRepository.withTransaction(async (tx) => {
+      const member = await this.projectsRepository.addProjectMember(
+        projectId,
+        dto.userId,
+        dto.role || 'MEMBER',
+        userId,
+        tx,
+      );
+
+      if (dto.userId !== userId) {
+        await this.projectsRepository.createNotification(
+          {
+            user: { connect: { id: dto.userId } },
+            project: { connect: { id: projectId } },
+            type: NotificationType.SYSTEM,
+            title: 'You were added to a project',
+            content: `You have been added to project "${project.name}" as ${dto.role || 'MEMBER'}.`,
+            data: {
+              action: 'PROJECT_MEMBER_ADDED',
+              projectId,
+              role: dto.role || 'MEMBER',
+              addedBy: userId,
+            },
+          },
+          tx,
+        );
+      }
+
+      return member;
+    });
 
     this.logger.log(
       `User ${dto.userId} added to project ${projectId} by ${userId} as ${dto.role || 'MEMBER'}`,
@@ -306,7 +330,6 @@ export class ProjectsService {
       projectId,
       memberUserId,
       dto.role,
-      userId,
     );
 
     this.logger.log(
@@ -335,7 +358,7 @@ export class ProjectsService {
       throw new NotFoundException('Project member not found');
     }
 
-    await this.projectsRepository.removeProjectMember(projectId, memberUserId, userId);
+    await this.projectsRepository.removeProjectMember(projectId, memberUserId);
 
     this.logger.log(
       `User ${memberUserId} removed from project ${projectId} by ${userId}`,

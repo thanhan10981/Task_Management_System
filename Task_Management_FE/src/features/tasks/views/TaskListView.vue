@@ -41,6 +41,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
@@ -49,7 +50,12 @@ import { useTasksQuery } from '../composables/useTasksQuery'
 const router = useRouter()
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
-const { data, isLoading, isError } = useTasksQuery()
+const taskQueryParams = computed(() =>
+  currentProjectId.value ? { projectId: currentProjectId.value } : {}
+)
+const { data, isLoading, isError } = useTasksQuery(taskQueryParams, {
+  enabled: computed(() => Boolean(currentProjectId.value)),
+})
 
 function openTask(taskId: string) {
   if (!currentProjectId.value) return

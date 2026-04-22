@@ -24,10 +24,8 @@ interface UseFilesOptions {
 export function useFiles(options: UseFilesOptions) {
   const { currentFolder, currentProjectId, folders, loadFolders, toast, errorMessage } = options
   const queryClient = useQueryClient()
-
   const recentFiles = ref<CloudinaryFile[]>([])
   const allFiles = ref<CloudinaryFile[]>([])
-  const loadingFiles = ref(false)
   const deletingFile = ref<string | null>(null)
   const folderSignature = computed(() =>
     folders.value
@@ -110,13 +108,6 @@ export function useFiles(options: UseFilesOptions) {
     { immediate: true },
   )
 
-  watch(
-    () => recentFilesQuery.isFetching.value,
-    (isFetching) => {
-      loadingFiles.value = isFetching
-    },
-    { immediate: true },
-  )
 
   watch(
     () => recentFilesQuery.data.value,
@@ -268,7 +259,7 @@ export function useFiles(options: UseFilesOptions) {
   return {
     recentFiles,
     allFiles,
-    loadingFiles,
+    loadingFiles: recentFilesQuery.isFetching,
     deletingFile,
     loadFiles,
     loadAllFiles,

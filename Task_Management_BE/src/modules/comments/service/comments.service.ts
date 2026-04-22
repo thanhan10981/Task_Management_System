@@ -15,6 +15,8 @@ import {
   UpdateCommentDto,
 } from '../dto/comment.dto';
 import { CommentsRepository } from '../repository/comments.repository';
+import { TASK_HISTORY_ACTIONS } from '../../tasks/constants/task-actions.constants';
+import { buildTaskHistoryMetadata } from '../../tasks/utils/task-history.util';
 
 @Injectable()
 export class CommentsService {
@@ -69,19 +71,16 @@ export class CommentsService {
       this.commentsRepository.createTaskHistory({
         task: { connect: { id: taskId } },
         user: { connect: { id: userId } },
-        action: 'TASK_COMMENTED',
-        newValue: {
-          commentId: createdComment.id,
-          content: createdComment.content,
-        },
-      }),
-      this.commentsRepository.createActivityLog({
-        user: { connect: { id: userId } },
-        project: { connect: { id: task.projectId } },
-        entityType: 'TASK',
-        entityId: taskId,
-        action: 'TASK_COMMENTED',
-        description: 'A comment was added to task',
+        actionType: TASK_HISTORY_ACTIONS.COMMENTED,
+        metadata: buildTaskHistoryMetadata({
+          comment: {
+            old: null,
+            new: {
+              commentId: createdComment.id,
+              content: createdComment.content,
+            },
+          },
+        }),
       }),
     ]);
 
@@ -114,17 +113,19 @@ export class CommentsService {
       this.commentsRepository.createTaskHistory({
         task: { connect: { id: existingComment.taskId } },
         user: { connect: { id: userId } },
-        action: 'TASK_COMMENT_UPDATED',
-        oldValue: { content: existingComment.content },
-        newValue: { content: dto.content },
-      }),
-      this.commentsRepository.createActivityLog({
-        user: { connect: { id: userId } },
-        project: { connect: { id: task.projectId } },
-        entityType: 'TASK',
-        entityId: existingComment.taskId,
-        action: 'TASK_COMMENT_UPDATED',
-        description: 'A task comment was updated',
+        actionType: TASK_HISTORY_ACTIONS.COMMENT_UPDATED,
+        metadata: buildTaskHistoryMetadata({
+          comment: {
+            old: {
+              commentId: existingComment.id,
+              content: existingComment.content,
+            },
+            new: {
+              commentId: existingComment.id,
+              content: dto.content,
+            },
+          },
+        }),
       }),
     ]);
 
@@ -160,16 +161,16 @@ export class CommentsService {
       this.commentsRepository.createTaskHistory({
         task: { connect: { id: existingComment.taskId } },
         user: { connect: { id: userId } },
-        action: 'TASK_COMMENT_DELETED',
-        oldValue: { commentId: existingComment.id, content: existingComment.content },
-      }),
-      this.commentsRepository.createActivityLog({
-        user: { connect: { id: userId } },
-        project: { connect: { id: task.projectId } },
-        entityType: 'TASK',
-        entityId: existingComment.taskId,
-        action: 'TASK_COMMENT_DELETED',
-        description: 'A task comment was deleted',
+        actionType: TASK_HISTORY_ACTIONS.COMMENT_DELETED,
+        metadata: buildTaskHistoryMetadata({
+          comment: {
+            old: {
+              commentId: existingComment.id,
+              content: existingComment.content,
+            },
+            new: null,
+          },
+        }),
       }),
     ]);
 

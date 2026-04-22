@@ -20,6 +20,16 @@ interface RegisterPayload extends LoginPayload {
   confirmPassword: string
 }
 
+interface ForgotPasswordPayload {
+  email: string
+}
+
+interface ResetPasswordPayload {
+  resetToken: string
+  newPassword: string
+  confirmPassword: string
+}
+
 export function useLoginMutation() {
   return useMutation({
     mutationKey: QUERY_KEYS.auth.login,
@@ -31,5 +41,19 @@ export function useRegisterMutation() {
   return useMutation({
     mutationKey: QUERY_KEYS.auth.register,
     mutationFn: (payload: RegisterPayload) => post<AuthSuccessResponse>('/auth/register', payload),
+  })
+}
+
+export function useForgotPasswordMutation() {
+  return useMutation({
+    mutationKey: QUERY_KEYS.auth.forgotPassword,
+    mutationFn: (payload: ForgotPasswordPayload) => post<{ message: string }>('/auth/forgot-password', payload),
+  })
+}
+
+export function useResetPasswordMutation() {
+  return useMutation({
+    mutationKey: QUERY_KEYS.auth.resetPassword,
+    mutationFn: (payload: ResetPasswordPayload) => post<{ message: string }>('/auth/reset-password', payload),
   })
 }

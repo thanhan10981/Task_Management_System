@@ -1,20 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ThemeMode } from '@prisma/client';
-import { IsEnum, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsObject, IsOptional } from 'class-validator';
 
 export class UpdateUserSettingsDto {
-  @ApiPropertyOptional({ example: 'en' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  language?: string;
-
-  @ApiPropertyOptional({ example: 'Asia/Ho_Chi_Minh' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  timezone?: string;
-
   @ApiPropertyOptional({ enum: ThemeMode, example: 'SYSTEM' })
   @IsOptional()
   @IsEnum(ThemeMode)

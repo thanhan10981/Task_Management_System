@@ -97,10 +97,6 @@ export class CommentsRepository {
     return this.prisma.taskHistory.create({ data });
   }
 
-  createActivityLog(data: Prisma.ActivityLogCreateInput) {
-    return this.prisma.activityLog.create({ data });
-  }
-
   createNotification(data: Prisma.NotificationCreateInput) {
     return this.prisma.notification.create({ data });
   }

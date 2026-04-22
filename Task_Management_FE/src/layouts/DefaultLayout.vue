@@ -1,44 +1,57 @@
 <template>
-  <div class="app-shell">
+  <div class="flex min-h-screen" style="background: var(--bg-app); font-family: 'Inter', system-ui, sans-serif;">
 
     <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
-    <aside class="sidebar">
+    <aside
+      class="w-20 min-h-screen h-screen sticky top-0 z-50 flex flex-col items-center pt-4 pb-6 flex-shrink-0"
+      style="background: var(--sidebar-bg); border-right: 1px solid var(--sidebar-border); box-shadow: 2px 0 12px rgba(0,0,0,0.03);"
+    >
       <!-- Logo -->
-      <div class="sidebar-logo">
+      <div class="flex items-center justify-center py-1">
         <OctomLogo size="sm" orientation="col" />
       </div>
 
-      <div class="sidebar-divider" />
+      <!-- Divider -->
+      <div class="w-8 h-px my-2.5" style="background: var(--border-base);" />
+
       <!-- Nav -->
-      <nav class="sidebar-nav">
+      <nav class="flex flex-col items-center gap-1 flex-1">
         <RouterLink
           v-for="item in navItems"
           :key="item.name"
           :to="navTarget(item)"
-          class="nav-item"
-          :class="{ 'nav-item--active': isActive(item) }"
+          class="nav-item relative w-11 h-11 rounded-[14px] flex items-center justify-center cursor-pointer no-underline font-[inherit] border-none bg-transparent transition-all duration-[180ms]"
+          :class="isActive(item) ? 'nav-item--active' : ''"
           :title="item.label"
           active-class=""
         >
-          <span class="nav-icon" v-html="item.icon" />
+          <span class="nav-icon flex items-center justify-center" v-html="item.icon" />
           <span class="nav-tooltip">{{ item.label }}</span>
         </RouterLink>
       </nav>
     </aside>
 
-    <!-- ══ RIGHT COLUMN (header + content) ═══════════════════════ -->
-    <div class="right-col">
+    <!-- ══ RIGHT COLUMN ═══════════════════════════════════════ -->
+    <div class="flex flex-col flex-1 min-w-0">
 
-      <!-- ── TOP HEADER ─────────────────────────────────────────── -->
-      <header class="top-header">
-        <!-- Search (centre) -->
-        <div class="header-search">
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- ── TOP HEADER ─────────────────────────────────────── -->
+      <header
+        class="h-16 flex items-center px-7 gap-5 sticky top-0 z-40"
+        style="background: var(--header-bg); border-bottom: 1px solid var(--header-border); box-shadow: var(--shadow-sm);"
+      >
+        <!-- Search -->
+        <div class="flex-1 max-w-[420px] mx-auto relative flex items-center">
+          <svg
+            class="absolute left-3.5 pointer-events-none flex-shrink-0 text-slate-400"
+            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          >
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
             v-model="searchQuery"
-            class="search-input"
+            class="search-input w-full h-[38px] rounded-xl pl-10 pr-3.5 text-[13px] outline-none font-[inherit] transition-all duration-200"
+            style="border: 1.5px solid var(--search-border); background: var(--search-bg); color: var(--text-secondary);"
             type="text"
             placeholder="Search anything..."
             @keyup.enter="handleSearch"
@@ -46,30 +59,50 @@
         </div>
 
         <!-- Right actions -->
-        <div class="header-actions">
-          <div ref="projectMenuWrapRef" class="project-menu-wrap">
-            <button class="project-menu-btn" @click.stop="toggleProjectMenu">
-              <span class="project-menu-label">{{ currentProjectName }}</span>
+        <div class="flex items-center gap-2.5 flex-shrink-0">
+
+          <!-- Project selector -->
+          <div ref="projectMenuWrapRef" class="relative">
+            <button
+              class="h-10 inline-flex items-center gap-2 rounded-xl px-3 text-[13px] font-semibold cursor-pointer max-w-[220px] transition-all duration-200"
+              style="border: 1.5px solid var(--btn-border); background: var(--btn-bg); color: var(--text-secondary);"
+              @click.stop="toggleProjectMenu"
+            >
+              <span class="overflow-hidden text-ellipsis whitespace-nowrap max-w-[170px]">{{ currentProjectName }}</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
 
             <Transition name="dropdown-fade">
-              <div v-if="projectMenuOpen" class="project-dropdown" @click.stop>
+              <div
+                v-if="projectMenuOpen"
+                class="absolute top-[calc(100%+8px)] right-0 min-w-[240px] max-w-[300px] rounded-2xl border p-2 z-[300]"
+                style="background: var(--dropdown-bg); border-color: var(--border-base); box-shadow: var(--shadow-lg);"
+                @click.stop
+              >
                 <button
                   v-for="project in projects"
                   :key="project.id"
-                  class="project-dropdown-item"
-                  :class="project.id === currentProjectId ? 'project-dropdown-item--active' : ''"
+                  class="w-full flex items-center gap-2 rounded-[10px] border-none text-[13px] font-semibold cursor-pointer px-2.5 py-2 text-left transition-colors duration-150"
+                  :class="project.id === currentProjectId
+                    ? 'text-indigo-700'
+                    : ''"
+                  :style="project.id === currentProjectId
+                    ? 'background: var(--bg-active);'
+                    : 'background: none; color: var(--text-secondary);'"
                   @click="selectProject(project.id)"
                 >
-                  <span class="project-dot" />
-                  <span class="project-dropdown-name">{{ project.name }}</span>
+                  <span class="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
+                  <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ project.name }}</span>
                 </button>
 
-                <div class="dropdown-divider" />
-                <button class="project-create-btn" @click="goToCreateProject">
+                <div class="h-px my-1" style="background: var(--divider);" />
+                <button
+                  class="w-full border-none rounded-[10px] bg-none text-indigo-500 text-[13px] font-bold cursor-pointer text-left px-2.5 py-2 hover:opacity-80 transition-opacity"
+                  style="background: none;"
+                  @click="goToCreateProject"
+                >
                   + Create Project
                 </button>
               </div>
@@ -77,38 +110,69 @@
           </div>
 
           <!-- Notification bell -->
-          <button class="notif-btn" title="Notifications" @click="toggleNotif">
-            <!-- Bell body -->
+          <button
+            class="notif-btn relative w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer text-indigo-500 flex-shrink-0 transition-all duration-200"
+            style="border: 1.5px solid var(--btn-border); background: var(--btn-bg);"
+            title="Notifications"
+            @click="toggleNotif"
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <!-- Badge with count -->
-            <span v-if="unreadCount > 0" class="notif-badge">
+            <span
+              v-if="unreadCount > 0"
+              class="notif-badge absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-[9px] bg-red-500 border-2 border-white text-white text-[10px] font-extrabold leading-[14px] flex items-center justify-center tracking-tight"
+              style="box-shadow: 0 2px 6px rgba(239,68,68,0.4);"
+            >
               {{ unreadCount > 9 ? '9+' : unreadCount }}
             </span>
           </button>
 
           <!-- Avatar + dropdown -->
-          <div ref="avatarWrapRef" class="avatar-wrap" @click="toggleUserMenu">
-            <div class="header-avatar">{{ userInitial }}</div>
-            <svg class="avatar-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <div
+            ref="avatarWrapRef"
+            class="flex items-center gap-1.5 cursor-pointer relative px-2 py-1 rounded-xl transition-all duration-200"
+            style="border: 1.5px solid var(--btn-border); background: var(--btn-bg);"
+            @click="toggleUserMenu"
+          >
+            <div
+              class="w-[30px] h-[30px] rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-xs font-extrabold text-white tracking-wide flex-shrink-0"
+            >
+              {{ userInitial }}
+            </div>
+            <svg class="flex-shrink-0 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polyline points="6 9 12 15 18 9" />
             </svg>
 
-            <!-- Dropdown -->
+            <!-- User dropdown -->
             <Transition name="dropdown-fade">
-              <div v-if="userMenuOpen" class="user-dropdown" @click.stop>
-                <div class="dropdown-header">
-                  <div class="dropdown-avatar">{{ userInitial }}</div>
+              <div
+                v-if="userMenuOpen"
+                class="absolute top-[calc(100%+8px)] right-0 rounded-2xl border p-2 min-w-[220px] z-[300]"
+                style="background: var(--dropdown-bg); border-color: var(--border-base); box-shadow: var(--shadow-lg);"
+                @click.stop
+              >
+                <div class="flex items-center gap-2.5 px-2.5 pt-2 pb-2.5">
+                  <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-extrabold text-white flex-shrink-0">
+                    {{ userInitial }}
+                  </div>
                   <div>
-                    <p class="dropdown-name">{{ displayUserName }}</p>
-                    <p class="dropdown-email">{{ authStore.user?.email ?? '' }}</p>
+                    <p class="text-[13px] font-bold capitalize m-0" style="color: var(--text-heading);">{{ displayUserName }}</p>
+                    <p class="text-[11px] mt-0.5 max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap m-0" style="color: var(--text-subtle);">{{ authStore.user?.email ?? '' }}</p>
                   </div>
                 </div>
-                <div class="dropdown-divider" />
-                <button class="dropdown-item" @click="handleLogout">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <div class="h-px my-1" style="background: var(--divider);" />
+                <button
+                  class="flex items-center gap-2 w-full px-3 py-2 rounded-[10px] border-none bg-none text-[13px] font-semibold text-red-500 cursor-pointer font-[inherit] transition-colors duration-150 hover:bg-red-50"
+                  style="background: none;"
+                  @click="handleLogout"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
                   Logout
                 </button>
               </div>
@@ -118,51 +182,66 @@
       </header>
 
       <!-- ── PAGE CONTENT ─────────────────────────────────────── -->
-      <main class="main-content">
+      <main
+        class="flex-1 flex flex-col overflow-hidden"
+        :class="isBoardRoute ? 'p-0' : 'p-6 px-7 pb-8 max-md:p-5 max-md:px-4.5 max-sm:p-4 max-sm:px-3.5'"
+      >
         <RouterView />
       </main>
     </div>
 
+    <!-- ══ CREATE PROJECT MODAL ═══════════════════════════════ -->
     <Teleport to="body">
       <Transition name="dropdown-fade">
-        <div v-if="createProjectModalOpen" class="modal-overlay" @click="closeCreateProjectModal">
-          <div class="project-modal" @click.stop>
-            <h3 class="project-modal-title">Create Project</h3>
-            <p class="project-modal-subtitle">Create a new project and switch to it instantly.</p>
+        <div
+          v-if="createProjectModalOpen"
+          class="fixed inset-0 flex items-center justify-center z-[500] p-5"
+          style="background: rgba(15,23,42,0.45);"
+          @click="closeCreateProjectModal"
+        >
+          <div
+            class="w-full max-w-[520px] rounded-2xl border p-5"
+            style="background: var(--modal-bg); border-color: var(--modal-border); box-shadow: var(--shadow-xl);"
+            @click.stop
+          >
+            <h3 class="text-xl font-bold m-0" style="color: var(--text-heading);">Create Project</h3>
+            <p class="mt-1.5 mb-4 text-[13px] m-0" style="color: var(--text-muted);">Create a new project and switch to it instantly.</p>
 
-            <form class="project-modal-form" @submit.prevent="submitCreateProject">
-              <label class="project-field-label" for="create-project-name">Project name</label>
+            <form class="flex flex-col gap-2" @submit.prevent="submitCreateProject">
+              <label class="text-xs font-semibold" style="color: var(--text-secondary);" for="create-project-name">Project name</label>
               <input
                 id="create-project-name"
                 v-model.trim="createProjectForm.name"
                 type="text"
-                class="project-field-input"
+                class="field-input w-full rounded-[10px] px-3 py-2.5 text-sm outline-none font-[inherit] transition-all duration-[180ms]"
+                style="border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--text-primary);"
                 maxlength="180"
                 required
                 autofocus
               >
 
-              <label class="project-field-label" for="create-project-description">Description</label>
+              <label class="text-xs font-semibold" style="color: var(--text-secondary);" for="create-project-description">Description</label>
               <textarea
                 id="create-project-description"
                 v-model.trim="createProjectForm.description"
-                class="project-field-input project-field-textarea"
+                class="field-input w-full rounded-[10px] px-3 py-2.5 text-sm outline-none font-[inherit] transition-all duration-[180ms] resize-y min-h-[80px]"
+                style="border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--text-primary);"
                 maxlength="1000"
                 rows="3"
               />
 
-              <label class="project-field-label" for="create-project-members">Add members</label>
-              <div ref="memberPickerRef" class="member-picker">
-                <div v-if="selectedMembers.length" class="member-chip-list">
+              <label class="text-xs font-semibold" style="color: var(--text-secondary);" for="create-project-members">Add members</label>
+              <div ref="memberPickerRef" class="relative">
+                <div v-if="selectedMembers.length" class="flex flex-wrap gap-1.5 mb-2">
                   <button
                     v-for="member in selectedMembers"
                     :key="member.id"
                     type="button"
-                    class="member-chip"
+                    class="inline-flex items-center gap-1.5 border border-indigo-200 bg-indigo-50 rounded-full px-2.5 py-1 text-xs text-indigo-900 cursor-pointer"
                     @click="removeMember(member.id)"
                   >
-                    <span class="member-chip-name">{{ displayMemberName(member) }}</span>
-                    <span class="member-chip-remove">&times;</span>
+                    <span class="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">{{ displayMemberName(member) }}</span>
+                    <span class="text-[13px] leading-none">&times;</span>
                   </button>
                 </div>
 
@@ -170,40 +249,49 @@
                   id="create-project-members"
                   v-model.trim="memberSearchQuery"
                   type="text"
-                  class="project-field-input"
+                  class="field-input w-full rounded-[10px] px-3 py-2.5 text-sm outline-none font-[inherit] transition-all duration-[180ms]"
+                  style="border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--text-primary);"
                   placeholder="Search user by name or email"
                   @focus="memberDropdownOpen = true"
                 >
 
-                <div v-if="memberDropdownOpen" class="member-dropdown">
-                  <p v-if="loadingAssignableUsers" class="member-dropdown-state">Loading members...</p>
-                  <p v-else-if="memberLoadError" class="member-dropdown-state member-dropdown-state--error">
-                    {{ memberLoadError }}
-                  </p>
-                  <p v-else-if="filteredAssignableUsers.length === 0" class="member-dropdown-state">
-                    No members found
-                  </p>
+                <div
+                  v-if="memberDropdownOpen"
+                  class="mt-1.5 rounded-[10px] border max-h-[190px] overflow-y-auto"
+                  style="border-color: var(--border-medium); background: var(--dropdown-bg); box-shadow: var(--shadow-md);"
+                >
+                  <p v-if="loadingAssignableUsers" class="m-0 p-2.5 text-xs" style="color: var(--text-muted);">Loading members...</p>
+                  <p v-else-if="memberLoadError" class="m-0 p-2.5 text-xs text-red-600">{{ memberLoadError }}</p>
+                  <p v-else-if="filteredAssignableUsers.length === 0" class="m-0 p-2.5 text-xs" style="color: var(--text-muted);">No members found</p>
 
                   <button
                     v-for="user in filteredAssignableUsers"
                     :key="user.id"
                     type="button"
-                    class="member-dropdown-item"
+                    class="w-full border-none text-left px-2.5 py-2 flex flex-col gap-0.5 cursor-pointer transition-colors duration-150"
+                    style="background: var(--dropdown-bg);"
+                    @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--dropdown-item-hover)'"
+                    @mouseleave="($event.currentTarget as HTMLElement).style.background = 'var(--dropdown-bg)'"
                     @click="addMember(user)"
                   >
-                    <span class="member-option-name">{{ displayMemberName(user) }}</span>
-                    <span class="member-option-email">{{ user.email }}</span>
+                    <span class="text-[13px] font-semibold" style="color: var(--text-heading);">{{ displayMemberName(user) }}</span>
+                    <span class="text-xs" style="color: var(--text-muted);">{{ user.email }}</span>
                   </button>
                 </div>
               </div>
 
-              <p v-if="createProjectError" class="project-error">{{ createProjectError }}</p>
+              <p v-if="createProjectError" class="text-red-600 text-[13px] mt-1 m-0">{{ createProjectError }}</p>
 
-              <div class="project-modal-actions">
-                <button type="button" class="project-cancel-btn" @click="closeCreateProjectModal">Cancel</button>
+              <div class="mt-2 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  class="border-none rounded-[10px] text-[13px] font-semibold px-3.5 py-2.5 cursor-pointer transition-colors duration-[180ms]"
+                  style="background: var(--bg-surface-3); color: var(--text-secondary);"
+                  @click="closeCreateProjectModal"
+                >Cancel</button>
                 <button
                   type="submit"
-                  class="project-submit-btn"
+                  class="border-none rounded-[10px] text-[13px] font-semibold px-3.5 py-2.5 cursor-pointer bg-indigo-500 hover:bg-indigo-600 text-white transition-colors duration-[180ms] disabled:opacity-60 disabled:cursor-not-allowed"
                   :disabled="creatingProject || !createProjectForm.name"
                 >
                   {{ creatingProject ? 'Creating...' : 'Create Project' }}
@@ -218,14 +306,14 @@
 </template>
 
 <script setup lang="ts">
-import { get } from '@/api/client'
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
 import OctomLogo from '@/components/common/OctomLogo.vue'
-import { listUsers } from '@/api/users'
+import { useAuthMeQuery } from '@/features/auth/composables/useAuthQueries'
+import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
 import type { User } from '@/types/user.types'
 
 const router = useRouter()
@@ -245,48 +333,47 @@ const unreadCount = ref(2)
 function toggleNotif() { /* open notif panel */ }
 
 /* ── Menus ──────────────────────────────────────────── */
-const userMenuOpen = ref(false)
-const avatarWrapRef = ref<HTMLElement | null>(null)
-const projectMenuOpen = ref(false)
-const projectMenuWrapRef = ref<HTMLElement | null>(null)
+const userMenuOpen      = ref(false)
+const avatarWrapRef     = ref<HTMLElement | null>(null)
+const projectMenuOpen   = ref(false)
+const projectMenuWrapRef= ref<HTMLElement | null>(null)
 const createProjectModalOpen = ref(false)
-const creatingProject = ref(false)
-const createProjectError = ref('')
-const assignableUsers = ref<User[]>([])
-const loadingAssignableUsers = ref(false)
-const memberLoadError = ref('')
+const creatingProject   = ref(false)
+const createProjectError= ref('')
 const memberSearchQuery = ref('')
-const memberDropdownOpen = ref(false)
-const memberPickerRef = ref<HTMLElement | null>(null)
-const selectedMembers = ref<User[]>([])
-const createProjectForm = reactive({
-  name: '',
-  description: '',
-})
+const memberDropdownOpen= ref(false)
+const memberPickerRef   = ref<HTMLElement | null>(null)
+const selectedMembers   = ref<User[]>([])
+const createProjectForm = reactive({ name: '', description: '' })
 
-const selectedMemberIds = computed(() => new Set(selectedMembers.value.map((member) => member.id)))
+const selectedMemberIds = computed(() => new Set(selectedMembers.value.map((m) => m.id)))
+const shouldHydrateCurrentUser = computed(() => Boolean(authStore.accessToken) && !authStore.user)
+const authMeQuery = useAuthMeQuery(shouldHydrateCurrentUser)
+const assignableUsersQuery = useUsersQuery(memberSearchQuery, {
+  enabled: computed(() => createProjectModalOpen.value),
+})
+const assignableUsers        = computed(() => assignableUsersQuery.data.value ?? [])
+const loadingAssignableUsers = computed(() => assignableUsersQuery.isPending.value)
+const memberLoadError        = computed(() => (assignableUsersQuery.isError.value ? 'Failed to load users' : ''))
+
 const filteredAssignableUsers = computed(() => {
   const query = memberSearchQuery.value.trim().toLowerCase()
-
   return assignableUsers.value
-    .filter((user) => user.id !== authStore.user?.id)
-    .filter((user) => !selectedMemberIds.value.has(user.id))
-    .filter((user) => {
-      if (!query) {
-        return true
-      }
-
-      const fullName = (user.fullName || '').toLowerCase()
-      const email = user.email.toLowerCase()
-      return fullName.includes(query) || email.includes(query)
+    .filter((u) => u.id !== authStore.user?.id)
+    .filter((u) => !selectedMemberIds.value.has(u.id))
+    .filter((u) => {
+      if (!query) return true
+      return (u.fullName || '').toLowerCase().includes(query) || u.email.toLowerCase().includes(query)
     })
     .slice(0, 8)
 })
 
 const currentProjectName = computed(() => {
-  const current = projects.value.find((project) => project.id === currentProjectId.value)
+  const current = projects.value.find((p) => p.id === currentProjectId.value)
   return current?.name ?? 'Select Project'
 })
+
+const isBoardRoute = computed(() => route.name === 'board')
 
 function toggleUserMenu(e: MouseEvent) {
   e.stopPropagation()
@@ -298,59 +385,40 @@ function toggleProjectMenu() {
 }
 
 function onClickOutside(e: MouseEvent) {
-  if (avatarWrapRef.value && !avatarWrapRef.value.contains(e.target as Node)) {
+  if (avatarWrapRef.value && !avatarWrapRef.value.contains(e.target as Node))
     userMenuOpen.value = false
-  }
-
-  if (projectMenuWrapRef.value && !projectMenuWrapRef.value.contains(e.target as Node)) {
+  if (projectMenuWrapRef.value && !projectMenuWrapRef.value.contains(e.target as Node))
     projectMenuOpen.value = false
-  }
-
-  if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node)) {
+  if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node))
     memberDropdownOpen.value = false
-  }
 }
 
-async function hydrateCurrentUser() {
-  if (authStore.user || !authStore.accessToken) {
-    return
-  }
+watch(
+  () => authMeQuery.data.value?.data,
+  (user) => { if (user) authStore.setAuth(authStore.accessToken, user) },
+  { immediate: true },
+)
+watch(
+  () => authMeQuery.error.value,
+  (error) => { if (error) console.error('[DefaultLayout] Cannot hydrate current user', error) },
+)
 
-  try {
-    const response = await get<{ data: User }>('/auth/me')
-    if (response?.data) {
-      authStore.setAuth(authStore.accessToken, response.data)
-    }
-  } catch (error) {
-    console.error('[DefaultLayout] Cannot hydrate current user', error)
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('click', onClickOutside)
-  void hydrateCurrentUser()
-})
+onMounted(() => document.addEventListener('click', onClickOutside))
 onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 /* ── Auth ──────────────────────────────────────────── */
 const userInitial = computed(() => {
   const fullName = authStore.user?.fullName?.trim() ?? ''
   if (fullName) {
-    return fullName
-      .split(/\s+/)
-      .map((part) => part.charAt(0))
-      .slice(0, 2)
-      .join('')
-      .toUpperCase()
+    return fullName.split(/\s+/).map((p) => p.charAt(0)).slice(0, 2).join('').toUpperCase()
   }
-
   const email = authStore.user?.email ?? ''
   return email.charAt(0).toUpperCase() || 'U'
 })
 
-const displayUserName = computed(() => {
-  return authStore.user?.fullName?.trim() || authStore.user?.email?.split('@')[0] || 'User'
-})
+const displayUserName = computed(() =>
+  authStore.user?.fullName?.trim() || authStore.user?.email?.split('@')[0] || 'User'
+)
 
 function handleLogout() {
   userMenuOpen.value = false
@@ -362,15 +430,9 @@ function handleLogout() {
 function selectProject(projectId: string) {
   projectMenuOpen.value = false
   projectStore.setCurrentProjectId(projectId)
-
-  const routeName = typeof route.name === 'string' ? route.name : 'dashboard'
+  const routeName  = typeof route.name === 'string' ? route.name : 'dashboard'
   const targetName = routeName === 'not-found' ? 'dashboard' : routeName
-
-  void router.push({
-    name: targetName,
-    query: route.query,
-    hash: route.hash,
-  })
+  void router.push({ name: targetName, query: route.query, hash: route.hash })
 }
 
 function goToCreateProject() {
@@ -378,7 +440,6 @@ function goToCreateProject() {
   createProjectError.value = ''
   createProjectModalOpen.value = true
   memberDropdownOpen.value = false
-  void ensureAssignableUsersLoaded()
 }
 
 function closeCreateProjectModal() {
@@ -396,53 +457,29 @@ function displayMemberName(user: User) {
 }
 
 function addMember(user: User) {
-  if (selectedMemberIds.value.has(user.id)) {
-    return
-  }
-
+  if (selectedMemberIds.value.has(user.id)) return
   selectedMembers.value.push(user)
   memberSearchQuery.value = ''
   memberDropdownOpen.value = true
 }
 
 function removeMember(userId: string) {
-  selectedMembers.value = selectedMembers.value.filter((member) => member.id !== userId)
-}
-
-async function ensureAssignableUsersLoaded() {
-  if (assignableUsers.value.length > 0 || loadingAssignableUsers.value) {
-    return
-  }
-
-  loadingAssignableUsers.value = true
-  memberLoadError.value = ''
-
-  try {
-    assignableUsers.value = await listUsers()
-  } catch {
-    memberLoadError.value = 'Failed to load users'
-  } finally {
-    loadingAssignableUsers.value = false
-  }
+  selectedMembers.value = selectedMembers.value.filter((m) => m.id !== userId)
 }
 
 async function submitCreateProject() {
   if (!createProjectForm.name) return
-
   creatingProject.value = true
   createProjectError.value = ''
   try {
     const created = await projectStore.createAndSelectProject({
       name: createProjectForm.name,
       description: createProjectForm.description || undefined,
-      memberIds: selectedMembers.value.map((member) => member.id),
+      memberIds: selectedMembers.value.map((m) => m.id),
     })
-
     if (created?.id) {
       closeCreateProjectModal()
-      if (route.name !== 'dashboard') {
-        await router.push({ name: 'dashboard' })
-      }
+      if (route.name !== 'dashboard') await router.push({ name: 'dashboard' })
     }
   } catch (error) {
     createProjectError.value = extractErrorMessage(error)
@@ -456,48 +493,27 @@ function extractErrorMessage(error: unknown) {
     const payload = (error as { response?: { data?: unknown } }).response?.data
     if (payload && typeof payload === 'object') {
       const message = (payload as { message?: unknown }).message
-      if (typeof message === 'string') {
-        return message
-      }
-
+      if (typeof message === 'string') return message
       const nested = (payload as { data?: { message?: unknown } }).data?.message
-      if (typeof nested === 'string') {
-        return nested
-      }
+      if (typeof nested === 'string') return nested
     }
   }
-
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-
+  if (error instanceof Error && error.message) return error.message
   return 'Failed to create project'
 }
 
-/* ── Active route ──────────────────────────────────── */
 function isActive(item: { routeName: string }) {
   const routeName = typeof route.name === 'string' ? route.name : ''
-
-  if (item.routeName === 'tasks') {
-    return routeName === 'tasks' || routeName === 'task-detail'
-  }
-
+  if (item.routeName === 'tasks') return routeName === 'tasks' || routeName === 'task-detail'
   return routeName === item.routeName
 }
 
 function navTarget(item: { routeName: string; requiresProject?: boolean }) {
-  if (!item.requiresProject) {
-    return { name: item.routeName }
-  }
-
-  if (!currentProjectId.value) {
-    return { name: 'dashboard' }
-  }
-
+  if (!item.requiresProject) return { name: item.routeName }
+  if (!currentProjectId.value) return { name: 'dashboard' }
   return { name: item.routeName }
 }
 
-/* ── Nav items ─────────────────────────────────────── */
 const navItems = [
   {
     name: 'dashboard', label: 'Dashboard', routeName: 'dashboard', requiresProject: false,
@@ -507,7 +523,7 @@ const navItems = [
     </svg>`,
   },
   {
-    name: 'timeline', label: 'Timeline', routeName: 'timeline', requiresProject: true,
+    name: 'board', label: 'Board', routeName: 'board', requiresProject: true,
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
       <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
@@ -538,78 +554,8 @@ const navItems = [
 </script>
 
 <style scoped>
-/* ─── Reset & fonts ───────────────────────────────────────────── */
-* { box-sizing: border-box; }
-
-/* ─── App shell ───────────────────────────────────────────────── */
-.app-shell {
-  display: flex;
-  min-height: 100vh;
-  background: var(--bg-app);
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
-/* ══════════════════════════════════════════════════════════════
-   SIDEBAR
-════════════════════════════════════════════════════════════════ */
-.sidebar {
-  width: 80px;
-  min-height: 100vh;
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--sidebar-border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px 0 24px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  z-index: 50;
-  box-shadow: 2px 0 12px rgba(0,0,0,0.03);
-}
-
-/* ─── Sidebar logo ────────────────────────────────────────────── */
-.sidebar-logo {
-  padding: 4px 0 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Divider */
-.sidebar-divider {
-  width: 32px;
-  height: 1px;
-  background: var(--border-base);
-  margin: 10px 0;
-}
-
-/* Nav */
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-}
-
-.nav-item {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.18s, color 0.18s, transform 0.15s, box-shadow 0.18s;
-  color: var(--text-subtle);
-  border: none;
-  background: transparent;
-  text-decoration: none;
-  font-family: inherit;
-}
+/* 1. Nav item: CSS-variable colors + hover + active gradient */
+.nav-item { color: var(--text-subtle); }
 .nav-item:hover {
   background: var(--nav-hover-bg);
   color: var(--nav-hover-color);
@@ -620,14 +566,11 @@ const navItems = [
   color: #ffffff !important;
   box-shadow: 0 4px 14px rgba(99,102,241,0.35);
 }
-.nav-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+
+/* 2. :deep() for injected SVG */
 .nav-icon :deep(svg) { display: block; }
 
-/* Tooltip */
+/* 3. Tooltip — needs ::before arrow pseudo-element */
 .nav-tooltip {
   position: absolute;
   left: calc(100% + 12px);
@@ -659,551 +602,37 @@ const navItems = [
   transform: translateY(-50%) translateX(0);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   RIGHT COLUMN
-════════════════════════════════════════════════════════════════ */
-.right-col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── TOP HEADER ────────────────────────────────────────────────── */
-.top-header {
-  height: 64px;
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--header-border);
-  display: flex;
-  align-items: center;
-  padding: 0 28px;
-  gap: 20px;
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  box-shadow: var(--shadow-sm);
-}
-
-/* Brand */
-.header-brand {
-  flex-shrink: 0;
-  min-width: 80px;
-}
-.header-logo-text {
-  font-size: 18px;
-  font-weight: 900;
-  color: #1e293b;
-  letter-spacing: -0.03em;
-}
-
-/* Search */
-.header-search {
-  flex: 1;
-  max-width: 420px;
-  margin: 0 auto;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.search-icon {
-  position: absolute;
-  left: 14px;
-  color: #94a3b8;
-  pointer-events: none;
-  flex-shrink: 0;
-}
-.search-input {
-  width: 100%;
-  height: 38px;
-  border-radius: 12px;
-  border: 1.5px solid var(--search-border);
-  background: var(--search-bg);
-  padding: 0 14px 0 40px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  outline: none;
-  font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
+/* 4. Search focus with CSS-variable background */
 .search-input::placeholder { color: var(--text-subtle); }
 .search-input:focus {
-  border-color: #6366f1;
-  background: var(--search-focus-bg);
+  border-color: #6366f1 !important;
+  background: var(--search-focus-bg) !important;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
 }
 
-/* Right actions */
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
+/* 5. Field input focus */
+.field-input:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
 }
 
-.project-menu-wrap {
-  position: relative;
-}
-
-.project-menu-btn {
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 12px;
-  border: 1.5px solid var(--btn-border);
-  background: var(--btn-bg);
-  color: var(--text-secondary);
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  max-width: 220px;
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.project-menu-btn:hover {
-  border-color: var(--btn-hover-border);
-  background: var(--btn-hover-bg);
-}
-
-.project-menu-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 170px;
-}
-
-.project-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 240px;
-  max-width: 300px;
-  background: var(--dropdown-bg);
-  border-radius: 16px;
-  border: 1px solid var(--border-base);
-  box-shadow: var(--shadow-lg);
-  padding: 8px;
-  z-index: 300;
-}
-
-.project-dropdown-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: none;
-  border-radius: 10px;
-  background: none;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 9px 10px;
-  text-align: left;
-}
-
-.project-dropdown-item:hover {
-  background: var(--dropdown-item-hover);
-}
-
-.project-dropdown-item--active {
-  background: var(--bg-active);
-  color: #4338ca;
-}
-
-.project-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #6366f1;
-  flex-shrink: 0;
-}
-
-.project-dropdown-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-create-btn {
-  width: 100%;
-  border: none;
-  border-radius: 10px;
-  background: none;
-  color: #6366f1;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: left;
-  padding: 9px 10px;
-}
-
-.project-create-btn:hover {
-  background: var(--bg-active);
-}
-
-/* ── Notification bell ────────────────────────────────── */
-.notif-btn {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: 1.5px solid var(--btn-border);
-  background: var(--btn-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #6366f1;
-  transition: border-color 0.2s, background 0.2s, transform 0.15s;
-  flex-shrink: 0;
-}
-.notif-btn:hover {
-  border-color: #a5b4fc;
-  background: var(--bg-active);
-  transform: translateY(-1px);
-}
-.notif-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: #ef4444;
-  border: 2px solid #fff;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  letter-spacing: -0.01em;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
-  animation: badge-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
+/* 6. @keyframes — not possible in Tailwind */
+.notif-badge { animation: badge-pop 0.3s cubic-bezier(0.34,1.56,0.64,1); }
 @keyframes badge-pop {
   from { transform: scale(0); opacity: 0; }
   to   { transform: scale(1); opacity: 1; }
 }
 
-/* Avatar */
-.avatar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  position: relative;
-  padding: 4px 8px;
-  border-radius: 12px;
-  border: 1.5px solid var(--btn-border);
-  background: var(--btn-bg);
-  transition: border-color 0.2s, background 0.2s;
-}
-.avatar-wrap:hover {
-  border-color: var(--btn-hover-border);
-  background: var(--btn-hover-bg);
-}
-.header-avatar {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: 0.03em;
-  flex-shrink: 0;
-}
-.avatar-caret { color: #94a3b8; flex-shrink: 0; }
-
-/* Dropdown */
-.user-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: var(--dropdown-bg);
-  border-radius: 16px;
-  border: 1px solid var(--border-base);
-  box-shadow: var(--shadow-lg);
-  padding: 8px;
-  min-width: 220px;
-  z-index: 300;
-}
-.dropdown-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px 10px;
-}
-.dropdown-avatar {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 800;
-  color: #fff;
-  flex-shrink: 0;
-}
-.dropdown-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-heading);
-  margin: 0;
-  text-transform: capitalize;
-}
-.dropdown-email {
-  font-size: 11px;
-  color: var(--text-subtle);
-  margin: 2px 0 0;
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dropdown-divider {
-  height: 1px;
-  background: var(--divider);
-  margin: 4px 0;
-}
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: 10px;
-  border: none;
-  background: none;
-  font-size: 13px;
-  font-weight: 600;
-  color: #ef4444;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
-}
-.dropdown-item:hover { background: #fff1f2; }
-
-/* Dropdown transition */
+/* 7. Dropdown transition */
 .dropdown-fade-enter-active,
 .dropdown-fade-leave-active { transition: opacity 0.15s, transform 0.15s; }
 .dropdown-fade-enter-from,
 .dropdown-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
-/* ── MAIN CONTENT ──────────────────────────────────────────────── */
-.main-content {
-  flex: 1;
-  padding: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 500;
-  padding: 20px;
-}
-
-.project-modal {
-  width: 100%;
-  max-width: 520px;
-  background: var(--modal-bg);
-  border-radius: 16px;
-  border: 1px solid var(--modal-border);
-  box-shadow: var(--shadow-xl);
-  padding: 20px;
-}
-
-.project-modal-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-heading);
-  margin: 0;
-}
-
-.project-modal-subtitle {
-  margin: 6px 0 16px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.project-modal-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.project-field-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.project-field-input {
-  width: 100%;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  outline: none;
-  background: var(--input-bg);
-  color: var(--text-primary);
-  font-family: inherit;
-  transition: border-color 0.18s, box-shadow 0.18s;
-}
-
-.project-field-input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
-}
-
-.project-field-textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
-.member-picker {
-  position: relative;
-}
-
-.member-chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.member-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #3730a3;
-  cursor: pointer;
-}
-
-.member-chip-name {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.member-chip-remove {
-  font-size: 13px;
-  line-height: 1;
-}
-
-.member-dropdown {
-  margin-top: 6px;
-  border: 1px solid var(--border-medium);
-  border-radius: 10px;
-  background: var(--dropdown-bg);
-  box-shadow: var(--shadow-md);
-  max-height: 190px;
-  overflow-y: auto;
-}
-
-.member-dropdown-item {
-  width: 100%;
-  border: none;
-  background: var(--dropdown-bg);
-  text-align: left;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  cursor: pointer;
-}
-
-.member-dropdown-item:hover {
-  background: var(--dropdown-item-hover);
-}
-
-.member-option-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-heading);
-}
-
-.member-option-email {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.member-dropdown-state {
-  margin: 0;
-  padding: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.member-dropdown-state--error {
-  color: #dc2626;
-}
-
-.project-error {
-  color: #dc2626;
-  font-size: 13px;
-  margin: 4px 0 0;
-}
-
-.project-modal-actions {
-  margin-top: 8px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.project-cancel-btn,
-.project-submit-btn {
-  border: none;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 10px 14px;
-  cursor: pointer;
-  transition: background 0.18s;
-}
-
-.project-cancel-btn {
-  background: var(--bg-surface-3);
-  color: var(--text-secondary);
-}
-
-.project-cancel-btn:hover {
-  background: var(--border-medium);
-}
-
-.project-submit-btn {
-  background: #6366f1;
-  color: #ffffff;
-}
-
-.project-submit-btn:hover {
-  background: #4f46e5;
-}
-
-.project-submit-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+/* 8. Hover states using CSS variables (can't be done with Tailwind) */
+.notif-btn:hover {
+  border-color: #a5b4fc !important;
+  background: var(--bg-active) !important;
+  transform: translateY(-1px);
 }
 </style>

@@ -1,49 +1,53 @@
 <template>
-  <section class="cpv-root">
-    <div class="cpv-card">
-      <h1 class="cpv-title">Create your first project</h1>
-      <p class="cpv-desc">
+  <section class="flex justify-center items-start min-h-[60vh] px-4 pt-6 pb-12">
+    <div class="w-full max-w-[600px] bg-white rounded-[20px] border border-slate-100 px-10 py-9 shadow-[0_2px_16px_rgba(0,0,0,0.05)] max-sm:px-5 max-sm:py-6 max-sm:rounded-2xl max-[400px]:px-4 max-[400px]:py-5">
+      <h1 class="text-[1.375rem] font-bold text-slate-800 mb-2 max-[480px]:text-lg">Create your first project</h1>
+      <p class="text-sm text-slate-500 leading-relaxed m-0">
         A project is required before you can work with files, tasks, and boards.
       </p>
 
-      <form class="cpv-form" @submit.prevent="submit">
+      <form class="mt-6 flex flex-col gap-[18px]" @submit.prevent="submit">
+        <!-- Project name -->
         <div class="cpv-field">
           <label class="cpv-label" for="project-name">Project name</label>
           <input
             id="project-name"
             v-model.trim="form.name"
             type="text"
-            class="cpv-input"
+            class="cpv-input w-full border-[1.5px] border-slate-200 rounded-[10px] px-3.5 py-[11px] text-sm text-slate-800 outline-none transition-all duration-[180ms] font-[inherit]"
             placeholder="Example: Mobile App Revamp"
             required
             maxlength="180"
           >
         </div>
 
+        <!-- Description -->
         <div class="cpv-field">
           <label class="cpv-label" for="project-description">Description</label>
           <textarea
             id="project-description"
             v-model.trim="form.description"
             rows="4"
-            class="cpv-input cpv-textarea"
+            class="cpv-input w-full border-[1.5px] border-slate-200 rounded-[10px] px-3.5 py-[11px] text-sm text-slate-800 outline-none transition-all duration-[180ms] font-[inherit] resize-y min-h-[100px]"
             placeholder="Short project summary"
             maxlength="1000"
           />
         </div>
 
-        <p v-if="errorMessage" class="cpv-error">
+        <!-- Error -->
+        <p v-if="errorMessage" class="rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[0.8125rem] text-red-500 m-0">
           {{ errorMessage }}
         </p>
 
-        <div class="cpv-actions">
+        <!-- Actions -->
+        <div class="flex justify-end pt-1 max-[480px]:justify-stretch">
           <button
             type="submit"
-            class="cpv-btn-submit"
+            class="gradient-btn px-7 py-[11px] shadow-[0_4px_14px_rgba(99,102,241,0.3)] max-[480px]:w-full"
             :disabled="loading || !form.name"
           >
             <svg v-if="loading" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="cpv-spin">
-              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
             </svg>
             {{ loading ? 'Creating...' : 'Create Project' }}
           </button>
@@ -69,9 +73,7 @@ const form = reactive({
 })
 
 async function submit() {
-  if (!form.name) {
-    return
-  }
+  if (!form.name) return
 
   loading.value = true
   errorMessage.value = ''
@@ -100,141 +102,21 @@ function extractErrorMessage(error: unknown) {
     const payload = (error as { response?: { data?: unknown } }).response?.data
     if (payload && typeof payload === 'object') {
       const message = (payload as { message?: unknown }).message
-      if (typeof message === 'string') {
-        return message
-      }
-
+      if (typeof message === 'string') return message
       const nested = (payload as { data?: { message?: unknown } }).data?.message
-      if (typeof nested === 'string') {
-        return nested
-      }
+      if (typeof nested === 'string') return nested
     }
   }
-
-  if (error instanceof Error && error.message) {
-    return error.message
-  }
-
+  if (error instanceof Error && error.message) return error.message
   return 'Failed to create project'
 }
 </script>
 
 <style scoped>
-/* ── Root ──────────────────────────────────────────────────────────────────── */
-.cpv-root {
-  display: flex;
-  justify-content: center;
-  padding: 24px 16px 48px;
-  min-height: 60vh;
-  align-items: flex-start;
-}
-
-/* ── Card ──────────────────────────────────────────────────────────────────── */
-.cpv-card {
-  width: 100%;
-  max-width: 600px;
-  background: #fff;
-  border-radius: 20px;
-  border: 1px solid #f1f5f9;
-  padding: 36px 40px;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
-}
-@media (max-width: 640px) { .cpv-card { padding: 24px 20px; border-radius: 16px; } }
-@media (max-width: 400px) { .cpv-card { padding: 20px 16px; } }
-
-.cpv-title {
-  font-size: 1.375rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 8px;
-}
-@media (max-width: 480px) { .cpv-title { font-size: 1.125rem; } }
-
-.cpv-desc {
-  font-size: 0.875rem;
-  color: #64748b;
-  margin: 0;
-  line-height: 1.6;
-}
-
-/* ── Form ──────────────────────────────────────────────────────────────────── */
-.cpv-form {
-  margin-top: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.cpv-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.cpv-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #475569;
-}
-
-.cpv-input {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 11px 14px;
-  font-size: 0.875rem;
-  color: #1e293b;
-  outline: none;
-  transition: border-color 0.18s, box-shadow 0.18s;
-  font-family: inherit;
-}
 .cpv-input:focus {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
-.cpv-textarea { resize: vertical; min-height: 100px; }
-
-/* ── Error ──────────────────────────────────────────────────────────────────── */
-.cpv-error {
-  border-radius: 10px;
-  border: 1px solid #fecaca;
-  background: #fff1f2;
-  padding: 10px 14px;
-  font-size: 0.8125rem;
-  color: #ef4444;
-  margin: 0;
-}
-
-/* ── Actions ────────────────────────────────────────────────────────────────── */
-.cpv-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
-}
-@media (max-width: 480px) {
-  .cpv-actions { justify-content: stretch; }
-  .cpv-btn-submit { width: 100%; }
-}
-
-.cpv-btn-submit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 11px 28px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #fff;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
-  transition: opacity 0.18s, transform 0.15s;
-}
-.cpv-btn-submit:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
-.cpv-btn-submit:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .cpv-spin { animation: cpv-spin 0.9s linear infinite; }
 @keyframes cpv-spin { to { transform: rotate(360deg); } }

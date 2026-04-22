@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import { AssignTaskUserDto } from '../dto/task.dto';
 import {
@@ -73,6 +73,26 @@ export class TaskAssigneeService {
             },
             tx,
           ),
+          ...(dto.userId !== userId
+            ? [
+                this.tasksRepository.createNotification(
+                  {
+                    user: { connect: { id: dto.userId } },
+                    project: { connect: { id: task.projectId } },
+                    type: NotificationType.TASK_ASSIGNED,
+                    title: 'You were assigned to a task',
+                    content: `You have been assigned to task "${task.title}".`,
+                    data: {
+                      taskId,
+                      projectId: task.projectId,
+                      assignedBy: userId,
+                      action: TASK_HISTORY_ACTIONS.ASSIGNED,
+                    },
+                  },
+                  tx,
+                ),
+              ]
+            : []),
         ]);
 
         return created;

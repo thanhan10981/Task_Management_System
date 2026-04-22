@@ -5,9 +5,6 @@
     <div class="board-header">
       <div class="board-header-left">
         <div class="board-title-wrap">
-          <svg class="board-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="11" rx="2"/>
-          </svg>
           <h1 class="board-title">Board</h1>
         </div>
 

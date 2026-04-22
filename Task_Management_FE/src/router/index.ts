@@ -44,10 +44,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Files', requiresProject: true },
       },
       {
-        path: 'timeline',
-        name: 'timeline',
-        component: () => import('@/features/tasks/views/TimelineView.vue'),
-        meta: { title: 'Timeline', requiresProject: true },
+        path: 'board',
+        name: 'board',
+        component: () => import('@/features/tasks/views/BoardView.vue'),
+        meta: { title: 'Board', requiresProject: true },
       },
       {
         path: 'settings',

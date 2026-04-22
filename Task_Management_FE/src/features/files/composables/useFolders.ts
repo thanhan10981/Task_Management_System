@@ -20,11 +20,8 @@ const EMPTY_FOLDER_NAME = 'Root'
 
 export function useFolders(options: UseFoldersOptions) {
   const { currentFolder, currentProjectId, toast, errorMessage } = options
-
   const folders = ref<CloudinaryFolder[]>([])
   const expandedFolderPaths = ref<Set<string>>(new Set())
-  const loadingFolders = ref(false)
-
   const folderRows = computed<FolderRow[]>(() => buildFolderRows(folders.value, expandedFolderPaths.value))
 
   const folderQuery = useQuery({
@@ -40,20 +37,11 @@ export function useFolders(options: UseFoldersOptions) {
   })
 
   watch(
-    () => folderQuery.isFetching.value,
-    (isFetching) => {
-      loadingFolders.value = isFetching
-    },
-    { immediate: true },
-  )
-
-  watch(
     () => currentProjectId.value,
     (projectId) => {
       if (projectId) {
         return
       }
-
       folders.value = []
       currentFolder.value = ''
     },
@@ -66,7 +54,6 @@ export function useFolders(options: UseFoldersOptions) {
       if (!backendFolders || !currentProjectId.value) {
         return
       }
-
       const loaded = backendFolders.map((folder) => ({
         name: folder.name || (folder.path ? folder.path.split('/').pop() || folder.path : EMPTY_FOLDER_NAME),
         path: normalizeFolderPath(folder.path),
@@ -148,7 +135,7 @@ export function useFolders(options: UseFoldersOptions) {
   return {
     folders,
     folderRows,
-    loadingFolders,
+    loadingFolders: folderQuery.isFetching,
     expandedFolderPaths,
     loadFolders,
     autoExpandRoots,

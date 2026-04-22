@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ProjectAccessModule } from '../../common/access/project-access.module';
 import { buildMailFrom } from '../../common/helpers/mail-from.helper';
 import { MailJobQueueService } from '../../common/mail/services/mail-job-queue.service';
 import { PrismaModule } from '../../common/prisma/prisma.module';
+import { ReminderController } from './controller/reminder.controller';
 import { TaskRepository } from './repository/task.repository';
 import { MailService } from './service/mail.service';
 import { ReminderService } from './service/reminder.service';
@@ -13,6 +15,7 @@ import { ReminderService } from './service/reminder.service';
   imports: [
     ConfigModule,
     PrismaModule,
+    ProjectAccessModule,
     ScheduleModule.forRoot(),
     MailerModule.forRootAsync({
       imports: [ConfigModule],
@@ -55,6 +58,7 @@ import { ReminderService } from './service/reminder.service';
       },
     }),
   ],
+  controllers: [ReminderController],
   providers: [TaskRepository, MailService, ReminderService, MailJobQueueService],
   exports: [ReminderService],
 })

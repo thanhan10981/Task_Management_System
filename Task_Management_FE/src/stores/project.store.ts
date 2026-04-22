@@ -15,6 +15,8 @@ export const useProjectStore = defineStore('project', () => {
   )
   const loadingProjects = ref(false)
   const initialized = ref(false)
+  const projectContextResolved = ref(false)
+  let initializePromise: Promise<void> | null = null
 
   const hasProjects = computed(() => projects.value.length > 0)
   const currentProject = computed(() =>
@@ -41,9 +43,16 @@ export const useProjectStore = defineStore('project', () => {
     }
 
     const currentStillExists = projects.value.some((project) => project.id === currentProjectId.value)
-    if (!currentStillExists) {
-      setCurrentProjectId(null)
+    if (currentStillExists) {
+      return
     }
+
+    if (projects.value.length === 1) {
+      setCurrentProjectId(projects.value[0].id)
+      return
+    }
+
+    setCurrentProjectId(null)
   }
 
   async function loadProjects() {
@@ -56,6 +65,7 @@ export const useProjectStore = defineStore('project', () => {
       ensureCurrentProjectSelection()
     } finally {
       loadingProjects.value = false
+      projectContextResolved.value = true
     }
   }
 
@@ -64,8 +74,23 @@ export const useProjectStore = defineStore('project', () => {
       return
     }
 
-    await loadProjects()
-    initialized.value = true
+    if (!forceReload && initializePromise) {
+      await initializePromise
+      return
+    }
+
+    projectContextResolved.value = false
+
+    initializePromise = (async () => {
+      await loadProjects()
+      initialized.value = true
+    })()
+
+    try {
+      await initializePromise
+    } finally {
+      initializePromise = null
+    }
   }
 
   async function createAndSelectProject(payload: CreateProjectPayload) {
@@ -80,10 +105,20 @@ export const useProjectStore = defineStore('project', () => {
     return created
   }
 
-  function resetProjectContext() {
+  function resetProjectContext(options?: { clearStoredLastProject?: boolean }) {
+    const shouldClearStoredLastProject = options?.clearStoredLastProject ?? false
+
     projects.value = []
     initialized.value = false
-    setCurrentProjectId(null)
+    projectContextResolved.value = false
+    initializePromise = null
+
+    if (shouldClearStoredLastProject) {
+      setCurrentProjectId(null)
+      return
+    }
+
+    currentProjectId.value = null
   }
 
   return {
@@ -91,6 +126,7 @@ export const useProjectStore = defineStore('project', () => {
     currentProjectId,
     loadingProjects,
     initialized,
+    projectContextResolved,
     hasProjects,
     currentProject,
     hasCurrentProject,

@@ -66,6 +66,58 @@ export class TaskRepository {
       .filter((task) => task.assignees.length > 0);
   }
 
+  async findTaskForManualReminder(taskId: string): Promise<TaskReminderTask | null> {
+    const task = await this.prisma.task.findFirst({
+      where: {
+        id: taskId,
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+        title: true,
+        dueDate: true,
+        projectId: true,
+        project: {
+          select: {
+            name: true,
+          },
+        },
+        assignees: {
+          select: {
+            userId: true,
+            user: {
+              select: {
+                email: true,
+                fullName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!task?.dueDate) {
+      return null;
+    }
+
+    const assignees = task.assignees
+      .filter((assignee) => Boolean(assignee.user.email))
+      .map((assignee) => ({
+        userId: assignee.userId,
+        email: assignee.user.email as string,
+        fullName: assignee.user.fullName,
+      }));
+
+    return {
+      taskId: task.id,
+      title: task.title,
+      dueDate: task.dueDate,
+      projectId: task.projectId,
+      projectName: task.project?.name,
+      assignees,
+    };
+  }
+
   async tryReserveReminderNotification(
     input: SaveReminderNotificationInput,
   ): Promise<string | null> {

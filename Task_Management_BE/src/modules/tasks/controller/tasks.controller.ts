@@ -6,7 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards,
   Request,
   Query,
   HttpStatus,
@@ -27,7 +26,6 @@ import {
   TaskQueryDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import {
   CreateTaskStatusDto,
   UpdateTaskStatusDto,
@@ -38,7 +36,6 @@ import { TaskStatusService } from '../service/task-status.service';
 
 @ApiTags('Tasks')
 @ApiBearerAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('tasks')
 export class TasksController {
   // Service split keeps task domain maintainable as complexity grows.

@@ -25,4 +25,6 @@ export const taskService = {
     patch(`${BASE}/projects/${projectId}/statuses/${statusId}`, data),
   updateTask: (id: string, data: UpdateTaskInput) => patch(`${BASE}/${id}`, data),
   deleteTask: (id: string) => del(`${BASE}/${id}`),
+  deleteProjectStatus: (projectId: string, statusId: string) =>
+    del(`${BASE}/projects/${projectId}/statuses/${statusId}`),
 }

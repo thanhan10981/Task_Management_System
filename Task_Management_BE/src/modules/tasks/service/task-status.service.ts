@@ -26,15 +26,26 @@ export class TaskStatusService {
   async createStatus(userId: string, projectId: string, dto: CreateTaskStatusDto) {
     await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
 
+    const existingStatuses = await this.tasksRepository.listProjectStatuses(projectId);
+    const usedPositions = new Set(
+      existingStatuses.map((status) => status.position),
+    );
+    const nextPosition =
+      Math.max(0, ...existingStatuses.map((status) => status.position ?? 0)) + 1;
+    const position =
+      dto.position && !usedPositions.has(dto.position)
+        ? dto.position
+        : nextPosition;
+
     let createdStatus;
     try {
       createdStatus = await this.tasksRepository.createTaskStatus({
         project: { connect: { id: projectId } },
         name: dto.name,
         color: dto.color,
-        position: dto.position,
-        isDefault: dto.isDefault || false,
-        isDone: dto.isDone || false,
+        position,
+        isDefault: dto.isDefault ?? existingStatuses.length === 0,
+        isDone: dto.isDone ?? false,
       });
     } catch (error) {
       if (

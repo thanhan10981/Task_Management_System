@@ -300,37 +300,51 @@
 
 <script setup lang="ts">
 import { post } from '@/api/client'
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useToast } from '@/composables/useToast'
+import { useTaskAnalyticsChartQuery } from '@/features/dashboard/composables/useTaskAnalyticsChartQuery'
+import type { TaskChartPeriod } from '@/features/dashboard/schemas/task-chart.schema'
+import { useTasksQuery } from '@/features/tasks/composables/useTasksQuery'
+import type { Task } from '@/features/tasks/schemas/task.schema'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
-import { useTasksQuery } from '@/features/tasks/composables/useTasksQuery'
-import { useRouter } from 'vue-router'
 import {
+  CategoryScale,
   Chart,
+  type ChartDataset,
   Filler,
+  LineController,
+  LineElement,
+  LinearScale,
+  PointElement,
+  Tooltip,
+} from 'chart.js'
+import { storeToRefs } from 'pinia'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+
+Chart.register(
   LineController,
   LineElement,
   LinearScale,
   CategoryScale,
   PointElement,
   Tooltip,
-  type ChartDataset,
-} from 'chart.js'
-import { useTaskAnalyticsChartQuery } from '@/features/dashboard/composables/useTaskAnalyticsChartQuery'
-import type { TaskChartPeriod } from '@/features/dashboard/schemas/task-chart.schema'
-import type { Task } from '@/features/tasks/schemas/task.schema'
-
-Chart.register(LineController, LineElement, LinearScale, CategoryScale, PointElement, Tooltip, Filler)
+  Filler
+)
 
 const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
 
 const projectStore = useProjectStore()
-const { currentProjectId, hasProjects, loadingProjects, initialized, projectContextResolved, currentProject } =
-  storeToRefs(projectStore)
+const {
+  currentProjectId,
+  hasProjects,
+  loadingProjects,
+  initialized,
+  projectContextResolved,
+  currentProject,
+} = storeToRefs(projectStore)
 
 const showProjectResolvingState = computed(
   () => !initialized.value || (loadingProjects.value && !projectContextResolved.value)
@@ -360,7 +374,7 @@ const reminderThresholdOptions = [
   { label: '1 day', value: 1440 },
 ] as const
 const isCurrentProjectOwner = computed(
-  () => Boolean(authStore.user?.id) && currentProject.value?.createdBy === authStore.user?.id,
+  () => Boolean(authStore.user?.id) && currentProject.value?.createdBy === authStore.user?.id
 )
 const chartSummary = computed(() => taskChartResponse.value?.data?.summary)
 const activeTabLabel = computed(
@@ -408,7 +422,9 @@ const currentData = computed(() => {
 
   const { labels, totalSeries, completedSeries } = apiData
   const hasValidLength =
-    labels.length > 1 && labels.length === totalSeries.length && labels.length === completedSeries.length
+    labels.length > 1 &&
+    labels.length === totalSeries.length &&
+    labels.length === completedSeries.length
 
   if (!hasValidLength) return { labels: [], series1: [], series2: [] }
   return { labels, series1: completedSeries, series2: totalSeries }
@@ -436,7 +452,10 @@ function getCssColor(name: string, fallback: string) {
 }
 
 function destroyTaskDoneChart() {
-  if (taskDoneChart) { taskDoneChart.destroy(); taskDoneChart = null }
+  if (taskDoneChart) {
+    taskDoneChart.destroy()
+    taskDoneChart = null
+  }
 }
 
 function buildChartDatasets(): ChartDataset<'line', number[]>[] {
@@ -491,7 +510,10 @@ function buildChartDatasets(): ChartDataset<'line', number[]>[] {
 }
 
 async function renderTaskDoneChart() {
-  if (!hasChartData.value) { destroyTaskDoneChart(); return }
+  if (!hasChartData.value) {
+    destroyTaskDoneChart()
+    return
+  }
   await nextTick()
   if (!chartCanvas.value) return
 
@@ -544,8 +566,16 @@ async function renderTaskDoneChart() {
   })
 }
 
-watch([currentData, hasChartData], () => { void renderTaskDoneChart() }, { immediate: true, deep: true })
-onBeforeUnmount(() => { destroyTaskDoneChart() })
+watch(
+  [currentData, hasChartData],
+  () => {
+    void renderTaskDoneChart()
+  },
+  { immediate: true, deep: true }
+)
+onBeforeUnmount(() => {
+  destroyTaskDoneChart()
+})
 
 function formatTime(dateStr: string) {
   try {
@@ -561,47 +591,66 @@ function formatTime(dateStr: string) {
 
 function getProgress(status: string): number {
   switch (status) {
-    case 'done': return 100
-    case 'in_progress': return 60
-    case 'todo': return 24
-    case 'cancelled': return 10
-    default: return 0
+    case 'done':
+      return 100
+    case 'in_progress':
+      return 60
+    case 'todo':
+      return 24
+    case 'cancelled':
+      return 10
+    default:
+      return 0
   }
 }
 
 function getProgressClass(status: string): string {
   switch (status) {
-    case 'done': return 'bg-gradient-to-r from-indigo-500 to-violet-500'
-    case 'in_progress': return 'bg-gradient-to-r from-cyan-500 to-cyan-400'
-    case 'todo': return 'bg-gradient-to-r from-amber-400 to-amber-300'
-    default: return 'bg-slate-300'
+    case 'done':
+      return 'bg-gradient-to-r from-indigo-500 to-violet-500'
+    case 'in_progress':
+      return 'bg-gradient-to-r from-cyan-500 to-cyan-400'
+    case 'todo':
+      return 'bg-gradient-to-r from-amber-400 to-amber-300'
+    default:
+      return 'bg-slate-300'
   }
 }
 
 function getStatusIconClass(status: string): string {
   switch (status) {
-    case 'done': return 'bg-gradient-to-br from-indigo-500 to-violet-500'
-    case 'in_progress': return 'bg-gradient-to-br from-cyan-500 to-cyan-400'
-    case 'todo': return 'bg-gradient-to-br from-amber-400 to-amber-500'
-    case 'cancelled': return 'bg-gradient-to-br from-slate-400 to-slate-500'
-    default: return 'bg-gradient-to-br from-indigo-500 to-indigo-400'
+    case 'done':
+      return 'bg-gradient-to-br from-indigo-500 to-violet-500'
+    case 'in_progress':
+      return 'bg-gradient-to-br from-cyan-500 to-cyan-400'
+    case 'todo':
+      return 'bg-gradient-to-br from-amber-400 to-amber-500'
+    case 'cancelled':
+      return 'bg-gradient-to-br from-slate-400 to-slate-500'
+    default:
+      return 'bg-gradient-to-br from-indigo-500 to-indigo-400'
   }
 }
 
 function getStatusIconStyle(status: string): string {
   switch (status) {
-    case 'done': return 'box-shadow: 0 2px 8px rgba(99,102,241,0.35);'
-    case 'in_progress': return 'box-shadow: 0 2px 8px rgba(6,182,212,0.35);'
-    case 'todo': return 'box-shadow: 0 2px 8px rgba(251,191,36,0.35);'
-    case 'cancelled': return 'box-shadow: 0 2px 8px rgba(100,116,139,0.25);'
-    default: return 'box-shadow: 0 2px 8px rgba(99,102,241,0.30);'
+    case 'done':
+      return 'box-shadow: 0 2px 8px rgba(99,102,241,0.35);'
+    case 'in_progress':
+      return 'box-shadow: 0 2px 8px rgba(6,182,212,0.35);'
+    case 'todo':
+      return 'box-shadow: 0 2px 8px rgba(251,191,36,0.35);'
+    case 'cancelled':
+      return 'box-shadow: 0 2px 8px rgba(100,116,139,0.25);'
+    default:
+      return 'box-shadow: 0 2px 8px rgba(99,102,241,0.30);'
   }
 }
 
 function buildTaskRoute(taskId: string) {
   return router.resolve({
-    name: 'task-detail',
-    params: { id: taskId },
+    name: 'tasks',
+    query: { taskId },
   })
 }
 
@@ -623,8 +672,8 @@ async function copyTaskLink(taskId: string) {
 
 function openTask(taskId: string) {
   void router.push({
-    name: 'task-detail',
-    params: { id: taskId },
+    name: 'tasks',
+    query: { taskId },
   })
 }
 
@@ -741,13 +790,15 @@ async function setReminder(task: Task) {
 
     if (sentCount > 0 && skippedCount > 0) {
       toast.success(
-        `Sent ${sentCount} reminder email(s) for ${thresholdMinutes} min before deadline, skipped ${skippedCount} duplicate reminder(s)`,
+        `Sent ${sentCount} reminder email(s) for ${thresholdMinutes} min before deadline, skipped ${skippedCount} duplicate reminder(s)`
       )
       return
     }
 
     if (sentCount > 0) {
-      toast.success(`Reminder email sent for ${task.title} at ${thresholdMinutes} min before deadline`)
+      toast.success(
+        `Reminder email sent for ${task.title} at ${thresholdMinutes} min before deadline`
+      )
       return
     }
 
@@ -757,8 +808,10 @@ async function setReminder(task: Task) {
       error &&
       typeof error === 'object' &&
       'response' in error &&
-      typeof (error as { response?: { data?: { message?: unknown } } }).response?.data?.message === 'string'
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message as string)
+      typeof (error as { response?: { data?: { message?: unknown } } }).response?.data?.message ===
+        'string'
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data
+            ?.message as string)
         : 'Unable to send reminder email'
 
     toast.error(message)

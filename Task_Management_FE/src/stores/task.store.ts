@@ -1,3 +1,5 @@
+import { del, get, patch, post } from '@/api/client'
+import { getTaskFileMetadata, type CloudinaryFileMetadata } from '@/api/cloudinary'
 import { addProjectMember, listProjectMembers } from '@/api/projects'
 import { taskService } from '@/features/tasks/services/task.service'
 import { defineStore } from 'pinia'
@@ -29,6 +31,7 @@ export interface Subtask {
 export interface Comment {
   id: string
   taskId: string
+  parentCommentId?: string | null
   authorId: string
   text: string
   createdAt: string
@@ -36,10 +39,13 @@ export interface Comment {
 
 export interface Attachment {
   id: string
+  fileId?: string | null
   taskId: string
   name: string
   url: string
   type: 'image' | 'file'
+  format?: string
+  resourceType?: string
   size: string
 }
 
@@ -53,13 +59,16 @@ export interface ActivityLog {
 
 export interface Task {
   id: string
+  parentTaskId?: string | null
   title: string
   description: string
+  tags?: unknown
   status: string
   priority: 'low' | 'medium' | 'high' | 'urgent'
   label: string
   labelBg: string
   labelColor: string
+  start: string
   due: string
   sprint: string
   assignees: Member[]
@@ -83,19 +92,51 @@ type RawTaskAssignee = {
 type RawTaskStatus = {
   id?: string
   name?: string | null
+  isDone?: boolean | null
 }
 
 type RawTask = {
   id?: string
+  projectId?: string | null
+  parentTaskId?: string | null
   title?: string | null
   description?: string | null
   priority?: string | null
+  tags?: unknown
+  startDate?: string | null
   dueDate?: string | null
   createdAt?: string | null
   updatedAt?: string | null
   status?: RawTaskStatus | null
   assignees?: RawTaskAssignee[] | null
 }
+
+type RawComment = {
+  id?: string
+  taskId?: string
+  parentCommentId?: string | null
+  userId?: string
+  user?: RawUser | null
+  content?: string | null
+  createdAt?: string | null
+}
+
+type RawTaskHistory = {
+  id?: string
+  taskId?: string
+  userId?: string
+  actionType?: string | null
+  action?: string | null
+  metadata?: HistoryMetadata | null
+  createdAt?: string | null
+}
+
+type HistoryChange = {
+  old?: unknown
+  new?: unknown
+}
+
+type HistoryMetadata = Record<string, HistoryChange | undefined>
 
 type RawProjectStatus = {
   id?: string
@@ -115,6 +156,10 @@ type CreateProjectTaskPayload = {
   description?: string
   statusId: string
   priority: Task['priority']
+  label?: string
+  labelBg?: string
+  labelColor?: string
+  startDate?: string
   dueDate?: string
   assigneeIds?: string[]
 }
@@ -133,7 +178,16 @@ const DEFAULT_COLUMNS: Column[] = [
   { id: 'done', title: 'Done', icon: 'target', color: '#10b981' },
 ]
 
-const MEMBER_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#ef4444', '#f97316']
+const MEMBER_COLORS = [
+  '#6366f1',
+  '#ec4899',
+  '#f59e0b',
+  '#10b981',
+  '#06b6d4',
+  '#8b5cf6',
+  '#ef4444',
+  '#f97316',
+]
 
 export const useTaskStore = defineStore('tasks', () => {
   const members = ref<Member[]>([])
@@ -148,7 +202,9 @@ export const useTaskStore = defineStore('tasks', () => {
   const comments = ref<Comment[]>([])
   const activityLogs = ref<ActivityLog[]>([])
   const attachments = ref<Attachment[]>([])
+  const trashTasks = ref<Task[]>([])
   const loading = ref(false)
+  const loadingTrash = ref(false)
   const loadedProjectId = ref<string | null>(null)
 
   const labelPresets: Record<string, { bg: string; color: string }> = {
@@ -164,6 +220,43 @@ export const useTaskStore = defineStore('tasks', () => {
 
   function labelStyle(label: string) {
     return labelPresets[label] ?? { bg: '#f1f5f9', color: '#475569' }
+  }
+
+  function labelTags(label: string, labelBg?: string, labelColor?: string) {
+    if (!label) return null
+
+    const style = labelStyle(label)
+    return {
+      label,
+      labelBg: labelBg || style.bg,
+      labelColor: labelColor || style.color,
+    }
+  }
+
+  function readTaskLabel(rawTags: unknown) {
+    if (typeof rawTags === 'string') {
+      try {
+        return readTaskLabel(JSON.parse(rawTags))
+      } catch {
+        return { label: '', labelBg: labelStyle('').bg, labelColor: labelStyle('').color }
+      }
+    }
+
+    if (!rawTags || typeof rawTags !== 'object' || Array.isArray(rawTags)) {
+      return { label: '', labelBg: labelStyle('').bg, labelColor: labelStyle('').color }
+    }
+
+    const tags = rawTags as Record<string, unknown>
+    const label = typeof tags.label === 'string' ? tags.label.trim() : ''
+    const style = labelStyle(label)
+    const labelBg = typeof tags.labelBg === 'string' ? tags.labelBg : style.bg
+    const labelColor = typeof tags.labelColor === 'string' ? tags.labelColor : style.color
+
+    if (label && !labelPresets[label]) {
+      labelPresets[label] = { bg: labelBg, color: labelColor }
+    }
+
+    return { label, labelBg, labelColor }
   }
 
   function initialsFromName(name: string) {
@@ -191,7 +284,12 @@ export const useTaskStore = defineStore('tasks', () => {
 
   function normalizePriority(priority?: string | null): Task['priority'] {
     const normalized = priority?.trim().toLowerCase()
-    if (normalized === 'low' || normalized === 'medium' || normalized === 'high' || normalized === 'urgent') {
+    if (
+      normalized === 'low' ||
+      normalized === 'medium' ||
+      normalized === 'high' ||
+      normalized === 'urgent'
+    ) {
       return normalized
     }
     return 'medium'
@@ -216,18 +314,23 @@ export const useTaskStore = defineStore('tasks', () => {
 
   function mapTask(rawTask: RawTask): Task {
     const rawAssignees = Array.isArray(rawTask.assignees) ? rawTask.assignees : []
-    const assignees = rawAssignees.map(mapMember).filter((member): member is Member => Boolean(member))
-    const emptyLabelStyle = labelStyle('')
+    const assignees = rawAssignees
+      .map(mapMember)
+      .filter((member): member is Member => Boolean(member))
+    const taskLabel = readTaskLabel(rawTask.tags)
 
     return {
       id: rawTask.id ?? '',
+      parentTaskId: rawTask.parentTaskId ?? null,
       title: rawTask.title ?? '',
       description: rawTask.description ?? '',
+      tags: rawTask.tags ?? null,
       status: rawTask.status?.id ?? '',
       priority: normalizePriority(rawTask.priority),
-      label: '',
-      labelBg: emptyLabelStyle.bg,
-      labelColor: emptyLabelStyle.color,
+      label: taskLabel.label,
+      labelBg: taskLabel.labelBg,
+      labelColor: taskLabel.labelColor,
+      start: rawTask.startDate ?? '',
       due: rawTask.dueDate ?? '',
       sprint: '',
       assignees,
@@ -236,6 +339,303 @@ export const useTaskStore = defineStore('tasks', () => {
       createdAt: rawTask.createdAt ?? new Date().toISOString(),
       updatedAt: rawTask.updatedAt ?? new Date().toISOString(),
     }
+  }
+
+  function unwrapPayload<T>(response: T | { data?: T }): T {
+    if (response && typeof response === 'object' && 'data' in response) {
+      return (response as { data?: T }).data as T
+    }
+
+    return response as T
+  }
+
+  function unwrapList<T>(response: T[] | { data?: T[] }): T[] {
+    if (Array.isArray(response)) return response
+    return Array.isArray(response?.data) ? response.data : []
+  }
+
+  function upsertTask(rawTask: RawTask) {
+    const nextTask = mapTask(rawTask)
+    const idx = tasks.value.findIndex((task) => task.id === nextTask.id)
+
+    if (idx >= 0) {
+      // Some list endpoints can omit description; keep local value in that case.
+      const hasDescription = Object.prototype.hasOwnProperty.call(rawTask, 'description')
+      const hasTags = Object.prototype.hasOwnProperty.call(rawTask, 'tags')
+      const nextDescription = hasDescription ? nextTask.description : tasks.value[idx].description
+      const nextTags = hasTags ? nextTask.tags : tasks.value[idx].tags
+      const nextLabel = hasTags ? nextTask.label : tasks.value[idx].label
+      const nextLabelBg = hasTags ? nextTask.labelBg : tasks.value[idx].labelBg
+      const nextLabelColor = hasTags ? nextTask.labelColor : tasks.value[idx].labelColor
+
+      tasks.value[idx] = {
+        ...tasks.value[idx],
+        ...nextTask,
+        description: nextDescription,
+        tags: nextTags,
+        label: nextLabel,
+        labelBg: nextLabelBg,
+        labelColor: nextLabelColor,
+      }
+      return
+    }
+
+    tasks.value.push(nextTask)
+  }
+
+  function replaceSubtasks(taskId: string, rawSubtasks: RawTask[]) {
+    subtasks.value = subtasks.value.filter((subtask) => subtask.taskId !== taskId)
+    subtasks.value.push(
+      ...rawSubtasks.map((rawSubtask) => ({
+        id: rawSubtask.id ?? '',
+        taskId,
+        title: rawSubtask.title ?? '',
+        completed:
+          Boolean(rawSubtask.status?.isDone) ||
+          /done|complete/i.test(rawSubtask.status?.name ?? ''),
+        assigneeId: rawSubtask.assignees?.[0]?.userId ?? rawSubtask.assignees?.[0]?.user?.id,
+        dueDate: rawSubtask.dueDate ? rawSubtask.dueDate.slice(0, 10) : undefined,
+      }))
+    )
+  }
+
+  function replaceComments(taskId: string, rawComments: RawComment[]) {
+    comments.value = comments.value.filter((comment) => comment.taskId !== taskId)
+    upsertMembersFromComments(rawComments)
+    comments.value.push(
+      ...rawComments.map((rawComment) => ({
+        id: rawComment.id ?? '',
+        taskId,
+        parentCommentId: rawComment.parentCommentId ?? null,
+        authorId: rawComment.userId ?? 'system',
+        text: rawComment.content ?? '',
+        createdAt: rawComment.createdAt ?? new Date().toISOString(),
+      }))
+    )
+    updateTask(taskId, { comments: commentsByTask(taskId).length })
+  }
+
+  function upsertMembersFromComments(rawComments: RawComment[]) {
+    rawComments.forEach((rawComment) => {
+      const id = rawComment.userId || rawComment.user?.id
+      if (!id || members.value.some((member) => member.id === id)) return
+
+      const name = getDisplayName(rawComment.user)
+      members.value.push({
+        id,
+        name,
+        initials: initialsFromName(name),
+        color: colorFromSeed(id || name),
+      })
+    })
+  }
+
+  function formatHistoryAction(rawItem: RawTaskHistory) {
+    const actionType = (rawItem.actionType ?? rawItem.action ?? 'UPDATED').toUpperCase()
+    const metadata = rawItem.metadata ?? {}
+
+    if (actionType === 'CREATED') {
+      const title = formatHistoryValue(metadata.task?.new, 'task')
+      return title ? `created task ${title}` : 'created this task'
+    }
+
+    if (actionType === 'STATUS_CHANGED' || metadata.status) {
+      return formatChangeSentence('changed status', metadata.status)
+    }
+
+    if (actionType === 'ASSIGNED') {
+      return `assigned ${formatAssigneeValue(metadata.assignee?.new)}`
+    }
+
+    if (actionType === 'UNASSIGNED') {
+      return `unassigned ${formatAssigneeValue(metadata.assignee?.old)}`
+    }
+
+    if (actionType === 'COMMENTED') return 'commented on this task'
+    if (actionType === 'COMMENT_UPDATED') return 'updated a comment'
+    if (actionType === 'COMMENT_DELETED') return 'deleted a comment'
+
+    if (actionType === 'DELETED') {
+      const title = formatHistoryValue(metadata.task?.old, 'task')
+      return title ? `deleted task ${title}` : 'deleted this task'
+    }
+
+    const detailedChanges = visibleHistoryChanges(metadata)
+      .filter(([, change]) => change && ('old' in change || 'new' in change))
+      .map(([field, change]) => formatFieldChange(field, change))
+      .filter(Boolean)
+
+    if (detailedChanges.length) {
+      return `updated ${detailedChanges.join('; ')}`
+    }
+
+    return actionType.replace(/_/g, ' ').toLowerCase()
+  }
+
+  function visibleHistoryChanges(metadata: HistoryMetadata) {
+    return Object.entries(metadata).filter(([field]) => field !== 'description')
+  }
+
+  function formatChangeSentence(prefix: string, change?: HistoryChange) {
+    if (!change) return prefix
+    const oldValue = formatHistoryValue(change.old)
+    const newValue = formatHistoryValue(change.new)
+
+    if (oldValue && newValue) return `${prefix} from ${oldValue} to ${newValue}`
+    if (newValue) return `${prefix} to ${newValue}`
+    if (oldValue) return `${prefix} from ${oldValue}`
+    return prefix
+  }
+
+  function formatFieldChange(field: string, change?: HistoryChange) {
+    if (!change) return ''
+    const label = formatHistoryField(field)
+    const oldValue = formatHistoryValue(change.old, field)
+    const newValue = formatHistoryValue(change.new, field)
+
+    if (oldValue && newValue) return `${label} from ${oldValue} to ${newValue}`
+    if (newValue) return `${label} to ${newValue}`
+    if (oldValue) return `removed ${label} ${oldValue}`
+    return label
+  }
+
+  function formatHistoryField(field: string) {
+    const labels: Record<string, string> = {
+      title: 'title',
+      description: 'description',
+      priority: 'priority',
+      status: 'status',
+      statusId: 'status',
+      startDate: 'start date',
+      dueDate: 'due date',
+      parentTaskId: 'parent task',
+      assignee: 'assignee',
+      task: 'task',
+    }
+
+    return (
+      labels[field] ??
+      field
+        .replace(/Id$/, '')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .toLowerCase()
+    )
+  }
+
+  function formatAssigneeValue(value: unknown) {
+    if (value === null || value === undefined || value === '') return 'someone'
+    const id = String(value)
+    return getMember(id)?.name ?? shortId(id)
+  }
+
+  function formatHistoryValue(value: unknown, field = '') {
+    if (value === null || value === undefined || value === '') return ''
+
+    if (field === 'assignee') return formatAssigneeValue(value)
+
+    if (typeof value === 'object') {
+      const record = value as Record<string, unknown>
+      const title = record.title ?? record.name ?? record.fullName ?? record.email
+      if (title) return quoteIfNeeded(String(title))
+      if ('id' in record && record.id) return shortId(String(record.id))
+      return ''
+    }
+
+    if (typeof value === 'boolean') return value ? 'yes' : 'no'
+
+    const text = String(value)
+    if (/date/i.test(field) || /^\d{4}-\d{2}-\d{2}/.test(text)) {
+      const date = new Date(text)
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      }
+    }
+
+    return quoteIfNeeded(text)
+  }
+
+  function quoteIfNeeded(value: string) {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    if (/^[a-z0-9 _-]+$/i.test(trimmed) && trimmed.length <= 24) return trimmed
+    return `"${trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed}"`
+  }
+
+  function shortId(id: string) {
+    return id.length > 12 ? `${id.slice(0, 8)}...` : id
+  }
+
+  function replaceActivity(taskId: string, rawHistory: RawTaskHistory[]) {
+    activityLogs.value = activityLogs.value.filter((activity) => activity.taskId !== taskId)
+    activityLogs.value.push(
+      ...rawHistory
+        .filter((rawItem) => !isDescriptionOnlyHistory(rawItem))
+        .map((rawItem) => ({
+          id: rawItem.id ?? '',
+          taskId,
+          authorId: rawItem.userId ?? 'system',
+          action: formatHistoryAction(rawItem),
+          createdAt: rawItem.createdAt ?? new Date().toISOString(),
+        }))
+    )
+  }
+
+  function isDescriptionOnlyHistory(rawItem: RawTaskHistory) {
+    const actionType = (rawItem.actionType ?? rawItem.action ?? 'UPDATED').toUpperCase()
+    const metadata = rawItem.metadata ?? {}
+    const visibleChanges = visibleHistoryChanges(metadata)
+
+    return actionType === 'UPDATED' && Object.keys(metadata).length > 0 && visibleChanges.length === 0
+  }
+
+  function replaceAttachments(taskId: string, rawFiles: CloudinaryFileMetadata[]) {
+    const existingTaskAttachments = attachments.value.filter(
+      (attachment) => attachment.taskId === taskId
+    )
+    if (!rawFiles.length && existingTaskAttachments.length) {
+      updateTask(taskId, { files: existingTaskAttachments.length })
+      return
+    }
+
+    attachments.value = attachments.value.filter((attachment) => attachment.taskId !== taskId)
+    attachments.value.push(
+      ...rawFiles.map((file) => ({
+        id: file.id ?? file.publicId,
+        fileId: file.id,
+        taskId,
+        name: file.fileName || file.publicId.split('/').pop() || 'file',
+        url: file.secureUrl,
+        type: file.resourceType === 'image' ? ('image' as const) : ('file' as const),
+        format: file.format,
+        resourceType: file.resourceType,
+        size: formatBytes(Number(file.bytes) || 0),
+      }))
+    )
+    updateTask(taskId, { files: attachmentsByTask(taskId).length })
+  }
+
+  function formatBytes(bytes: number) {
+    if (!bytes) return '0 KB'
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  function firstOpenStatusId() {
+    return (
+      columns.value.find((column) => /todo|to do|backlog/i.test(column.title))?.id ??
+      columns.value.find((column) => !/done|complete/i.test(column.title))?.id ??
+      columns.value[0]?.id
+    )
+  }
+
+  function doneStatusId() {
+    return columns.value.find((column) => /done|complete/i.test(column.title))?.id
   }
 
   function mapProjectMember(rawMember: RawProjectMember): Member | null {
@@ -258,13 +658,15 @@ export const useTaskStore = defineStore('tasks', () => {
       ? nextMembers
       : Array.from(
           new Map(
-            nextTasks.flatMap((task) => task.assignees).map((member) => [member.id, member] as const),
-          ).values(),
+            nextTasks
+              .flatMap((task) => task.assignees)
+              .map((member) => [member.id, member] as const)
+          ).values()
         )
   }
 
   function tasksByCol(colId: string) {
-    return tasks.value.filter((task) => task.status === colId)
+    return tasks.value.filter((task) => task.status === colId && !task.parentTaskId)
   }
 
   function subtasksByTask(taskId: string) {
@@ -307,8 +709,12 @@ export const useTaskStore = defineStore('tasks', () => {
         listProjectMembers(projectId),
       ])
 
-      const nextColumns = Array.isArray(statusResponse)
-        ? statusResponse.map((status: RawProjectStatus) => ({
+      const rawStatuses = Array.isArray(statusResponse)
+        ? (statusResponse as RawProjectStatus[])
+        : []
+
+      const nextColumns = rawStatuses.length
+        ? rawStatuses.map((status) => ({
             id: status.id ?? '',
             title: status.name ?? 'Untitled',
             icon: inferColumnIcon(status.name ?? '', Boolean(status.isDone)),
@@ -317,7 +723,7 @@ export const useTaskStore = defineStore('tasks', () => {
         : []
 
       const nextTasks = Array.isArray((taskResponse as { data?: unknown[] })?.data)
-        ? ((taskResponse as { data: RawTask[] }).data.map(mapTask))
+        ? (taskResponse as { data: RawTask[] }).data.map(mapTask)
         : []
       const nextMembers = Array.isArray(membersResponse)
         ? membersResponse
@@ -332,6 +738,26 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
+  async function loadProjectTrash(projectId: string) {
+    loadingTrash.value = true
+
+    try {
+      const response = await taskService.listTasks({
+        projectId,
+        deleted: 'true',
+        page: 1,
+        limit: 100,
+      })
+      const rawTasks = Array.isArray((response as { data?: unknown[] })?.data)
+        ? (response as { data: RawTask[] }).data
+        : []
+
+      trashTasks.value = rawTasks.map(mapTask)
+    } finally {
+      loadingTrash.value = false
+    }
+  }
+
   async function addMemberToProject(projectId: string, userId: string) {
     await addProjectMember(projectId, userId)
     await loadProjectBoard(projectId)
@@ -339,13 +765,17 @@ export const useTaskStore = defineStore('tasks', () => {
 
   function resetProjectBoard() {
     replaceBoardData([...DEFAULT_COLUMNS], [])
+    trashTasks.value = []
     loadedProjectId.value = null
   }
 
   async function createTaskInProject(payload: CreateProjectTaskPayload) {
     const priority = payload.priority.toUpperCase()
+    const startDate = payload.startDate
+      ? new Date(payload.startDate).toISOString()
+      : undefined
     const dueDate = payload.dueDate
-      ? new Date(`${payload.dueDate}T00:00:00`).toISOString()
+      ? new Date(payload.dueDate).toISOString()
       : undefined
 
     await taskService.createTask({
@@ -354,6 +784,8 @@ export const useTaskStore = defineStore('tasks', () => {
       projectId: payload.projectId,
       statusId: payload.statusId,
       priority,
+      tags: labelTags(payload.label ?? '', payload.labelBg, payload.labelColor) ?? undefined,
+      startDate,
       dueDate,
       assigneeIds: payload.assigneeIds?.length ? payload.assigneeIds : undefined,
     })
@@ -365,7 +797,6 @@ export const useTaskStore = defineStore('tasks', () => {
     await taskService.createProjectStatus(payload.projectId, {
       name: payload.title,
       color: payload.color,
-      position: columns.value.length + 1,
       isDone: false,
       isDefault: columns.value.length === 0,
     })
@@ -375,6 +806,38 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function updateStatusPosition(projectId: string, statusId: string, position: number) {
     await taskService.updateProjectStatus(projectId, statusId, { position })
+    await loadProjectBoard(projectId)
+  }
+
+  async function updateStatusInProject(
+    projectId: string,
+    statusId: string,
+    data: { title?: string; color?: string }
+  ) {
+    await taskService.updateProjectStatus(projectId, statusId, {
+      ...(data.title !== undefined && { name: data.title }),
+      ...(data.color !== undefined && { color: data.color }),
+    })
+    await loadProjectBoard(projectId)
+  }
+
+  async function deleteStatusInProject(
+    projectId: string,
+    statusId: string,
+    moveToStatusId?: string
+  ) {
+    // If there are tasks in this status and a migration target is given, move them first
+    if (moveToStatusId) {
+      const affectedTaskIds = tasks.value
+        .filter((t) => t.status === statusId && !t.parentTaskId)
+        .map((t) => t.id)
+      await Promise.all(
+        affectedTaskIds.map((taskId) =>
+          taskService.updateTask(taskId, { statusId: moveToStatusId } as never)
+        )
+      )
+    }
+    await taskService.deleteProjectStatus(projectId, statusId)
     await loadProjectBoard(projectId)
   }
 
@@ -397,11 +860,148 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  function addTask(data: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'files'>) {
+  async function loadTaskDetail(taskId: string) {
+    const taskResponse = await get<RawTask | { data?: RawTask }>(`/tasks/${taskId}`)
+    const rawTask = unwrapPayload(taskResponse)
+    upsertTask(rawTask)
+
+    if (rawTask.projectId && loadedProjectId.value !== rawTask.projectId) {
+      await loadProjectBoard(rawTask.projectId)
+      upsertTask(rawTask)
+    }
+
+    const [subtaskResponse, commentResponse, historyResponse, fileResponse] = await Promise.all([
+      get<RawTask[] | { data?: RawTask[] }>(`/tasks/parent/${taskId}`, {
+        params: { page: 1, limit: 100 },
+      }),
+      get<RawComment[] | { data?: RawComment[] }>(`/tasks/${taskId}/comments`, {
+        params: { page: 1, limit: 100 },
+      }),
+      get<RawTaskHistory[] | { data?: RawTaskHistory[] }>(`/tasks/${taskId}/history`, {
+        params: { page: 1, limit: 100 },
+      }),
+      rawTask.projectId ? getTaskFileMetadata(rawTask.projectId, taskId) : Promise.resolve([]),
+    ])
+
+    replaceSubtasks(taskId, unwrapList(subtaskResponse))
+    replaceComments(taskId, unwrapList(commentResponse))
+    replaceActivity(taskId, unwrapList(historyResponse))
+    replaceAttachments(taskId, fileResponse)
+  }
+
+  async function updateTaskRemote(taskId: string, data: Record<string, unknown>) {
+    const response = await patch<RawTask | { data?: RawTask }>(`/tasks/${taskId}`, data)
+    upsertTask(unwrapPayload(response))
+    await loadTaskDetail(taskId)
+  }
+
+  async function updateTaskLabelRemote(
+    taskId: string,
+    label: string,
+    labelBg?: string,
+    labelColor?: string
+  ) {
+    await updateTaskRemote(taskId, {
+      tags: labelTags(label, labelBg, labelColor),
+    })
+  }
+
+  async function createSubtaskRemote(taskId: string, title: string) {
+    const parentTask = getTask(taskId)
+    const statusId = firstOpenStatusId()
+    if (!parentTask || !loadedProjectId.value || !statusId) return
+
+    await post('/tasks', {
+      title,
+      projectId: loadedProjectId.value,
+      parentTaskId: taskId,
+      statusId,
+      priority: parentTask.priority.toUpperCase(),
+    })
+
+    await loadTaskDetail(taskId)
+  }
+
+  async function updateSubtaskRemote(
+    parentTaskId: string,
+    subtaskId: string,
+    data: Record<string, unknown>
+  ) {
+    await patch(`/tasks/${subtaskId}`, data)
+    await loadTaskDetail(parentTaskId)
+  }
+
+  async function toggleSubtaskRemote(parentTaskId: string, subtaskId: string) {
+    const subtask = subtasks.value.find((item) => item.id === subtaskId)
+    const statusId = subtask?.completed ? firstOpenStatusId() : doneStatusId()
+    if (!statusId) return
+
+    await updateSubtaskRemote(parentTaskId, subtaskId, { statusId })
+  }
+
+  async function deleteSubtaskRemote(parentTaskId: string, subtaskId: string) {
+    await del(`/tasks/${subtaskId}`)
+    await loadTaskDetail(parentTaskId)
+  }
+
+  async function addCommentRemote(taskId: string, text: string, parentCommentId?: string) {
+    await post(`/tasks/${taskId}/comments`, {
+      content: text,
+      parentCommentId,
+    })
+    await loadTaskDetail(taskId)
+  }
+
+  async function deleteCommentRemote(taskId: string, commentId: string) {
+    await del(`/tasks/${taskId}/comments/${commentId}`)
+    await loadTaskDetail(taskId)
+  }
+
+  async function assignTaskMemberRemote(taskId: string, memberId: string) {
+    await post(`/tasks/${taskId}/assignees`, { userId: memberId })
+    await loadTaskDetail(taskId)
+  }
+
+  async function unassignTaskMemberRemote(taskId: string, memberId: string) {
+    await del(`/tasks/${taskId}/assignees/${memberId}`)
+    await loadTaskDetail(taskId)
+  }
+
+  async function deleteTaskRemote(taskId: string, projectId?: string | null) {
+    await taskService.deleteTask(taskId)
+    tasks.value = tasks.value.filter((task) => task.id !== taskId)
+    subtasks.value = subtasks.value.filter((subtask) => subtask.taskId !== taskId)
+    comments.value = comments.value.filter((comment) => comment.taskId !== taskId)
+    activityLogs.value = activityLogs.value.filter((activity) => activity.taskId !== taskId)
+    attachments.value = attachments.value.filter((attachment) => attachment.taskId !== taskId)
+
+    const nextProjectId = projectId ?? loadedProjectId.value
+    if (nextProjectId) {
+      await loadProjectTrash(nextProjectId)
+    }
+  }
+
+  async function restoreTaskRemote(taskId: string, projectId?: string | null) {
+    const response = await patch<RawTask | { data?: RawTask }>(`/tasks/${taskId}/restore`, {})
+    const restoredTask = unwrapPayload(response)
+    trashTasks.value = trashTasks.value.filter((task) => task.id !== taskId)
+    upsertTask(restoredTask)
+
+    const nextProjectId = projectId ?? restoredTask.projectId ?? loadedProjectId.value
+    if (nextProjectId) {
+      await loadProjectBoard(nextProjectId)
+      await loadProjectTrash(nextProjectId)
+    }
+  }
+
+  function addTask(
+    data: Omit<Task, 'id' | 'start' | 'createdAt' | 'updatedAt' | 'comments' | 'files'>
+  ) {
     const lc = labelStyle(data.label)
     tasks.value.push({
       ...data,
       id: `task_${Date.now()}`,
+      start: '',
       labelBg: lc.bg,
       labelColor: lc.color,
       comments: 0,
@@ -477,6 +1077,7 @@ export const useTaskStore = defineStore('tasks', () => {
     comments.value.push({
       id: `cmt_${Date.now()}`,
       taskId,
+      parentCommentId: null,
       authorId,
       text,
       createdAt: new Date().toISOString(),
@@ -492,15 +1093,24 @@ export const useTaskStore = defineStore('tasks', () => {
   }
 
   function addAttachment(taskId: string, att: Omit<Attachment, 'id' | 'taskId'>) {
-    attachments.value.push({ ...att, id: `att_${Date.now()}`, taskId })
-    updateTask(taskId, { files: attachmentsByTask(taskId).length + 1 })
+    const id = att.fileId ?? `att_${Date.now()}`
+    const idx = attachments.value.findIndex((attachment) => attachment.id === id)
+    const nextAttachment = { ...att, id, taskId }
+
+    if (idx >= 0) {
+      attachments.value[idx] = nextAttachment
+    } else {
+      attachments.value.push(nextAttachment)
+    }
+
+    updateTask(taskId, { files: attachmentsByTask(taskId).length })
   }
 
   function removeAttachment(id: string) {
     const attachment = attachments.value.find((item) => item.id === id)
     if (!attachment) return
     attachments.value = attachments.value.filter((item) => item.id !== id)
-    updateTask(attachment.taskId, { files: attachmentsByTask(attachment.taskId).length - 1 })
+    updateTask(attachment.taskId, { files: attachmentsByTask(attachment.taskId).length })
   }
 
   return {
@@ -512,7 +1122,9 @@ export const useTaskStore = defineStore('tasks', () => {
     comments,
     activityLogs,
     attachments,
+    trashTasks,
     loading,
+    loadingTrash,
     loadedProjectId,
     tasksByCol,
     subtasksByTask,
@@ -525,12 +1137,28 @@ export const useTaskStore = defineStore('tasks', () => {
     labelStyle,
     labelPresets,
     loadProjectBoard,
+    loadProjectTrash,
     resetProjectBoard,
     addMemberToProject,
     createTaskInProject,
     createStatusInProject,
+    updateStatusInProject,
+    deleteStatusInProject,
     updateStatusPosition,
     moveTaskToStatus,
+    loadTaskDetail,
+    updateTaskRemote,
+    updateTaskLabelRemote,
+    createSubtaskRemote,
+    updateSubtaskRemote,
+    toggleSubtaskRemote,
+    deleteSubtaskRemote,
+    addCommentRemote,
+    deleteCommentRemote,
+    assignTaskMemberRemote,
+    unassignTaskMemberRemote,
+    deleteTaskRemote,
+    restoreTaskRemote,
     addTask,
     updateTask,
     moveTask,

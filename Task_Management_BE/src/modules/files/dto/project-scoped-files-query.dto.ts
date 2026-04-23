@@ -12,6 +12,11 @@ export class ProjectScopedFilesQueryDto {
   @MaxLength(255)
   folderPath?: string;
 
+  @ApiPropertyOptional({ description: 'Task ID attached to file', example: '22222222-2222-2222-2222-222222222222' })
+  @IsOptional()
+  @IsUUID()
+  taskId?: string;
+
   @ApiPropertyOptional({ description: 'Parent folder path', example: 'tasks' })
   @IsOptional()
   @IsString()

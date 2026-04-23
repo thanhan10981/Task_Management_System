@@ -9,11 +9,14 @@
             <div class="flex items-center gap-2">
               <span class="td-breadcrumb-item">Tasks</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-              <span class="td-task-id">T-{{ task?.id }}</span>
+              <span class="td-task-id">{{ shortTaskCode }}</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
               <span class="td-breadcrumb-item font-semibold" style="color:var(--text-primary)">{{ task?.title?.slice(0,28) }}…</span>
             </div>
             <div class="flex items-center gap-1">
+              <button class="td-topbar-btn td-topbar-btn--danger" title="Move to trash" @click="showDeleteConfirm = true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
               <button class="td-topbar-btn" title="Close" @click="$emit('update:modelValue', false)">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -40,6 +43,13 @@
               <div class="td-section">
                 <div class="td-section-hd">
                   <h3 class="td-section-title">Description</h3>
+                  <button
+                    class="td-desc-save"
+                    :disabled="!descriptionDirty || savingDescription"
+                    @click="saveDescription"
+                  >
+                    {{ savingDescription ? 'Saving...' : 'Save' }}
+                  </button>
                 </div>
                 <div class="td-toolbar">
                   <!-- Bold -->
@@ -56,11 +66,11 @@
                   </button>
                   <span class="td-toolbar-divider"/>
                   <!-- Bullet list -->
-                  <button class="td-toolbar-btn" @mousedown.prevent @click="fmt('insertUnorderedList')" title="Bullet list">
+                  <button class="td-toolbar-btn" @mousedown.prevent @click="toggleList('ul')" title="Bullet list">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>
                   </button>
                   <!-- Ordered list -->
-                  <button class="td-toolbar-btn" @mousedown.prevent @click="fmt('insertOrderedList')" title="Ordered list">
+                  <button class="td-toolbar-btn" @mousedown.prevent @click="toggleList('ol')" title="Ordered list">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke-width="2"/><path d="M4 10h2" stroke-width="2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke-width="2"/></svg>
                   </button>
                 </div>
@@ -68,10 +78,11 @@
                   ref="descRef"
                   class="td-editor"
                   contenteditable="true"
+                  dir="ltr"
+                  spellcheck="true"
                   data-placeholder="Add a description…"
-                  @blur="onDescBlur"
-                  v-html="descHtml"
-                />
+                  @input="onDescInput"
+                ></div>
               </div>
 
               <!-- ── SUBTASKS ── -->
@@ -94,7 +105,7 @@
                       <button
                         class="td-check-box shrink-0"
                         :class="{ checked: st.completed }"
-                        @click="store.toggleSubtask(st.id)"
+                        @click="toggleSubtask(st.id)"
                       >
                         <svg v-if="st.completed" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
                       </button>
@@ -182,12 +193,12 @@
                             type="date"
                             :value="st.dueDate"
                             style="position:absolute;inset:0;opacity:0;width:100%;cursor:pointer;pointer-events:none"
-                            @change="e => store.updateSubtask(st.id, { dueDate: (e.target as HTMLInputElement).value })"
+                            @change="e => updateSubtaskDueDate(st.id, (e.target as HTMLInputElement).value)"
                           />
                         </div>
 
                         <!-- Delete -->
-                        <button class="td-subtask-meta-btn opacity-0 group-hover:opacity-100" title="Delete" @click="store.deleteSubtask(st.id)">
+                        <button class="td-subtask-meta-btn opacity-0 group-hover:opacity-100" title="Delete" @click="deleteSubtask(st.id)">
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
 
@@ -252,15 +263,70 @@
                         <div class="flex items-center gap-2 mb-1">
                           <span class="td-activity-user">{{ store.getMember(entry.authorId)?.name ?? 'User' }}</span>
                           <span class="td-activity-time">{{ timeAgo(entry.createdAt) }}</span>
+                          <button class="td-comment-action" @click="startReply(entry.id)">
+                            Reply
+                          </button>
+                          <button
+                            v-if="canRemoveComment(entry.authorId)"
+                            class="td-comment-action danger"
+                            @click="removeComment(entry.id)"
+                          >
+                            Remove
+                          </button>
                         </div>
                         <p class="td-comment-card-text">{{ entry.text }}</p>
+
+                        <div v-if="entry.replies?.length" class="flex flex-col gap-1.5 mt-3">
+                          <div v-for="reply in entry.replies" :key="reply.id" class="td-comment-reply">
+                            <div
+                              class="td-avatar-xxs"
+                              :style="{ background: store.getMember(reply.authorId)?.color ?? '#94a3b8' }"
+                            >
+                              {{ store.getMember(reply.authorId)?.initials ?? '?' }}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                              <div class="flex items-center gap-2 mb-0.5">
+                                <span class="td-activity-user">{{ store.getMember(reply.authorId)?.name ?? 'User' }}</span>
+                                <span class="td-activity-time">{{ timeAgo(reply.createdAt) }}</span>
+                                <button
+                                  v-if="canRemoveComment(reply.authorId)"
+                                  class="td-comment-action danger"
+                                  @click="removeComment(reply.id)"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                              <p class="td-comment-card-text">{{ reply.text }}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div v-if="replyingToCommentId === entry.id" class="td-reply-box">
+                          <textarea
+                            v-model="replyText"
+                            class="td-comment-textarea"
+                            rows="2"
+                            placeholder="Write a reply..."
+                            @keydown.ctrl.enter="submitReply(entry.id)"
+                          />
+                          <div class="flex justify-end gap-2 mt-1">
+                            <button class="td-comment-action" @click="cancelReply">Cancel</button>
+                            <button
+                              class="td-comment-submit"
+                              :disabled="!replyText.trim()"
+                              @click="submitReply(entry.id)"
+                            >
+                              Reply
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <!-- Activity log: compact line -->
                     <div v-else class="td-log-row">
                       <div class="td-log-dot"/>
                       <span class="td-log-user">{{ store.getMember(entry.authorId)?.name?.split(' ')[0] ?? 'User' }}</span>
-                      <span class="td-log-text">{{ entry.text }}</span>
+                      <span class="td-log-text" :title="entry.text">{{ entry.text }}</span>
                       <span class="td-activity-time">{{ timeAgo(entry.createdAt) }}</span>
                     </div>
                   </template>
@@ -272,22 +338,67 @@
                 <h3 class="td-section-title">Attachments</h3>
                 <label class="td-drop-zone" for="file-upload-input">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                  <span class="text-[13px] font-semibold">Drop files here or click to upload</span>
+                  <span class="text-[13px] font-semibold">{{ uploadingAttachments ? 'Uploading...' : 'Drop files here or click to upload' }}</span>
                   <span class="text-xs" style="color:var(--text-subtle)">Images, PDFs, Docs…</span>
                 </label>
-                <input id="file-upload-input" type="file" multiple class="hidden" @change="onFileUpload" />
+                <input id="file-upload-input" type="file" multiple class="hidden" :disabled="uploadingAttachments" @change="onFileUpload" />
+                <p v-if="attachmentUploadError" class="text-xs text-red-500 m-0">{{ attachmentUploadError }}</p>
 
                 <div v-if="taskAttachments.length > 0" class="td-attach-grid mt-2">
                   <div v-for="att in taskAttachments" :key="att.id" class="td-attach-item group">
+                    <button class="td-attach-preview-btn" type="button" @click="openAttachmentPreview(att)">
                     <img v-if="att.type === 'image'" :src="att.url" :alt="att.name" class="td-attach-img" />
                     <div v-else class="td-attach-file">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted)"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                       <span class="truncate w-full text-center">{{ att.name }}</span>
                       <span>{{ att.size }}</span>
                     </div>
-                    <button class="td-attach-remove" @click="store.removeAttachment(att.id)">×</button>
+                    </button>
+                    <div class="td-attach-caption" :title="att.name">{{ att.name }}</div>
+                    <button
+                      class="td-attach-remove"
+                      :disabled="deletingAttachmentId === att.id"
+                      @click.stop="deleteAttachment(att)"
+                    >
+                      {{ deletingAttachmentId === att.id ? '...' : '×' }}
+                    </button>
                   </div>
                 </div>
+
+                <Transition name="td-modal">
+                  <div v-if="previewAttachment" class="td-preview-overlay" @click.self="closeAttachmentPreview">
+                    <div class="td-preview-panel">
+                      <div class="td-preview-head">
+                        <div class="min-w-0">
+                          <p class="td-preview-title">{{ previewAttachment.name }}</p>
+                          <p class="td-preview-meta">{{ previewAttachment.format?.toUpperCase() || previewAttachment.resourceType || 'FILE' }} - {{ previewAttachment.size }}</p>
+                        </div>
+                        <button class="td-topbar-btn" title="Close preview" @click="closeAttachmentPreview">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                      <div class="td-preview-body">
+                        <img
+                          v-if="previewAttachment.type === 'image'"
+                          :src="previewUrl || previewAttachment.url"
+                          :alt="previewAttachment.name"
+                          class="td-preview-image"
+                        />
+                        <iframe
+                          v-else-if="canInlinePreview(previewAttachment)"
+                          :src="previewUrl || previewAttachment.url"
+                          class="td-preview-frame"
+                          :title="previewAttachment.name"
+                        />
+                        <div v-else class="td-preview-empty">
+                          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                          <p>Preview is not available for this file type.</p>
+                          <a class="td-preview-link" :href="previewUrl || previewAttachment.url" target="_blank" rel="noreferrer">Open file</a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Transition>
               </div>
 
             </div><!-- /td-main -->
@@ -333,7 +444,23 @@
               <!-- Due Date -->
               <div class="td-prop">
                 <p class="td-prop-label">Due Date</p>
-                <input type="date" class="td-prop-input" :value="task.due" @change="e => store.updateTask(task!.id, { due: (e.target as HTMLInputElement).value })" />
+                <input
+                  type="datetime-local"
+                  class="td-prop-input"
+                  :value="toDateTimeLocalValue(task.due)"
+                  @change="onDueDateChange"
+                />
+              </div>
+
+              <!-- Start Date -->
+              <div class="td-prop">
+                <p class="td-prop-label">Start Date</p>
+                <input
+                  type="datetime-local"
+                  class="td-prop-input"
+                  :value="toDateTimeLocalValue(task.start)"
+                  @change="onStartDateChange"
+                />
               </div>
 
               <!-- Sprint -->
@@ -394,7 +521,7 @@
                 <div class="flex flex-wrap gap-1 mt-1">
                   <span v-if="task.label" class="td-label-tag" :style="{ background: task.labelBg, color: task.labelColor }">
                     {{ task.label }}
-                    <button @click="store.updateTask(task!.id, { label: '', labelBg: '#f1f5f9', labelColor: '#475569' })">×</button>
+                    <button @click="clearLabel">×</button>
                   </span>
                   <div class="relative" ref="labelPickerRef">
                     <button class="td-add-label" @click="toggleLabelPicker">
@@ -442,13 +569,32 @@
 
               <!-- Meta -->
               <div class="td-prop mt-2 pt-4" style="border-top:1px solid var(--border-base)">
-                <p class="td-meta-row">Created {{ formatDate(task.createdAt) }}</p>
-                <p class="td-meta-row mt-0.5">Updated {{ formatDate(task.updatedAt) }}</p>
+                <p class="td-meta-row">Created {{ formatDateTime(task.createdAt) }}</p>
+                <p class="td-meta-row mt-0.5">Updated {{ formatDateTime(task.updatedAt) }}</p>
               </div>
 
             </div><!-- /td-sidebar -->
 
           </div><!-- /td-body -->
+
+          <Transition name="td-confirm">
+            <div v-if="showDeleteConfirm" class="td-delete-layer" @click.self="showDeleteConfirm = false">
+              <div class="td-delete-card" @click.stop>
+                <div class="td-delete-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </div>
+                <p class="td-delete-title">Move this task to Trash?</p>
+                <p class="td-delete-copy">"{{ task?.title }}" will be hidden from the board. You can restore it from Trash later.</p>
+                <p v-if="deleteTaskError" class="td-delete-error">{{ deleteTaskError }}</p>
+                <div class="td-delete-actions">
+                  <button class="td-delete-btn td-delete-btn--ghost" :disabled="deletingTask" @click="showDeleteConfirm = false">Cancel</button>
+                  <button class="td-delete-btn td-delete-btn--danger" :disabled="deletingTask" @click="confirmDeleteTask">
+                    {{ deletingTask ? 'Moving...' : 'Move to Trash' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Transition>
         </div><!-- /td-panel -->
       </div><!-- /td-overlay -->
     </Transition>
@@ -456,71 +602,273 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import {
+  deleteFileMetadata,
+  getFilePreviewUrl,
+  uploadProjectFileToBackend,
+} from '@/api/cloudinary'
+import { useAuthStore } from '@/stores/auth.store'
+import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
-import type { Member, Subtask } from '@/stores/task.store'
+import type { Attachment, Comment as TaskComment, Member, Subtask } from '@/stores/task.store'
+import { storeToRefs } from 'pinia'
+import { computed, nextTick, ref, watch } from 'vue'
 
 // ── Props / Emits ─────────────────────────────────────────────────────────────
 const props = defineProps<{
   modelValue: boolean
   taskId: string | null
 }>()
-defineEmits<{ 'update:modelValue': [v: boolean] }>()
+const emit = defineEmits<{
+  'update:modelValue': [v: boolean]
+  deleted: [taskId: string]
+}>()
+
+type MergedActivityEntry = {
+  id: string
+  authorId: string
+  text: string
+  createdAt: string
+  isComment: boolean
+  replies?: TaskComment[]
+}
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 const store = useTaskStore()
+const authStore = useAuthStore()
+const projectStore = useProjectStore()
+const { currentProject, currentProjectId } = storeToRefs(projectStore)
 
 // ── Task ref ──────────────────────────────────────────────────────────────────
-const task = computed(() => props.taskId ? store.getTask(props.taskId) : null)
-const progress = computed(() => props.taskId ? store.subtaskProgress(props.taskId) : { done: 0, total: 0 })
+const task = computed(() => (props.taskId ? store.getTask(props.taskId) : null))
+const shortTaskCode = computed(() => `T-${task.value?.id?.slice(-5) ?? ''}`)
+const showDeleteConfirm = ref(false)
+const deletingTask = ref(false)
+const deleteTaskError = ref('')
+const progress = computed(() =>
+  props.taskId ? store.subtaskProgress(props.taskId) : { done: 0, total: 0 }
+)
 const sortedSubtasks = computed(() => {
   if (!props.taskId) return []
   const all = store.subtasksByTask(props.taskId)
-  return [...all.filter(s => !s.completed), ...all.filter(s => s.completed)]
+  return [...all.filter((s) => !s.completed), ...all.filter((s) => s.completed)]
 })
-const taskAttachments = computed(() => props.taskId ? store.attachmentsByTask(props.taskId) : [])
-const mergedActivity = computed(() => {
+const taskAttachments = computed(() => (props.taskId ? store.attachmentsByTask(props.taskId) : []))
+const commentThreads = computed(() => {
   if (!props.taskId) return []
-  const cmts = store.commentsByTask(props.taskId).map(c => ({
-    id: c.id, authorId: c.authorId, text: c.text, createdAt: c.createdAt, isComment: true,
-  }))
-  const acts = store.activityByTask(props.taskId).map(a => ({
-    id: a.id, authorId: a.authorId, text: a.action, createdAt: a.createdAt, isComment: false,
-  }))
-  return [...cmts, ...acts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const all = store.commentsByTask(props.taskId)
+  const repliesByParent = new Map<string, typeof all>()
+
+  all.forEach((comment) => {
+    if (!comment.parentCommentId) return
+    const replies = repliesByParent.get(comment.parentCommentId) ?? []
+    replies.push(comment)
+    repliesByParent.set(comment.parentCommentId, replies)
+  })
+
+  return all
+    .filter((comment) => !comment.parentCommentId)
+    .map((comment) => ({
+      ...comment,
+      replies: [...(repliesByParent.get(comment.id) ?? [])].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      ),
+    }))
 })
+const mergedActivity = computed<MergedActivityEntry[]>(() => {
+  if (!props.taskId) return []
+  const cmts = commentThreads.value.map((c) => ({
+    id: c.id,
+    authorId: c.authorId,
+    text: c.text,
+    createdAt: c.createdAt,
+    replies: c.replies,
+    isComment: true,
+  }))
+  const acts = store.activityByTask(props.taskId).map((a) => ({
+    id: a.id,
+    authorId: a.authorId,
+    text: a.action,
+    createdAt: a.createdAt,
+    isComment: false,
+  }))
+  return [...cmts, ...acts].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+})
+
+watch(
+  () => [props.modelValue, props.taskId] as const,
+  async ([open, id]) => {
+    if (!open || !id) return
+    showDeleteConfirm.value = false
+    deleteTaskError.value = ''
+    await store.loadTaskDetail(id)
+  },
+  { immediate: true }
+)
+
+async function confirmDeleteTask() {
+  if (!task.value) return
+
+  deletingTask.value = true
+  deleteTaskError.value = ''
+
+  try {
+    const deletedTaskId = task.value.id
+    await store.deleteTaskRemote(deletedTaskId, currentProjectId.value)
+    showDeleteConfirm.value = false
+    emit('deleted', deletedTaskId)
+    emit('update:modelValue', false)
+  } catch (error) {
+    deleteTaskError.value =
+      error instanceof Error ? error.message : 'Cannot move this task to Trash.'
+  } finally {
+    deletingTask.value = false
+  }
+}
 
 // ── Title editing ─────────────────────────────────────────────────────────────
 const titleRef = ref<HTMLElement | null>(null)
-watch(() => props.taskId, async () => {
-  await nextTick()
-  if (titleRef.value && task.value) {
-    titleRef.value.textContent = task.value.title
+watch(
+  () => props.taskId,
+  async () => {
+    await nextTick()
+    if (titleRef.value && task.value) {
+      titleRef.value.textContent = task.value.title
+    }
   }
-})
-function onTitleBlur() {
+)
+async function onTitleBlur() {
   if (!task.value || !titleRef.value) return
   const newTitle = titleRef.value.textContent?.trim() || task.value.title
-  store.updateTask(task.value.id, { title: newTitle })
+  if (newTitle === task.value.title) return
+  await store.updateTaskRemote(task.value.id, { title: newTitle })
 }
 
 // ── Description ───────────────────────────────────────────────────────────────
 const descRef = ref<HTMLElement | null>(null)
 const descHtml = ref('')
-watch(() => props.taskId, async (id) => {
-  if (!id) return
-  await nextTick()
-  const t = store.getTask(id)
-  descHtml.value = t?.description ?? ''
-  if (descRef.value) descRef.value.innerHTML = t?.description ?? ''
-}, { immediate: true })
+const descriptionDirty = ref(false)
+const savingDescription = ref(false)
+
+function syncDescriptionFromTask() {
+  if (!props.modelValue || !descRef.value) return
+  if (descriptionDirty.value) return
+
+  const serverDesc = task.value?.description ?? ''
+  descHtml.value = serverDesc
+  if (descRef.value.innerHTML !== serverDesc) {
+    descRef.value.innerHTML = serverDesc
+  }
+}
+
+watch(
+  () => props.taskId,
+  async (id) => {
+    if (!id) return
+    await nextTick()
+    const t = store.getTask(id)
+    descHtml.value = t?.description ?? ''
+    descriptionDirty.value = false
+    if (descRef.value) descRef.value.innerHTML = t?.description ?? ''
+  },
+  { immediate: true }
+)
+
+watch(
+  [() => props.modelValue, () => task.value?.description, descRef],
+  async ([open]) => {
+    if (!open) return
+    await nextTick()
+    syncDescriptionFromTask()
+  },
+  { immediate: true }
+)
 function fmt(cmd: string) {
+  ensureDescriptionSelection()
   document.execCommand(cmd, false)
   descRef.value?.focus()
+  markDescriptionDirty()
 }
-function onDescBlur() {
+function onDescInput() {
+  markDescriptionDirty()
+}
+function markDescriptionDirty() {
+  if (!descRef.value) return
+  descHtml.value = descRef.value.innerHTML
+  descriptionDirty.value = true
+}
+async function saveDescription() {
   if (!task.value || !descRef.value) return
-  store.updateTask(task.value.id, { description: descRef.value.innerHTML })
+  const nextDescription = descRef.value.innerHTML
+  savingDescription.value = true
+
+  try {
+    await store.updateTaskRemote(task.value.id, { description: nextDescription })
+    const refreshed = store.getTask(task.value.id)
+    const serverDesc = refreshed?.description ?? ''
+    descHtml.value = serverDesc
+    await nextTick()
+    if (descRef.value) descRef.value.innerHTML = serverDesc
+    descriptionDirty.value = false
+  } finally {
+    savingDescription.value = false
+  }
+}
+function toggleList(type: 'ul' | 'ol') {
+  if (!descRef.value) return
+  ensureDescriptionSelection()
+  const command = type === 'ul' ? 'insertUnorderedList' : 'insertOrderedList'
+  const hadList = Boolean(descRef.value.querySelector(type))
+  const executed = document.execCommand(command, false)
+
+  if (!executed || (!hadList && !descRef.value.querySelector(type))) {
+    wrapCurrentDescriptionLines(type)
+  }
+
+  markDescriptionDirty()
+}
+function ensureDescriptionSelection() {
+  if (!descRef.value) return
+  descRef.value.focus()
+
+  const selection = window.getSelection()
+  if (
+    selection?.rangeCount &&
+    selection.anchorNode &&
+    descRef.value.contains(selection.anchorNode)
+  ) {
+    return
+  }
+
+  const range = document.createRange()
+  range.selectNodeContents(descRef.value)
+  range.collapse(false)
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+}
+function wrapCurrentDescriptionLines(type: 'ul' | 'ol') {
+  if (!descRef.value) return
+  const tag = type === 'ul' ? 'ul' : 'ol'
+  const lines = (descRef.value.innerText || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (!lines.length) {
+    descRef.value.innerHTML = `<${tag}><li><br></li></${tag}>`
+    return
+  }
+
+  descRef.value.innerHTML = `<${tag}>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</${tag}>`
+}
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 // ── Subtasks ──────────────────────────────────────────────────────────────────
@@ -537,16 +885,18 @@ async function startAddSubtask() {
   await nextTick()
   subtaskInputRef.value?.focus()
 }
-function commitSubtask() {
+async function commitSubtask() {
   if (!task.value) return
   if (newSubtaskTitle.value.trim()) {
-    store.addSubtask(task.value.id, newSubtaskTitle.value.trim())
+    await store.createSubtaskRemote(task.value.id, newSubtaskTitle.value.trim())
     newSubtaskTitle.value = ''
   }
   addingSubtask.value = false
 }
 function onSubtaskBackspace() {
-  if (!newSubtaskTitle.value) { addingSubtask.value = false }
+  if (!newSubtaskTitle.value) {
+    addingSubtask.value = false
+  }
 }
 async function startEditSubtask(st: Subtask) {
   editingSubtaskId.value = st.id
@@ -554,9 +904,11 @@ async function startEditSubtask(st: Subtask) {
   await nextTick()
   editInputRef.value?.focus()
 }
-function saveSubtaskEdit(id: string) {
+async function saveSubtaskEdit(id: string) {
   if (editingSubtaskTitle.value.trim()) {
-    store.updateSubtask(id, { title: editingSubtaskTitle.value.trim() })
+    await store.updateSubtaskRemote(props.taskId ?? '', id, {
+      title: editingSubtaskTitle.value.trim(),
+    })
   }
   editingSubtaskId.value = null
 }
@@ -570,6 +922,20 @@ function setStAssignee(subtaskId: string, memberId: string) {
   store.updateSubtask(subtaskId, { assigneeId: memberId || undefined })
   stAssigneePickerId.value = null
 }
+async function toggleSubtask(subtaskId: string) {
+  if (!props.taskId) return
+  await store.toggleSubtaskRemote(props.taskId, subtaskId)
+}
+async function updateSubtaskDueDate(subtaskId: string, dueDate: string) {
+  if (!props.taskId) return
+  await store.updateSubtaskRemote(props.taskId, subtaskId, {
+    dueDate: dueDate ? new Date(`${dueDate}T00:00:00`).toISOString() : null,
+  })
+}
+async function deleteSubtask(subtaskId: string) {
+  if (!props.taskId) return
+  await store.deleteSubtaskRemote(props.taskId, subtaskId)
+}
 // Close picker on outside click
 function onModalClick() {
   stAssigneePickerId.value = null
@@ -581,32 +947,169 @@ const stDateInputs: Record<string, HTMLInputElement> = {}
 function openStDatePicker(id: string) {
   const el = stDateInputs[id]
   if (!el) return
-  try { el.showPicker() } catch { el.click() }
+  try {
+    el.showPicker()
+  } catch {
+    el.click()
+  }
 }
 
 // ── Comments ──────────────────────────────────────────────────────────────────
 const newComment = ref('')
-function submitComment() {
+const replyingToCommentId = ref<string | null>(null)
+const replyText = ref('')
+
+async function submitComment() {
   if (!task.value || !newComment.value.trim()) return
-  store.addComment(task.value.id, newComment.value.trim())
+  await store.addCommentRemote(task.value.id, newComment.value.trim())
   newComment.value = ''
+}
+function startReply(commentId: string) {
+  replyingToCommentId.value = commentId
+  replyText.value = ''
+}
+function cancelReply() {
+  replyingToCommentId.value = null
+  replyText.value = ''
+}
+async function submitReply(parentCommentId: string) {
+  if (!task.value || !replyText.value.trim()) return
+  await store.addCommentRemote(task.value.id, replyText.value.trim(), parentCommentId)
+  cancelReply()
+}
+async function removeComment(commentId: string) {
+  if (!task.value) return
+  await store.deleteCommentRemote(task.value.id, commentId)
+  if (replyingToCommentId.value === commentId) cancelReply()
+}
+function canRemoveComment(authorId: string) {
+  return Boolean(authStore.user?.id && authStore.user.id === authorId)
 }
 
 // ── File upload ───────────────────────────────────────────────────────────────
-function onFileUpload(e: Event) {
+const uploadingAttachments = ref(false)
+const deletingAttachmentId = ref<string | null>(null)
+const attachmentUploadError = ref('')
+const previewAttachment = ref<Attachment | null>(null)
+const previewUrl = ref('')
+
+async function onFileUpload(e: Event) {
   if (!task.value) return
-  const files = (e.target as HTMLInputElement).files
+  const input = e.target as HTMLInputElement
+  const files = input.files
   if (!files) return
-  Array.from(files).forEach(f => {
-    const isImg = f.type.startsWith('image/')
-    const url = isImg ? URL.createObjectURL(f) : ''
-    store.addAttachment(task.value!.id, {
-      name: f.name,
-      url,
-      type: isImg ? 'image' : 'file',
-      size: `${(f.size / 1024).toFixed(0)} KB`,
+
+  if (!currentProjectId.value) {
+    attachmentUploadError.value = 'Please select a project before uploading attachments.'
+    input.value = ''
+    return
+  }
+
+  uploadingAttachments.value = true
+  attachmentUploadError.value = ''
+
+  try {
+    const folderPath = buildTaskAttachmentFolderPath()
+    const uploadedFiles = await Promise.all(
+      Array.from(files).map(async (file) => {
+        const result = await uploadProjectFileToBackend(currentProjectId.value!, file, {
+          taskId: task.value!.id,
+          folderPath,
+        })
+
+        return { file, result }
+      })
+    )
+
+    uploadedFiles.forEach(({ file, result }) => {
+      store.addAttachment(task.value!.id, {
+        fileId: result.id ?? null,
+        name: result.originalFilename || file.name,
+        url: result.secureUrl,
+        type: result.resourceType === 'image' ? 'image' : 'file',
+        format: result.format,
+        resourceType: result.resourceType,
+        size: formatFileSize(result.bytes || file.size),
+      })
     })
-  })
+
+    await store.loadTaskDetail(task.value!.id)
+  } catch (error) {
+    attachmentUploadError.value =
+      error instanceof Error ? error.message : 'Cannot upload attachments.'
+  } finally {
+    uploadingAttachments.value = false
+    input.value = ''
+  }
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+async function deleteAttachment(attachment: Attachment) {
+  if (!task.value) return
+  const fileId = attachment.fileId ?? attachment.id
+  if (!fileId) return
+
+  deletingAttachmentId.value = attachment.id
+  attachmentUploadError.value = ''
+
+  try {
+    await deleteFileMetadata(fileId)
+    if (previewAttachment.value?.id === attachment.id) {
+      closeAttachmentPreview()
+    }
+    await store.loadTaskDetail(task.value.id)
+  } catch (error) {
+    attachmentUploadError.value =
+      error instanceof Error ? error.message : 'Cannot delete attachment.'
+  } finally {
+    deletingAttachmentId.value = null
+  }
+}
+
+async function openAttachmentPreview(attachment: Attachment) {
+  previewAttachment.value = attachment
+  previewUrl.value = attachment.url
+
+  if (attachment.fileId && attachment.type !== 'image') {
+    try {
+      previewUrl.value = await getFilePreviewUrl(attachment.fileId)
+    } catch {
+      previewUrl.value = attachment.url
+    }
+  }
+}
+
+function closeAttachmentPreview() {
+  previewAttachment.value = null
+  previewUrl.value = ''
+}
+
+function canInlinePreview(attachment: Attachment) {
+  const format = attachment.format?.toLowerCase()
+  return ['pdf', 'txt', 'json', 'csv'].includes(format ?? '')
+}
+
+function buildTaskAttachmentFolderPath() {
+  const projectFolderName = slugifyFolderSegment(
+    currentProject.value?.name || currentProjectId.value || 'project'
+  )
+  return `${projectFolderName}/task-attachments`
+}
+
+function slugifyFolderSegment(value: string) {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'project'
+  )
 }
 
 // ── Assignees ─────────────────────────────────────────────────────────────────
@@ -616,9 +1119,7 @@ const assigneeSearchRef = ref<HTMLInputElement | null>(null)
 const assigneePickerRef = ref<HTMLElement | null>(null)
 
 const filteredMembers = computed(() =>
-  store.members.filter(m =>
-    m.name.toLowerCase().includes(assigneeSearch.value.toLowerCase())
-  )
+  store.members.filter((m) => m.name.toLowerCase().includes(assigneeSearch.value.toLowerCase()))
 )
 
 async function toggleAssigneePicker() {
@@ -629,17 +1130,15 @@ async function toggleAssigneePicker() {
     assigneeSearchRef.value?.focus()
   }
 }
-function toggleAssignee(m: Member) {
+async function toggleAssignee(m: Member) {
   if (!task.value) return
-  const existing = task.value.assignees.find(a => a.id === m.id)
-  const newAssignees = existing
-    ? task.value.assignees.filter(a => a.id !== m.id)
-    : [...task.value.assignees, m]
-  store.updateTask(task.value.id, { assignees: newAssignees })
+  const existing = task.value.assignees.find((a) => a.id === m.id)
+  if (existing) await store.unassignTaskMemberRemote(task.value.id, m.id)
+  else await store.assignTaskMemberRemote(task.value.id, m.id)
 }
-function removeAssignee(id: string) {
+async function removeAssignee(id: string) {
   if (!task.value) return
-  store.updateTask(task.value.id, { assignees: task.value.assignees.filter(a => a.id !== id) })
+  await store.unassignTaskMemberRemote(task.value.id, id)
 }
 
 // ── Labels ────────────────────────────────────────────────────────────────────
@@ -664,55 +1163,104 @@ async function toggleLabelPicker() {
   }
 }
 
-const LABEL_COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#06b6d4','#8b5cf6','#ef4444','#f97316']
-function createOrPickLabel() {
+const LABEL_COLORS = [
+  '#6366f1',
+  '#ec4899',
+  '#f59e0b',
+  '#10b981',
+  '#06b6d4',
+  '#8b5cf6',
+  '#ef4444',
+  '#f97316',
+]
+async function createOrPickLabel() {
   const name = labelSearch.value.trim()
   if (!name) return
   if (!store.labelPresets[name]) {
     const color = LABEL_COLORS[Math.floor(Math.random() * LABEL_COLORS.length)]
     store.labelPresets[name] = { bg: color + '20', color }
   }
-  setLabel(name)
+  await setLabel(name)
 }
 
-function setLabel(lbl: string) {
+async function setLabel(lbl: string) {
   if (!task.value) return
   const style = store.labelPresets[lbl]
-  store.updateTask(task.value.id, { label: lbl, labelBg: style.bg, labelColor: style.color })
+  await store.updateTaskLabelRemote(task.value.id, lbl, style.bg, style.color)
+  showLabelPicker.value = false
+}
+
+async function clearLabel() {
+  if (!task.value) return
+  await store.updateTaskLabelRemote(task.value.id, '')
   showLabelPicker.value = false
 }
 
 // ── Status / Priority ─────────────────────────────────────────────────────────
 const showStatusDrop = ref(false)
 const statusDropdownRef = ref<HTMLElement | null>(null)
-const currentColumn = computed(() => store.columns.find(c => c.id === task.value?.status))
+const currentColumn = computed(() => store.columns.find((c) => c.id === task.value?.status))
 
-function onStatusChange(e: Event) {
+async function onStatusChange2(colId: string) {
   if (!task.value) return
-  store.moveTask(task.value.id, (e.target as HTMLSelectElement).value)
-}
-function onStatusChange2(colId: string) {
-  if (!task.value) return
-  store.moveTask(task.value.id, colId)
+  await store.updateTaskRemote(task.value.id, { statusId: colId })
   showStatusDrop.value = false
 }
-const priorityOrder: Array<'low'|'medium'|'high'|'urgent'> = ['low','medium','high','urgent']
-const priorityMeta: Record<string, { color: string; label: string }> = {
-  low:    { color: '#10b981', label: 'Low' },
-  medium: { color: '#6366f1', label: 'Medium' },
-  high:   { color: '#f59e0b', label: 'High' },
-  urgent: { color: '#ef4444', label: 'Urgent' },
-}
-function cyclePriority() {
+const priorityOrder: Array<'low' | 'medium' | 'high' | 'urgent'> = [
+  'low',
+  'medium',
+  'high',
+  'urgent',
+]
+async function cyclePriority() {
   if (!task.value) return
   const idx = priorityOrder.indexOf(task.value.priority)
-  store.updateTask(task.value.id, { priority: priorityOrder[(idx + 1) % 4] })
+  await store.updateTaskRemote(task.value.id, {
+    priority: priorityOrder[(idx + 1) % 4].toUpperCase(),
+  })
+}
+async function onDueDateChange(e: Event) {
+  if (!task.value) return
+  const value = (e.target as HTMLInputElement).value
+  await store.updateTaskRemote(task.value.id, {
+    dueDate: value ? new Date(value).toISOString() : null,
+  })
+}
+async function onStartDateChange(e: Event) {
+  if (!task.value) return
+  const value = (e.target as HTMLInputElement).value
+  await store.updateTaskRemote(task.value.id, {
+    startDate: value ? new Date(value).toISOString() : null,
+  })
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function toDateTimeLocalValue(value: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const offsetMs = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
 function formatDate(d: string) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(d).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+function formatDateTime(d: string) {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -731,5 +1279,99 @@ function timeAgo(iso: string) {
 @keyframes tdIn {
   from { opacity: 0; transform: scale(0.96) translateY(12px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.td-topbar-btn--danger {
+  color: #ef4444;
+}
+.td-topbar-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+.td-confirm-enter-active,
+.td-confirm-leave-active {
+  transition: opacity 0.16s ease;
+}
+.td-confirm-enter-from,
+.td-confirm-leave-to {
+  opacity: 0;
+}
+.td-delete-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(239, 68, 68, 0.16), transparent 34%),
+    rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(8px);
+}
+.td-delete-card {
+  width: min(380px, 100%);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 22px;
+  padding: 22px;
+  background: var(--bg-surface);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.34);
+  text-align: center;
+}
+.td-delete-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #ef4444;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(249, 115, 22, 0.12));
+}
+.td-delete-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-heading);
+}
+.td-delete-copy {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.td-delete-error {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #ef4444;
+}
+.td-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.td-delete-btn {
+  height: 34px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+.td-delete-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.td-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.td-delete-btn--ghost {
+  color: var(--text-muted);
+  background: var(--bg-surface-2);
+}
+.td-delete-btn--danger {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.28);
 }
 </style>

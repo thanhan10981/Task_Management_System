@@ -83,9 +83,10 @@ export class FilesController {
   @ApiOperation({ summary: 'List user file metadata from database' })
   @ApiQuery({ name: 'projectId', required: true, type: String })
   @ApiQuery({ name: 'folderPath', required: false, type: String })
+  @ApiQuery({ name: 'taskId', required: false, type: String })
   @ApiResponse({ status: HttpStatus.OK, description: 'File list fetched successfully' })
   list(@Request() req, @Query() query: ProjectScopedFilesQueryDto) {
-    return this.filesService.list(req.user.id, query.projectId, query.folderPath);
+    return this.filesService.list(req.user.id, query.projectId, query.folderPath, query.taskId);
   }
 
   @Get('cloudinary/folders')

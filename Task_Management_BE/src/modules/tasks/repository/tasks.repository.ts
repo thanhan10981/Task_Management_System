@@ -23,7 +23,26 @@ export class TasksRepository {
         id,
         ...(includeDeleted ? {} : { isDeleted: false }),
       },
-      include: {
+      select: {
+        id: true,
+        projectId: true,
+        sprintId: true,
+        parentTaskId: true,
+        title: true,
+        description: true,
+        statusId: true,
+        priority: true,
+        progress: true,
+        startDate: true,
+        dueDate: true,
+        tags: true,
+        checklist: true,
+        coverFileId: true,
+        isDeleted: true,
+        createdBy: true,
+        updatedBy: true,
+        createdAt: true,
+        updatedAt: true,
         status: true,
         project: true,
         assignees: {
@@ -49,6 +68,7 @@ export class TasksRepository {
         title: true,
         description: true,
         priority: true,
+        tags: true,
         startDate: true,
         dueDate: true,
         parentTaskId: true,
@@ -103,10 +123,36 @@ export class TasksRepository {
     });
   }
 
-  findTasks(where: Prisma.TaskWhereInput, skip: number, take: number) {
+  restoreTask(id: string, updatedBy: string, tx?: TxClient) {
+    const client = tx ?? this.prisma;
+    return client.task.update({
+      where: { id },
+      data: {
+        isDeleted: false,
+        updatedBy,
+      },
+      include: {
+        createdByUser: true,
+        status: true,
+        project: true,
+        assignees: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+  }
+
+  findTasks(
+    where: Prisma.TaskWhereInput,
+    skip: number,
+    take: number,
+    options: { deletedOnly?: boolean } = {},
+  ) {
     return this.prisma.task.findMany({
       where: {
-        isDeleted: false,
+        isDeleted: options.deletedOnly ? true : false,
         ...where,
       },
       include: {
@@ -125,10 +171,13 @@ export class TasksRepository {
     });
   }
 
-  countTasks(where: Prisma.TaskWhereInput) {
+  countTasks(
+    where: Prisma.TaskWhereInput,
+    options: { deletedOnly?: boolean } = {},
+  ) {
     return this.prisma.task.count({
       where: {
-        isDeleted: false,
+        isDeleted: options.deletedOnly ? true : false,
         ...where,
       },
     });

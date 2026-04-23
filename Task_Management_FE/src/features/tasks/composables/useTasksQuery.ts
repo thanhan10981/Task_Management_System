@@ -2,9 +2,9 @@ import { get } from '@/api/client'
 import { QUERY_KEYS } from '@/constants/query-keys'
 import { apiResponseSchema, paginatedResponseSchema } from '@/schemas/api-response.schema'
 import { useQuery } from '@tanstack/vue-query'
-import { computed, unref, type MaybeRef } from 'vue'
+import { type MaybeRef, computed, unref } from 'vue'
 import { z } from 'zod'
-import { taskSchema, type TaskPriority, type TaskStatus } from '../schemas/task.schema'
+import { type TaskPriority, type TaskStatus, taskSchema } from '../schemas/task.schema'
 
 type TaskQueryParams = Record<string, unknown>
 
@@ -15,6 +15,7 @@ interface UseTasksQueryOptions {
 const rawTaskSchema = z
   .object({
     id: z.string().uuid(),
+    parentTaskId: z.string().uuid().nullable().optional(),
     title: z.string(),
     description: z.string().nullable().optional(),
     status: z.union([
@@ -42,7 +43,10 @@ function normalizeStatus(status: unknown): TaskStatus {
         ? String(status.name)
         : ''
 
-  const normalized = raw.trim().toLowerCase().replace(/[\s-]+/g, '_')
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
 
   if (normalized.includes('progress')) {
     return 'in_progress'
@@ -76,6 +80,7 @@ function normalizePriority(priority: string): TaskPriority {
 function normalizeTask(rawTask: z.infer<typeof rawTaskSchema>) {
   return taskSchema.parse({
     id: rawTask.id,
+    parentTaskId: rawTask.parentTaskId ?? null,
     title: rawTask.title,
     description: rawTask.description ?? undefined,
     status: normalizeStatus(rawTask.status),
@@ -87,7 +92,10 @@ function normalizeTask(rawTask: z.infer<typeof rawTaskSchema>) {
   })
 }
 
-export const useTasksQuery = (params: MaybeRef<TaskQueryParams> = {}, options: UseTasksQueryOptions = {}) => {
+export const useTasksQuery = (
+  params: MaybeRef<TaskQueryParams> = {},
+  options: UseTasksQueryOptions = {}
+) => {
   const enabled = computed(() => {
     if (typeof options.enabled === 'undefined') {
       return true
@@ -105,7 +113,7 @@ export const useTasksQuery = (params: MaybeRef<TaskQueryParams> = {}, options: U
 
       return {
         ...parsed,
-        data: parsed.data.map(normalizeTask),
+        data: parsed.data.map(normalizeTask).filter((task) => !task.parentTaskId),
       }
     },
   })

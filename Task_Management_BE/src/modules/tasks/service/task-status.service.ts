@@ -11,6 +11,44 @@ import {
 } from '../dto/task-status.dto';
 import { TasksRepository } from '../repository/tasks.repository';
 
+const DEFAULT_TASK_STATUSES = [
+  {
+    name: 'Backlog',
+    color: '#94a3b8',
+    position: 1,
+    isDefault: true,
+    isDone: false,
+  },
+  {
+    name: 'To Do',
+    color: '#6366f1',
+    position: 2,
+    isDefault: false,
+    isDone: false,
+  },
+  {
+    name: 'In Progress',
+    color: '#f59e0b',
+    position: 3,
+    isDefault: false,
+    isDone: false,
+  },
+  {
+    name: 'Review',
+    color: '#8b5cf6',
+    position: 4,
+    isDefault: false,
+    isDone: false,
+  },
+  {
+    name: 'Done',
+    color: '#10b981',
+    position: 5,
+    isDefault: false,
+    isDone: true,
+  },
+];
+
 @Injectable()
 export class TaskStatusService {
   constructor(
@@ -20,6 +58,19 @@ export class TaskStatusService {
 
   async listStatuses(userId: string, projectId: string) {
     await this.projectAccessService.ensureProjectMember(userId, projectId);
+    const statuses = await this.tasksRepository.listProjectStatuses(projectId);
+
+    if (statuses.length > 0) {
+      return statuses;
+    }
+
+    await this.tasksRepository.createManyTaskStatuses(
+      DEFAULT_TASK_STATUSES.map((status) => ({
+        projectId,
+        ...status,
+      })),
+    );
+
     return this.tasksRepository.listProjectStatuses(projectId);
   }
 

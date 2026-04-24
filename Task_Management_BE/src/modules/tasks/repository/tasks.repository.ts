@@ -198,6 +198,13 @@ export class TasksRepository {
     return this.prisma.taskStatus.create({ data });
   }
 
+  createManyTaskStatuses(data: Prisma.TaskStatusCreateManyInput[]) {
+    return this.prisma.taskStatus.createMany({
+      data,
+      skipDuplicates: true,
+    });
+  }
+
   updateTaskStatus(id: string, data: Prisma.TaskStatusUpdateInput) {
     return this.prisma.taskStatus.update({ where: { id }, data });
   }

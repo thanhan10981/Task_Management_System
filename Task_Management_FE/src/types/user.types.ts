@@ -4,6 +4,10 @@ export interface User {
   email: string
   fullName: string
   avatarUrl?: string
+  coverUrl?: string
+  jobTitle?: string
+  phone?: string
+  bio?: string
   createdAt: string
   updatedAt: string
 }

@@ -257,6 +257,7 @@ export async function uploadProjectFileToBackend(
   const payload = unwrapApiPayload(response.data)
 
   return {
+    id: payload.id,
     publicId: payload.publicId,
     url: payload.secureUrl,
     secureUrl: payload.secureUrl,
@@ -321,6 +322,26 @@ export async function getUploadedFileMetadata(
 
     throw error instanceof Error ? error : new Error('Cannot load files metadata')
   }
+}
+
+export async function getTaskFileMetadata(
+  projectId: string,
+  taskId: string,
+): Promise<CloudinaryFileMetadata[]> {
+  const response = await get<unknown>('/files', {
+    params: {
+      projectId,
+      taskId,
+    },
+  })
+  const payload = unwrapApiPayload(response as ApiEnvelope<unknown> | unknown)
+  const files = extractFilesFromPayload(payload)
+
+  if (!files) {
+    throw new Error('Invalid response format for task files')
+  }
+
+  return files
 }
 
 export async function getFolderMetadata(projectId: string): Promise<CloudinaryFolderMetadata[]> {

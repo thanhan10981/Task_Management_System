@@ -1,6 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ProjectAccessService } from '../../../common/access/project-access.service';
 import { formatDateTimeVietnam, getVietnamTimeZone } from '../../../common/utils/datetime.helper';
 import { TaskRepository } from '../repository/task.repository';
 import { MailService } from './mail.service';
@@ -13,6 +20,7 @@ export class ReminderService {
     private readonly taskRepository: TaskRepository,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    private readonly projectAccessService: ProjectAccessService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES, {
@@ -27,6 +35,93 @@ export class ReminderService {
     for (const thresholdMinutes of thresholds) {
       await this.processThreshold(thresholdMinutes);
     }
+  }
+
+  async sendTaskReminderNow(
+    userId: string,
+    taskId: string,
+    thresholdMinutes: number,
+  ) {
+    const projectId = await this.projectAccessService.ensureTaskAccess(userId, taskId);
+    const projectAccess = await this.projectAccessService.ensureProjectMember(userId, projectId);
+
+    if (!projectAccess.isOwner) {
+      throw new ForbiddenException('Only project owner can send reminder emails');
+    }
+
+    const task = await this.taskRepository.findTaskForManualReminder(taskId);
+
+    if (!task) {
+      throw new NotFoundException('Task not found or does not have a due date');
+    }
+
+    if (!task.assignees.length) {
+      throw new BadRequestException('Task does not have any assignees with email');
+    }
+
+    let sentCount = 0;
+    let skippedCount = 0;
+
+    for (const assignee of task.assignees) {
+      const reminderKey = `manual:${this.buildReminderKey(
+        task.taskId,
+        assignee.userId,
+        thresholdMinutes,
+        task.dueDate,
+      )}`;
+
+      const notificationId = await this.taskRepository.tryReserveReminderNotification({
+        userId: assignee.userId,
+        projectId,
+        title: 'Task deadline reminder',
+        content: `Task "${task.title}" is due at ${formatDateTimeVietnam(task.dueDate)} (Vietnam time)`,
+        data: {
+          reminderKey,
+          taskId: task.taskId,
+          thresholdMinutes,
+          dueDate: task.dueDate.toISOString(),
+          dueDateVietnam: formatDateTimeVietnam(task.dueDate),
+        },
+      });
+
+      if (!notificationId) {
+        skippedCount += 1;
+        continue;
+      }
+
+      try {
+        await this.mailService.sendTaskReminder({
+          to: assignee.email,
+          recipientName: assignee.fullName,
+          taskTitle: task.title,
+          dueDate: task.dueDate,
+          projectName: task.projectName,
+          thresholdMinutes,
+        });
+
+        sentCount += 1;
+      } catch (error) {
+        await this.taskRepository.deleteNotificationById(notificationId);
+
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `Failed to send manual reminder for task ${task.taskId} to user ${assignee.userId}: ${message}`,
+        );
+      }
+    }
+
+    if (sentCount === 0 && skippedCount > 0) {
+      throw new BadRequestException('Reminder mail was already sent for this task due date');
+    }
+
+    return {
+      message: 'Reminder emails queued successfully',
+      data: {
+        taskId: task.taskId,
+        sentCount,
+        skippedCount,
+      },
+    };
   }
 
   private async processThreshold(thresholdMinutes: number): Promise<void> {

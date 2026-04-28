@@ -9,7 +9,6 @@ import {
   Post,
   Query,
   Request,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiCookieAuth,
@@ -17,7 +16,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import {
   CommentQueryDto,
   CreateCommentDto,
@@ -27,7 +25,6 @@ import { CommentsService } from '../service/comments.service';
 
 @ApiTags('Comments')
 @ApiCookieAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('tasks/:taskId/comments')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}

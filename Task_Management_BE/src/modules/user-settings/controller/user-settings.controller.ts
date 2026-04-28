@@ -4,7 +4,6 @@ import {
   Get,
   Patch,
   Request,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiCookieAuth,
@@ -12,13 +11,11 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { UpdateUserSettingsDto } from '../dto/user-settings.dto';
 import { UserSettingsService } from '../service/user-settings.service';
 
 @ApiTags('User Settings')
 @ApiCookieAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('user-settings')
 export class UserSettingsController {
   constructor(private readonly userSettingsService: UserSettingsService) {}

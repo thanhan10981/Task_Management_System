@@ -7,7 +7,6 @@ import {
   Patch,
   Query,
   Request,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiCookieAuth,
@@ -15,13 +14,11 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { NotificationQueryDto } from '../dto/notification.dto';
 import { NotificationsService } from '../service/notifications.service';
 
 @ApiTags('Notifications')
 @ApiCookieAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}

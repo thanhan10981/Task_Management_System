@@ -14,9 +14,10 @@ export class CreateTaskStatusDto {
   @MaxLength(20, { message: 'Color must be at most 20 characters' })
   color?: string;
 
-  @ApiProperty({ description: 'Status position in board', example: 1 })
+  @ApiPropertyOptional({ description: 'Status position in board', example: 1 })
+  @IsOptional()
   @Min(1)
-  position: number;
+  position?: number;
 
   @ApiPropertyOptional({ description: 'Whether this status is default', example: false })
   @IsOptional()

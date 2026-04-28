@@ -7,7 +7,7 @@ interface UseStorageOptions {
   folders: Ref<CloudinaryFolder[]>
 }
 
-export function useStorage(options: UseStorageOptions) {
+export function useStorageRefined(options: UseStorageOptions) {
   const { allFiles, folders } = options
 
   const totalByteUsed = computed(() => allFiles.value.reduce((acc, f) => acc + (f.bytes || 0), 0))
@@ -35,10 +35,10 @@ export function useStorage(options: UseStorageOptions) {
     const sumBytes = (arr: CloudinaryFile[]) => arr.reduce((a, f) => a + (f.bytes || 0), 0)
 
     return [
-      { label: 'Media', icon: '🎬', size: formatBytes(sumBytes(media)), color: '#6366f1', bytes: sumBytes(media) },
-      { label: 'Documents', icon: '📄', size: formatBytes(sumBytes(docs)), color: '#f59e0b', bytes: sumBytes(docs) },
-      { label: 'Images', icon: '🖼', size: formatBytes(sumBytes(images)), color: '#ef4444', bytes: sumBytes(images) },
-      { label: 'Other', icon: '📎', size: formatBytes(sumBytes(other)), color: '#3b82f6', bytes: sumBytes(other) },
+      { label: 'Media', icon: 'media', size: formatBytes(sumBytes(media)), color: '#6366f1', bytes: sumBytes(media) },
+      { label: 'Documents', icon: 'document', size: formatBytes(sumBytes(docs)), color: '#f59e0b', bytes: sumBytes(docs) },
+      { label: 'Images', icon: 'image', size: formatBytes(sumBytes(images)), color: '#ef4444', bytes: sumBytes(images) },
+      { label: 'Other', icon: 'other', size: formatBytes(sumBytes(other)), color: '#3b82f6', bytes: sumBytes(other) },
     ]
   })
 

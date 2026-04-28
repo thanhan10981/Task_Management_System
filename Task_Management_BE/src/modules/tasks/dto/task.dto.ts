@@ -1,9 +1,11 @@
 import {
   ArrayUnique,
   IsArray,
+  IsBooleanString,
   IsDateString,
   IsEnum,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -39,6 +41,14 @@ export class CreateTaskDto {
   @IsOptional()
   @IsDateString({}, { message: 'dueDate must be a valid ISO date string' })
   dueDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Task metadata such as label display data',
+    example: { label: 'Design', labelBg: '#dbeafe', labelColor: '#2563eb' },
+  })
+  @IsOptional()
+  @IsObject()
+  tags?: Record<string, unknown>;
 
   @ApiProperty({ description: 'Project id', example: '11111111-1111-1111-1111-111111111111' })
   @IsNotEmpty({ message: 'Project ID is required' })
@@ -99,6 +109,14 @@ export class UpdateTaskDto {
   @IsDateString({}, { message: 'dueDate must be a valid ISO date string' })
   dueDate?: string;
 
+  @ApiPropertyOptional({
+    description: 'Task metadata such as label display data',
+    example: { label: 'Design', labelBg: '#dbeafe', labelColor: '#2563eb' },
+  })
+  @IsOptional()
+  @IsObject()
+  tags?: Record<string, unknown>;
+
   @ApiPropertyOptional({ description: 'Parent task id', example: '33333333-3333-3333-3333-333333333333' })
   @IsOptional()
   @IsUUID()
@@ -135,6 +153,11 @@ export class TaskQueryDto extends PaginationDto {
   @IsOptional()
   @IsUUID()
   projectId?: string;
+
+  @ApiPropertyOptional({ description: 'Return deleted tasks only', example: 'true' })
+  @IsOptional()
+  @IsBooleanString()
+  deleted?: string;
 }
 
 export class AssignTaskUserDto {

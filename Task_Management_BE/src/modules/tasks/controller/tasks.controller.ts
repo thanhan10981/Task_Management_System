@@ -6,7 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards,
   Request,
   Query,
   HttpStatus,
@@ -27,7 +26,6 @@ import {
   TaskQueryDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import {
   CreateTaskStatusDto,
   UpdateTaskStatusDto,
@@ -38,7 +36,6 @@ import { TaskStatusService } from '../service/task-status.service';
 
 @ApiTags('Tasks')
 @ApiBearerAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('tasks')
 export class TasksController {
   // Service split keeps task domain maintainable as complexity grows.
@@ -119,6 +116,17 @@ export class TasksController {
     @Body() updateTaskDto: UpdateTaskDto,
   ) {
     return this.taskService.update(req.user.id, id, updateTaskDto);
+  }
+
+  @Patch(':id/restore')
+  @ApiOperation({ summary: 'Restore deleted task by ID' })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Task ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task restored successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Task not found' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  restore(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.taskService.restore(req.user.id, id);
   }
 
   @Delete(':id')

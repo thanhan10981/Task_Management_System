@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,7 +16,8 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 import { UserSettingsModule } from './modules/user-settings/user-settings.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
-import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
+import { TaskAnalyticsModule } from './modules/task-analytics/task-analytics.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 import configuration from './config/configuration';
 import { validate } from './config/validation.schema';
@@ -38,9 +40,17 @@ import { validate } from './config/validation.schema';
     UserSettingsModule,
     CommentsModule,
     NotificationsModule,
-    ActivityLogsModule,
+    TaskAnalyticsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, LoggingInterceptor, ResponseInterceptor],
+  providers: [
+    AppService,
+    LoggingInterceptor,
+    ResponseInterceptor,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

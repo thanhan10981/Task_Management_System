@@ -3,8 +3,6 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ThemeMode } from '@prisma/client';
 
 interface UserSettingsPayload {
-  language?: string;
-  timezone?: string;
   theme?: ThemeMode;
   notificationSettings?: Record<string, unknown>;
   privacySettings?: Record<string, unknown>;
@@ -25,8 +23,6 @@ export class UserSettingsRepository {
     return this.prisma.userSettings.upsert({
       where: { userId },
       update: {
-        language: data.language,
-        timezone: data.timezone,
         theme: data.theme,
         notificationSettings: data.notificationSettings as any,
         privacySettings: data.privacySettings as any,
@@ -34,8 +30,6 @@ export class UserSettingsRepository {
       },
       create: {
         userId,
-        language: data.language,
-        timezone: data.timezone,
         theme: data.theme,
         notificationSettings: data.notificationSettings as any,
         privacySettings: data.privacySettings as any,

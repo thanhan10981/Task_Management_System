@@ -22,6 +22,7 @@ import {
 
 import {
   AssignTaskUserDto,
+  CreateTaskGroupDto,
   CreateTaskDto,
   TaskQueryDto,
   UpdateTaskDto,
@@ -61,6 +62,7 @@ export class TasksController {
   @ApiQuery({ name: 'status', required: false, type: String, example: 'TODO' })
   @ApiQuery({ name: 'priority', required: false, type: String, example: 'HIGH' })
   @ApiQuery({ name: 'search', required: false, type: String, example: 'api integration' })
+  @ApiQuery({ name: 'groupId', required: false, type: String, example: '33333333-3333-3333-3333-333333333333' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Tasks retrieved successfully' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
   findAll(@Request() req, @Query() queryDto: TaskQueryDto) {
@@ -80,6 +82,7 @@ export class TasksController {
   @ApiQuery({ name: 'status', required: false, type: String, example: 'TODO' })
   @ApiQuery({ name: 'priority', required: false, type: String, example: 'HIGH' })
   @ApiQuery({ name: 'search', required: false, type: String, example: 'api integration' })
+  @ApiQuery({ name: 'groupId', required: false, type: String, example: '33333333-3333-3333-3333-333333333333' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Child tasks retrieved successfully' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid parent task id' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
@@ -89,6 +92,84 @@ export class TasksController {
     @Query() queryDto: TaskQueryDto,
   ) {
     return this.taskService.findByParentTask(req.user.id, parentTaskId, queryDto);
+  }
+
+  @Get('projects/:projectId/groups')
+  @ApiOperation({ summary: 'List task groups by project' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task groups retrieved successfully' })
+  listGroups(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+  ) {
+    return this.taskService.listProjectGroups(req.user.id, projectId);
+  }
+
+  @Post('projects/:projectId/groups')
+  @ApiOperation({ summary: 'Create task group in project' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Task group created successfully' })
+  createGroup(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Body() createTaskGroupDto: CreateTaskGroupDto,
+  ) {
+    return this.taskService.createProjectGroup(
+      req.user.id,
+      projectId,
+      createTaskGroupDto,
+    );
+  }
+
+  @Get('projects/:projectId/statuses')
+  @ApiOperation({ summary: 'List task statuses by project' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task statuses retrieved successfully' })
+  listStatuses(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+  ) {
+    return this.taskStatusService.listStatuses(req.user.id, projectId);
+  }
+
+  @Post('projects/:projectId/statuses')
+  @ApiOperation({ summary: 'Create task status in project' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Task status created successfully' })
+  createStatus(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Body() createTaskStatusDto: CreateTaskStatusDto,
+  ) {
+    return this.taskStatusService.createStatus(
+      req.user.id,
+      projectId,
+      createTaskStatusDto,
+    );
+  }
+
+  @Patch('projects/:projectId/statuses/:statusId')
+  @ApiOperation({ summary: 'Update task status in project' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task status updated successfully' })
+  updateStatus(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('statusId', new ParseUUIDPipe()) statusId: string,
+    @Body() updateTaskStatusDto: UpdateTaskStatusDto,
+  ) {
+    return this.taskStatusService.updateStatus(
+      req.user.id,
+      projectId,
+      statusId,
+      updateTaskStatusDto,
+    );
+  }
+
+  @Delete('projects/:projectId/statuses/:statusId')
+  @ApiOperation({ summary: 'Delete task status in project' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task status deleted successfully' })
+  removeStatus(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('statusId', new ParseUUIDPipe()) statusId: string,
+  ) {
+    return this.taskStatusService.removeStatus(req.user.id, projectId, statusId);
   }
 
   @Get(':id')
@@ -181,56 +262,4 @@ export class TasksController {
     return this.taskAssigneeService.unassignUser(req.user.id, id, userId);
   }
 
-  @Get('/projects/:projectId/statuses')
-  @ApiOperation({ summary: 'List task statuses by project' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Task statuses retrieved successfully' })
-  listStatuses(
-    @Request() req,
-    @Param('projectId', new ParseUUIDPipe()) projectId: string,
-  ) {
-    return this.taskStatusService.listStatuses(req.user.id, projectId);
-  }
-
-  @Post('/projects/:projectId/statuses')
-  @ApiOperation({ summary: 'Create task status in project' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Task status created successfully' })
-  createStatus(
-    @Request() req,
-    @Param('projectId', new ParseUUIDPipe()) projectId: string,
-    @Body() createTaskStatusDto: CreateTaskStatusDto,
-  ) {
-    return this.taskStatusService.createStatus(
-      req.user.id,
-      projectId,
-      createTaskStatusDto,
-    );
-  }
-
-  @Patch('/projects/:projectId/statuses/:statusId')
-  @ApiOperation({ summary: 'Update task status in project' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Task status updated successfully' })
-  updateStatus(
-    @Request() req,
-    @Param('projectId', new ParseUUIDPipe()) projectId: string,
-    @Param('statusId', new ParseUUIDPipe()) statusId: string,
-    @Body() updateTaskStatusDto: UpdateTaskStatusDto,
-  ) {
-    return this.taskStatusService.updateStatus(
-      req.user.id,
-      projectId,
-      statusId,
-      updateTaskStatusDto,
-    );
-  }
-
-  @Delete('/projects/:projectId/statuses/:statusId')
-  @ApiOperation({ summary: 'Delete task status in project' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Task status deleted successfully' })
-  removeStatus(
-    @Request() req,
-    @Param('projectId', new ParseUUIDPipe()) projectId: string,
-    @Param('statusId', new ParseUUIDPipe()) statusId: string,
-  ) {
-    return this.taskStatusService.removeStatus(req.user.id, projectId, statusId);
-  }
 }

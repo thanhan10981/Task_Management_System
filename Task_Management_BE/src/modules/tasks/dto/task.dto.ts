@@ -60,6 +60,16 @@ export class CreateTaskDto {
   @IsUUID()
   statusId: string;
 
+  @ApiPropertyOptional({ description: 'Task group id', example: '33333333-3333-3333-3333-333333333333' })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string;
+
+  @ApiPropertyOptional({ description: 'Sprint id', example: '55555555-5555-5555-5555-555555555555' })
+  @IsOptional()
+  @IsUUID()
+  sprintId?: string;
+
   @ApiPropertyOptional({ description: 'Parent task id', example: '33333333-3333-3333-3333-333333333333' })
   @IsOptional()
   @IsUUID()
@@ -93,6 +103,16 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsUUID()
   statusId?: string;
+
+  @ApiPropertyOptional({ description: 'Task group id', example: '33333333-3333-3333-3333-333333333333' })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Sprint id', example: '55555555-5555-5555-5555-555555555555' })
+  @IsOptional()
+  @IsUUID()
+  sprintId?: string | null;
 
   @ApiPropertyOptional({ description: 'Task priority', enum: TaskPriority, example: 'MEDIUM' })
   @IsOptional()
@@ -154,10 +174,29 @@ export class TaskQueryDto extends PaginationDto {
   @IsUUID()
   projectId?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by task group id', example: '33333333-3333-3333-3333-333333333333' })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string;
+
   @ApiPropertyOptional({ description: 'Return deleted tasks only', example: 'true' })
   @IsOptional()
   @IsBooleanString()
   deleted?: string;
+}
+
+export class CreateTaskGroupDto {
+  @ApiProperty({ description: 'Task group name', example: 'Development' })
+  @IsString()
+  @IsNotEmpty({ message: 'Group name is required' })
+  @MaxLength(120, { message: 'Group name must be at most 120 characters' })
+  name: string;
+
+  @ApiPropertyOptional({ description: 'Task group color', example: '#6366f1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20, { message: 'Color must be at most 20 characters' })
+  color?: string;
 }
 
 export class AssignTaskUserDto {

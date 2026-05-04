@@ -1338,7 +1338,7 @@
 
   /* Overlay */
   .td-overlay {
-    @apply fixed inset-0 z-[200] flex items-center justify-center p-4;
+    @apply fixed inset-0 z-[600] flex items-center justify-center p-4;
     background: rgba(0,0,0,0.55);
     backdrop-filter: blur(6px);
   }

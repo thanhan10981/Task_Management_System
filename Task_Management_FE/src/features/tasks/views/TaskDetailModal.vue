@@ -441,6 +441,51 @@
                 </button>
               </div>
 
+              <!-- Group -->
+              <div class="td-prop">
+                <p class="td-prop-label">Group</p>
+                <div class="relative" ref="groupDropdownRef">
+                  <button
+                    class="td-status-trigger"
+                    @click.stop="showGroupDrop = !showGroupDrop"
+                  >
+                    <template v-if="currentGroup">
+                      <span class="td-status-dot" :style="{ background: currentGroup.color ?? '#94a3b8' }"/>
+                      <span class="truncate flex-1 text-left">{{ currentGroup.name }}</span>
+                    </template>
+                    <template v-else>
+                      <span class="td-status-dot" style="background:var(--bg-surface-3);border:1px solid var(--border-medium)"/>
+                      <span class="truncate flex-1 text-left" style="color:var(--text-muted)">No group</span>
+                    </template>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:0.5;flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  <div v-if="showGroupDrop" class="td-status-drop" @click.stop>
+                    <div
+                      class="td-status-option"
+                      :class="{ active: !task.groupId }"
+                      @click="onGroupChange('')"
+                    >
+                      <span class="td-status-dot" style="background:var(--bg-surface-3);border:1px solid var(--border-medium)"/>
+                      <span class="flex-1">No group</span>
+                      <svg v-if="!task.groupId" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <div v-if="loadingGroups" class="td-popover-empty">Loading groups...</div>
+                    <div
+                      v-for="group in taskGroups"
+                      :key="group.id"
+                      class="td-status-option"
+                      :class="{ active: task.groupId === group.id }"
+                      @click="onGroupChange(group.id)"
+                    >
+                      <span class="td-status-dot" :style="{ background: group.color ?? '#94a3b8' }"/>
+                      <span class="flex-1">{{ group.name }}</span>
+                      <svg v-if="task.groupId === group.id" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <div v-if="!loadingGroups && taskGroups.length === 0" class="td-popover-empty">No groups yet</div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Due Date -->
               <div class="td-prop">
                 <p class="td-prop-label">Due Date</p>
@@ -607,6 +652,7 @@ import {
   getFilePreviewUrl,
   uploadProjectFileToBackend,
 } from '@/api/cloudinary'
+import { listProjectGroups, type TaskGroup } from '@/api/tasks'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
@@ -940,6 +986,7 @@ async function deleteSubtask(subtaskId: string) {
 function onModalClick() {
   stAssigneePickerId.value = null
   showStatusDrop.value = false
+  showGroupDrop.value = false
 }
 
 // Subtask date picker
@@ -1201,11 +1248,52 @@ const showStatusDrop = ref(false)
 const statusDropdownRef = ref<HTMLElement | null>(null)
 const currentColumn = computed(() => store.columns.find((c) => c.id === task.value?.status))
 
+const showGroupDrop = ref(false)
+const groupDropdownRef = ref<HTMLElement | null>(null)
+const taskGroups = ref<TaskGroup[]>([])
+const loadingGroups = ref(false)
+const currentGroup = computed(() =>
+  taskGroups.value.find((group) => group.id === task.value?.groupId)
+)
+
+async function loadTaskGroups(projectId: string | null) {
+  if (!projectId) {
+    taskGroups.value = []
+    return
+  }
+
+  loadingGroups.value = true
+  try {
+    taskGroups.value = await listProjectGroups(projectId)
+  } catch (error) {
+    console.error('Failed to load task groups:', error)
+    taskGroups.value = []
+  } finally {
+    loadingGroups.value = false
+  }
+}
+
+watch(
+  [() => props.modelValue, currentProjectId],
+  async ([open, projectId]) => {
+    if (!open) return
+    await loadTaskGroups(projectId)
+  },
+  { immediate: true }
+)
+
 async function onStatusChange2(colId: string) {
   if (!task.value) return
   await store.updateTaskRemote(task.value.id, { statusId: colId })
   showStatusDrop.value = false
 }
+
+async function onGroupChange(groupId: string) {
+  if (!task.value) return
+  await store.updateTaskRemote(task.value.id, { groupId: groupId || null })
+  showGroupDrop.value = false
+}
+
 const priorityOrder: Array<'low' | 'medium' | 'high' | 'urgent'> = [
   'low',
   'medium',

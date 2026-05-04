@@ -41,7 +41,7 @@
       >
         <!-- Mobile: logo -->
         <div class="flex md:hidden items-center mr-1 shrink-0">
-          <OctomLogo size="sm" orientation="col" />
+          <OctomLogo size="sm" :showText="false" orientation="row" />
         </div>
 
         <!-- Search -->

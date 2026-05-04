@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { Prisma, ProjectMemberRole, ProjectStatus } from '@prisma/client';
+import { Prisma, PrismaClient, ProjectMemberRole, ProjectStatus } from '@prisma/client';
+
+export type TxClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
 
 @Injectable()
 export class ProjectsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async withTransaction<T>(handler: (tx: TxClient) => Promise<T>): Promise<T> {
+    return this.prisma.$transaction((tx) => handler(tx as TxClient));
+  }
 
   createProject(
     userId: string,
@@ -126,98 +135,51 @@ export class ProjectsRepository {
     userId: string,
     role: ProjectMemberRole,
     addedBy: string,
+    tx?: TxClient,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const member = await tx.projectMember.create({
-        data: {
+    const client = tx ?? this.prisma;
+    return client.projectMember.create({
+      data: {
+        projectId,
+        userId,
+        role,
+        addedBy,
+      },
+      include: {
+        user: true,
+      },
+    });
+  }
+
+  createNotification(data: Prisma.NotificationCreateInput, tx?: TxClient) {
+    const client = tx ?? this.prisma;
+    return client.notification.create({ data });
+  }
+
+  async updateProjectMemberRole(projectId: string, userId: string, role: ProjectMemberRole) {
+    return this.prisma.projectMember.update({
+      where: {
+        projectId_userId: {
           projectId,
           userId,
-          role,
-          addedBy,
         },
-        include: {
-          user: true,
-        },
-      });
-
-      await tx.activityLog.create({
-        data: {
-          userId: addedBy,
-          projectId,
-          entityType: 'PROJECT',
-          entityId: projectId,
-          action: 'PROJECT_MEMBER_ADDED',
-          description: 'A member was added to project',
-          metadata: {
-            memberId: userId,
-            role,
-          },
-        },
-      });
-
-      return member;
+      },
+      data: {
+        role,
+      },
     });
   }
 
-  async updateProjectMemberRole(projectId: string, userId: string, role: ProjectMemberRole, updatedBy: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const member = await tx.projectMember.update({
-        where: {
-          projectId_userId: {
-            projectId,
-            userId,
-          },
-        },
-        data: {
-          role,
-        },
-      });
-
-      await tx.activityLog.create({
-        data: {
-          userId: updatedBy,
+  async removeProjectMember(projectId: string, userId: string) {
+    await this.prisma.projectMember.delete({
+      where: {
+        projectId_userId: {
           projectId,
-          entityType: 'PROJECT',
-          entityId: projectId,
-          action: 'PROJECT_MEMBER_ROLE_UPDATED',
-          description: 'A project member role was updated',
-          metadata: {
-            memberId: userId,
-            role,
-          },
+          userId,
         },
-      });
-
-      return member;
+      },
     });
-  }
 
-  async removeProjectMember(projectId: string, userId: string, removedBy: string) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.projectMember.delete({
-        where: {
-          projectId_userId: {
-            projectId,
-            userId,
-          },
-        },
-      });
-
-      await tx.activityLog.create({
-        data: {
-          userId: removedBy,
-          projectId,
-          entityType: 'PROJECT',
-          entityId: projectId,
-          action: 'PROJECT_MEMBER_REMOVED',
-          description: 'A member was removed from project',
-          metadata: {
-            memberId: userId,
-          },
-        },
-      });
-
-      return { success: true };
-    });
+    return { success: true };
   }
 }

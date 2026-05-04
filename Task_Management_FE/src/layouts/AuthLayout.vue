@@ -17,7 +17,7 @@
 
       <!-- Logo -->
       <div class="relative z-10">
-        <OctomLogo size="md" />
+        <OctomLogo size="md" textColor="text-white" />
       </div>
 
       <!-- Center hero text -->
@@ -64,7 +64,7 @@
       <div class="w-full max-w-md animate-fade-up">
         <!-- Mobile logo -->
         <div class="mb-8 lg:hidden">
-          <OctomLogo size="md" />
+          <OctomLogo size="md" textColor="text-white" />
         </div>
 
         <RouterView />

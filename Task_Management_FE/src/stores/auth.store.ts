@@ -33,7 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const projectStore = useProjectStore()
-      projectStore.resetProjectContext()
+      projectStore.resetProjectContext({ clearStoredLastProject: false })
     } catch {
       // Ignore reset errors when pinia is not available yet.
     }

@@ -3,6 +3,7 @@ export interface ProjectSummary {
   name: string
   description?: string | null
   status?: string
+  createdBy?: string
   createdAt?: string
   updatedAt?: string
 }

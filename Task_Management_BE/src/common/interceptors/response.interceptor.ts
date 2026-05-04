@@ -10,7 +10,7 @@ interface Response<T> {
 
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor<unknown, Response<unknown>> {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<Response<unknown>> {
+  intercept(_context: ExecutionContext, next: CallHandler): Observable<Response<unknown>> {
     return next.handle().pipe(
       map((res) => {
         const sanitizedResponse = this.sanitizeSensitiveFields(res);

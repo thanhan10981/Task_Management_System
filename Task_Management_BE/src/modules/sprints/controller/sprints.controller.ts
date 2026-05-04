@@ -11,7 +11,6 @@ import {
   Post,
   Query,
   Request,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -20,13 +19,11 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CreateSprintDto, SprintQueryDto, UpdateSprintDto } from '../dto/sprint.dto';
 import { SprintsService } from '../service/sprints.service';
 
 @ApiTags('Sprints')
 @ApiCookieAuth('accessToken')
-@UseGuards(JwtAuthGuard)
 @Controller('sprints')
 export class SprintsController {
   constructor(private readonly sprintsService: SprintsService) {}

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,6 +17,7 @@ import { UserSettingsModule } from './modules/user-settings/user-settings.module
 import { CommentsModule } from './modules/comments/comments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 import configuration from './config/configuration';
 import { validate } from './config/validation.schema';
@@ -41,6 +43,15 @@ import { validate } from './config/validation.schema';
     ActivityLogsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, LoggingInterceptor, ResponseInterceptor],
+  providers: [
+    AppService,
+    LoggingInterceptor,
+    ResponseInterceptor,
+    // Global auth: every route is protected unless explicitly marked with @Public().
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

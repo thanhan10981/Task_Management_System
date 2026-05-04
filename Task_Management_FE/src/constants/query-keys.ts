@@ -3,6 +3,7 @@ export const QUERY_KEYS = {
     all: ['tasks'] as const,
     lists: () => [...QUERY_KEYS.tasks.all, 'list'] as const,
     list: (params: Record<string, unknown>) => [...QUERY_KEYS.tasks.lists(), params] as const,
+    search: (params: Record<string, unknown>) => [...QUERY_KEYS.tasks.all, 'search', params] as const,
     detail: (id: string) => [...QUERY_KEYS.tasks.all, 'detail', id] as const,
   },
   projects: {

@@ -45,7 +45,7 @@
         </div>
 
         <!-- Search -->
-        <div class="flex-1 max-w-[420px] mx-auto relative flex items-center">
+        <div ref="searchWrapRef" class="flex-1 max-w-[420px] mx-auto relative flex items-center">
           <svg
             class="absolute left-3 md:left-3.5 pointer-events-none flex-shrink-0 text-slate-400"
             width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -59,8 +59,80 @@
             style="border: 1.5px solid var(--search-border); background: var(--search-bg); color: var(--text-secondary);"
             type="text"
             placeholder="Search..."
+            @focus="openSearchMenu"
+            @keydown.escape="closeSearchMenu"
             @keyup.enter="handleSearch"
           >
+
+          <Transition name="dropdown-fade">
+            <div
+              v-if="shouldShowSearchMenu"
+              class="absolute top-[calc(100%+8px)] left-0 right-0 rounded-2xl border p-2 z-[300] max-h-[60vh] md:max-h-[360px] overflow-y-auto"
+              style="background: var(--dropdown-bg); border-color: var(--border-base); box-shadow: var(--shadow-lg);"
+              @click.stop
+            >
+              <div v-if="!hasCurrentProject" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                Select a project to search tasks.
+              </div>
+              <div v-else-if="searchDebouncing" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                Searching tasks...
+              </div>
+              <div v-else-if="searchLoading" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                Searching tasks...
+              </div>
+              <div v-else-if="searchError" class="px-2.5 py-3 text-[12px] text-red-500">
+                {{ searchError }}
+              </div>
+              <div v-else-if="searchResults.length === 0" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                No tasks found
+              </div>
+              <div v-else>
+                <button
+                  v-for="task in searchResults"
+                  :key="task.taskId"
+                  class="w-full text-left px-3 py-2 rounded-[10px] border-none cursor-pointer transition-colors"
+                  style="background: transparent;"
+                  @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--bg-active)'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
+                  @click="handleSearchResultClick(task)"
+                >
+                  <div class="flex items-start gap-2.5">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[12.5px] font-semibold m-0 truncate" style="color: var(--text-heading);">
+                        {{ task.title }}
+                      </p>
+                      <div class="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                        <span
+                          class="px-2 py-0.5 rounded-md font-semibold"
+                          style="background: var(--bg-surface-2); color: var(--text-muted);"
+                        >{{ formatSearchStatus(task.status) }}</span>
+                        <span
+                          class="px-2 py-0.5 rounded-md font-semibold"
+                          style="background: var(--bg-surface-2); color: var(--text-muted);"
+                        >{{ formatSearchPriority(task.priority) }}</span>
+                        <span
+                          v-if="task.dueDate"
+                          class="px-2 py-0.5 rounded-md font-semibold"
+                          style="background: var(--bg-surface-2); color: var(--text-muted);"
+                        >{{ formatSearchDueDate(task.dueDate) }}</span>
+                      </div>
+                    </div>
+                    <div v-if="task.assignees.length" class="flex items-center -space-x-2">
+                      <div
+                        v-for="assignee in task.assignees"
+                        :key="assignee.id"
+                        class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-white"
+                        style="background: #6366f1;"
+                        :title="assignee.name"
+                      >
+                        {{ assigneeInitials(assignee.name) }}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <!-- Right actions -->
@@ -115,24 +187,77 @@
           </div>
 
           <!-- Notification bell -->
-          <button
-            class="notif-btn relative w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center cursor-pointer text-indigo-500 flex-shrink-0 transition-all duration-200"
-            style="border: 1.5px solid var(--btn-border); background: var(--btn-bg);"
-            title="Notifications"
-            @click="toggleNotif"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-            <span
-              v-if="unreadCount > 0"
-              class="notif-badge absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-[9px] bg-red-500 border-2 border-white text-white text-[10px] font-extrabold leading-[14px] flex items-center justify-center tracking-tight"
-              style="box-shadow: 0 2px 6px rgba(239,68,68,0.4);"
+          <div ref="notifWrapRef" class="relative">
+            <button
+              class="notif-btn relative w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center cursor-pointer text-indigo-500 flex-shrink-0 transition-all duration-200"
+              style="border: 1.5px solid var(--btn-border); background: var(--btn-bg);"
+              title="Notifications"
+              @click.stop="toggleNotif"
             >
-              {{ unreadCount > 9 ? '9+' : unreadCount }}
-            </span>
-          </button>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              <span
+                v-if="unreadCount > 0"
+                class="notif-badge absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-[9px] bg-red-500 border-2 border-white text-white text-[10px] font-extrabold leading-[14px] flex items-center justify-center tracking-tight"
+                style="box-shadow: 0 2px 6px rgba(239,68,68,0.4);"
+              >
+                {{ unreadCount > 9 ? '9+' : unreadCount }}
+              </span>
+            </button>
+
+            <Transition name="dropdown-fade">
+              <div
+                v-if="notifMenuOpen"
+                class="absolute top-[calc(100%+8px)] right-0 w-[320px] max-w-[88vw] rounded-2xl border p-2 z-[300]"
+                style="background: var(--dropdown-bg); border-color: var(--border-base); box-shadow: var(--shadow-lg);"
+                @click.stop
+              >
+                <div class="flex items-center justify-between px-2.5 py-2">
+                  <div>
+                    <p class="text-[13px] font-bold m-0" style="color: var(--text-heading);">Notifications</p>
+                    <p class="text-[11px] m-0 mt-0.5" style="color: var(--text-subtle);">Latest updates for you</p>
+                  </div>
+                  <button
+                    class="text-[11px] font-semibold border-none rounded-lg px-2 py-1 cursor-pointer transition-colors"
+                    :disabled="unreadCount === 0"
+                    :style="unreadCount === 0
+                      ? 'background: var(--bg-surface-2); color: var(--text-muted); cursor: not-allowed;'
+                      : 'background: var(--bg-active); color: #4f46e5;'"
+                    @click="markAllRead"
+                  >
+                    Mark all
+                  </button>
+                </div>
+
+                <div class="max-h-[320px] overflow-y-auto">
+                  <div v-if="notificationsLoading" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">Loading notifications...</div>
+                  <div v-else-if="notificationsError" class="px-2.5 py-3 text-[12px] text-red-500">{{ notificationsError }}</div>
+                  <div v-else-if="notifications.length === 0" class="px-2.5 py-4 text-[12px]" style="color: var(--text-subtle);">No notifications yet.</div>
+                  <button
+                    v-else
+                    v-for="note in notifications"
+                    :key="note.id"
+                    class="w-full text-left px-3 py-2 rounded-[10px] border-none cursor-pointer transition-colors"
+                    :style="note.isRead
+                      ? 'background: transparent;'
+                      : 'background: var(--bg-active);'"
+                    @click="handleNotificationClick(note)"
+                  >
+                    <div class="flex items-start gap-2.5">
+                      <span class="mt-1 w-2 h-2 rounded-full flex-shrink-0" :style="note.isRead ? 'background: var(--border-medium);' : 'background: #6366f1;'" />
+                      <div class="min-w-0 flex-1">
+                        <p class="text-[12.5px] font-semibold m-0 truncate" style="color: var(--text-heading);">{{ note.title || 'Notification' }}</p>
+                        <p v-if="note.content" class="text-[11px] m-0 mt-0.5 line-clamp-2" style="color: var(--text-subtle);">{{ note.content }}</p>
+                        <p class="text-[10px] m-0 mt-1" style="color: var(--text-muted);">{{ formatNotificationTime(note.createdAt) }}</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
 
           <!-- Avatar + dropdown -->
           <div
@@ -336,7 +461,15 @@ import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
 import OctomLogo from '@/components/common/OctomLogo.vue'
 import { useAuthMeQuery } from '@/features/auth/composables/useAuthQueries'
+import { useTaskSearchQuery } from '@/features/tasks/composables/useTaskSearchQuery'
+import type { TaskSearchResult } from '@/features/tasks/types/task-search.types'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
+import {
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type NotificationItem,
+} from '@/api/notifications'
 import type { User } from '@/types/user.types'
 
 const router = useRouter()
@@ -347,13 +480,175 @@ const { projects, currentProjectId } = storeToRefs(projectStore)
 
 /* ── Search ─────────────────────────────────────────── */
 const searchQuery = ref('')
+const debouncedSearchQuery = ref('')
+const searchDebounceId = ref<number | null>(null)
+const searchMenuOpen = ref(false)
+const searchWrapRef = ref<HTMLElement | null>(null)
+
+const hasCurrentProject = computed(() => Boolean(currentProjectId.value))
+const searchParams = computed(() => {
+  const query = debouncedSearchQuery.value.trim()
+  if (!query || !currentProjectId.value) return null
+
+  return {
+    projectId: currentProjectId.value,
+    search: query,
+    limit: 10,
+  }
+})
+
+const taskSearchQuery = useTaskSearchQuery(searchParams, {
+  enabled: computed(() => Boolean(searchParams.value)),
+})
+
+const searchResults = computed(() => (searchParams.value ? taskSearchQuery.data.value ?? [] : []))
+const searchLoading = computed(() => Boolean(taskSearchQuery.isFetching.value))
+const searchError = computed(() => (taskSearchQuery.isError.value ? 'Failed to search tasks' : ''))
+const searchDebouncing = computed(() => {
+  const query = searchQuery.value.trim()
+  if (!query) return false
+  return query !== debouncedSearchQuery.value.trim()
+})
+const shouldShowSearchMenu = computed(() => {
+  if (!searchMenuOpen.value) return false
+  return Boolean(searchQuery.value.trim())
+})
+
 function handleSearch() {
-  // wire to global search later
+  if (!searchQuery.value.trim()) return
+  searchMenuOpen.value = true
+}
+
+function openSearchMenu() {
+  if (!searchQuery.value.trim()) return
+  searchMenuOpen.value = true
+}
+
+function closeSearchMenu() {
+  searchMenuOpen.value = false
+}
+
+function handleSearchResultClick(task: TaskSearchResult) {
+  searchMenuOpen.value = false
+  void router.push({
+    name: 'tasks',
+    query: {
+      ...route.query,
+      taskId: task.taskId,
+    },
+  })
+}
+
+function assigneeInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return 'U'
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+}
+
+function formatSearchStatus(status: string) {
+  const normalized = status.trim().replace(/[_-]+/g, ' ')
+  return normalized ? normalized.replace(/\b\w/g, (char) => char.toUpperCase()) : 'Unknown'
+}
+
+function formatSearchPriority(priority: string) {
+  const normalized = priority.trim().replace(/[_-]+/g, ' ')
+  return normalized ? normalized.replace(/\b\w/g, (char) => char.toUpperCase()) : 'Medium'
+}
+
+function formatSearchDueDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'No deadline'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
 }
 
 /* ── Notifications ──────────────────────────────────── */
-const unreadCount = ref(2)
-function toggleNotif() { /* open notif panel */ }
+const notifMenuOpen = ref(false)
+const notifWrapRef = ref<HTMLElement | null>(null)
+const notifications = ref<NotificationItem[]>([])
+const notificationsLoading = ref(false)
+const notificationsError = ref('')
+const notifPollId = ref<number | null>(null)
+
+const unreadCount = computed(() =>
+  notifications.value.filter((note) => !note.isRead).length
+)
+
+async function loadNotifications() {
+  if (notificationsLoading.value) return
+  notificationsLoading.value = true
+  notificationsError.value = ''
+  try {
+    notifications.value = await listNotifications({ page: 1, limit: 20 })
+  } catch {
+    notificationsError.value = 'Failed to load notifications'
+  } finally {
+    notificationsLoading.value = false
+  }
+}
+
+function startNotifPolling() {
+  if (!authStore.isAuthenticated) return
+  if (notifPollId.value) return
+  void loadNotifications()
+  notifPollId.value = window.setInterval(() => {
+    void loadNotifications()
+  }, 30000)
+}
+
+function stopNotifPolling() {
+  if (notifPollId.value) {
+    window.clearInterval(notifPollId.value)
+    notifPollId.value = null
+  }
+}
+
+function toggleNotif() {
+  notifMenuOpen.value = !notifMenuOpen.value
+  if (notifMenuOpen.value) {
+    void loadNotifications()
+  }
+}
+
+async function handleNotificationClick(note: NotificationItem) {
+  if (!note.isRead) {
+    try {
+      await markNotificationRead(note.id)
+      note.isRead = true
+    } catch {
+      notificationsError.value = 'Failed to mark notification as read'
+    }
+  }
+}
+
+async function markAllRead() {
+  if (unreadCount.value === 0) return
+  try {
+    await markAllNotificationsRead()
+    notifications.value = notifications.value.map((note) => ({
+      ...note,
+      isRead: true,
+    }))
+  } catch {
+    notificationsError.value = 'Failed to mark all as read'
+  }
+}
+
+function formatNotificationTime(dateStr: string) {
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
 
 /* ── Menus ──────────────────────────────────────────── */
 const userMenuOpen      = ref(false)
@@ -412,6 +707,10 @@ function onClickOutside(e: MouseEvent) {
     userMenuOpen.value = false
   if (projectMenuWrapRef.value && !projectMenuWrapRef.value.contains(e.target as Node))
     projectMenuOpen.value = false
+  if (notifWrapRef.value && !notifWrapRef.value.contains(e.target as Node))
+    notifMenuOpen.value = false
+  if (searchWrapRef.value && !searchWrapRef.value.contains(e.target as Node))
+    searchMenuOpen.value = false
   if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node))
     memberDropdownOpen.value = false
 }
@@ -422,12 +721,61 @@ watch(
   { immediate: true },
 )
 watch(
+  () => authStore.isAuthenticated,
+  (isAuthenticated) => {
+    if (isAuthenticated) {
+      startNotifPolling()
+    } else {
+      stopNotifPolling()
+      notifications.value = []
+    }
+  },
+  { immediate: true },
+)
+watch(
   () => authMeQuery.error.value,
   (error) => { if (error) console.error('[DefaultLayout] Cannot hydrate current user', error) },
 )
 
-onMounted(() => document.addEventListener('click', onClickOutside))
-onUnmounted(() => document.removeEventListener('click', onClickOutside))
+watch(
+  searchQuery,
+  (value) => {
+    if (searchDebounceId.value) window.clearTimeout(searchDebounceId.value)
+    const query = value.trim()
+    if (!query) {
+      debouncedSearchQuery.value = ''
+      searchMenuOpen.value = false
+      return
+    }
+
+    searchMenuOpen.value = true
+    searchDebounceId.value = window.setTimeout(() => {
+      debouncedSearchQuery.value = query
+    }, 500)
+  },
+)
+
+watch(
+  hasCurrentProject,
+  (value) => {
+    if (value) return
+    debouncedSearchQuery.value = ''
+    searchMenuOpen.value = false
+  },
+)
+
+onMounted(() => {
+  document.addEventListener('click', onClickOutside)
+  startNotifPolling()
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onClickOutside)
+  stopNotifPolling()
+  if (searchDebounceId.value) {
+    window.clearTimeout(searchDebounceId.value)
+    searchDebounceId.value = null
+  }
+})
 
 /* ── Auth ──────────────────────────────────────────── */
 const userInitial = computed(() => {

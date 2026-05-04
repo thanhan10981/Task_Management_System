@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import {
   createPaginatedResponse,
   createPaginationOptions,
@@ -118,18 +118,40 @@ export class TaskService {
       for (const assigneeId of assigneeIds) {
         await this.tasksRepository.assignUser(createdTask.id, assigneeId, userId, tx);
 
-        await this.recordHistoryAndActivity(
-          tx,
-          createdTask.id,
-          userId,
-          TASK_HISTORY_ACTIONS.ASSIGNED,
-          buildTaskHistoryMetadata({
-            assignee: {
-              old: null,
-              new: assigneeId,
-            },
-          }),
-        );
+        await Promise.all([
+          this.recordHistoryAndActivity(
+            tx,
+            createdTask.id,
+            userId,
+            TASK_HISTORY_ACTIONS.ASSIGNED,
+            buildTaskHistoryMetadata({
+              assignee: {
+                old: null,
+                new: assigneeId,
+              },
+            }),
+          ),
+          ...(assigneeId !== userId
+            ? [
+                this.tasksRepository.createNotification(
+                  {
+                    user: { connect: { id: assigneeId } },
+                    project: { connect: { id: createTaskDto.projectId } },
+                    type: NotificationType.TASK_ASSIGNED,
+                    title: 'You were assigned to a task',
+                    content: `You have been assigned to task "${createdTask.title}".`,
+                    data: {
+                      taskId: createdTask.id,
+                      projectId: createTaskDto.projectId,
+                      assignedBy: userId,
+                      action: TASK_HISTORY_ACTIONS.ASSIGNED,
+                    },
+                  },
+                  tx,
+                ),
+              ]
+            : []),
+        ]);
       }
 
       return createdTask;
@@ -437,18 +459,40 @@ export class TaskService {
           }
 
           await this.tasksRepository.assignUser(id, assigneeId, userId, tx);
-          await this.recordHistoryAndActivity(
-            tx,
-            id,
-            userId,
-            TASK_HISTORY_ACTIONS.ASSIGNED,
-            buildTaskHistoryMetadata({
-              assignee: {
-                old: null,
-                new: assigneeId,
-              },
-            }),
-          );
+          await Promise.all([
+            this.recordHistoryAndActivity(
+              tx,
+              id,
+              userId,
+              TASK_HISTORY_ACTIONS.ASSIGNED,
+              buildTaskHistoryMetadata({
+                assignee: {
+                  old: null,
+                  new: assigneeId,
+                },
+              }),
+            ),
+            ...(assigneeId !== userId
+              ? [
+                  this.tasksRepository.createNotification(
+                    {
+                      user: { connect: { id: assigneeId } },
+                      project: { connect: { id: existingTask.projectId } },
+                      type: NotificationType.TASK_ASSIGNED,
+                      title: 'You were assigned to a task',
+                      content: `You have been assigned to task "${task.title}".`,
+                      data: {
+                        taskId: id,
+                        projectId: existingTask.projectId,
+                        assignedBy: userId,
+                        action: TASK_HISTORY_ACTIONS.ASSIGNED,
+                      },
+                    },
+                    tx,
+                  ),
+                ]
+              : []),
+          ]);
         }
       }
 

@@ -151,7 +151,22 @@
                 <tr v-for="file in recentFiles" :key="file.publicId" class="file-row transition-colors duration-150 max-[768px]:block max-[768px]:border max-[768px]:rounded-[14px] max-[768px]:overflow-hidden" style="border-color: var(--border-medium);">
                   <td class="fv-td" style="color: var(--text-primary); border-color: var(--border-soft);" data-label="Name">
                     <div class="flex items-center gap-2.5">
-                      <span class="inline-flex items-center justify-center min-w-[38px] h-7 px-1.5 rounded-lg text-[10px] font-[800] tracking-[0.03em] whitespace-nowrap flex-shrink-0" :style="{ background: fileTypeBg(file.format) }" style="color: var(--text-heading);">
+                      <template v-if="isImageFile(file)">
+                        <img
+                          :src="file.secureUrl"
+                          :alt="file.fileName || fileName(file.publicId)"
+                          class="w-9 h-9 rounded-lg object-cover border flex-shrink-0 cursor-pointer transition-transform duration-150 hover:scale-[1.03]"
+                          style="border-color: var(--border-base);"
+                          loading="lazy"
+                          @click.stop="openImagePreview(file)"
+                        >
+                      </template>
+                      <span
+                        v-else
+                        class="inline-flex items-center justify-center min-w-[38px] h-7 px-1.5 rounded-lg text-[10px] font-[800] tracking-[0.03em] whitespace-nowrap flex-shrink-0"
+                        :style="{ background: fileTypeBg(file.format) }"
+                        style="color: var(--text-heading);"
+                      >
                         {{ getFileIconText(file.format) }}
                       </span>
                       <span class="font-semibold max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap max-[768px]:max-w-[calc(100vw-180px)]" style="color: var(--text-heading);">{{ file.fileName || fileName(file.publicId) }}</span>
@@ -344,6 +359,28 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- ── Image Preview Modal ─────────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="imagePreviewOpen" class="modal-overlay" @click.self="closeImagePreview">
+          <div class="modal-panel image-preview-panel" style="background: var(--modal-bg); border-color: var(--modal-border); box-shadow: 0 24px 64px rgba(0,0,0,0.28);">
+            <div class="flex items-center justify-between gap-3 mb-4">
+              <div class="min-w-0">
+                <p class="text-[14px] font-[800] m-0" style="color: var(--text-heading);">Image Preview</p>
+                <p class="text-[12px] m-0 mt-1 truncate" style="color: var(--text-subtle);">{{ imagePreviewTitle }}</p>
+              </div>
+              <button class="w-8 h-8 rounded-lg border-none flex items-center justify-center cursor-pointer transition-colors hover:bg-red-50 hover:text-red-500" style="background: var(--bg-surface-3); color: var(--text-muted);" @click="closeImagePreview">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="w-full max-h-[64vh] overflow-hidden rounded-2xl border flex items-center justify-center p-3" style="border-color: var(--border-base); background: var(--bg-surface-2);">
+              <img :src="imagePreviewUrl" :alt="imagePreviewTitle" class="max-w-full max-h-[60vh] object-contain block" />
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </section>
 </template>
 
@@ -384,6 +421,8 @@ const MAX_FOLDER_REFRESH_RETRY = 3
 const FOLDER_REFRESH_DELAY_MS = 350
 const DOWNLOAD_EVENT_KEY = 'tms:file-download-event'
 
+const IMAGE_FORMATS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'])
+
 const currentFolder = ref(DEFAULT_FOLDER)
 const openMenuId = ref<string | null>(null)
 
@@ -398,6 +437,9 @@ const uploaderRef = ref<HTMLElement | null>(null)
 const showDeleteConfirm = ref(false)
 const confirmingDelete = ref(false)
 const pendingDeleteFile = ref<CloudinaryFile | null>(null)
+const imagePreviewOpen = ref(false)
+const imagePreviewUrl = ref('')
+const imagePreviewTitle = ref('')
 const pendingDeleteFileName = computed(() => {
   const file = pendingDeleteFile.value
   if (!file) return 'this file'
@@ -512,6 +554,25 @@ async function handleUploaded(results: CloudinaryUploadResult[]) {
 }
 
 function triggerUploader() { uploaderRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+
+function isImageFile(file: CloudinaryFile) {
+  const format = (file.format || '').toLowerCase()
+  const resourceType = (file.resourceType || '').toLowerCase()
+  return resourceType === 'image' || IMAGE_FORMATS.has(format)
+}
+
+function openImagePreview(file: CloudinaryFile) {
+  if (!isImageFile(file)) return
+  imagePreviewUrl.value = file.secureUrl
+  imagePreviewTitle.value = (file.fileName || fileName(file.publicId) || 'Image').trim()
+  imagePreviewOpen.value = true
+}
+
+function closeImagePreview() {
+  imagePreviewOpen.value = false
+  imagePreviewUrl.value = ''
+  imagePreviewTitle.value = ''
+}
 
 function openFile(file: { id: string | null; format?: string | null; resourceType?: string | null; fileName?: string | null; publicId?: string | null; secureUrl: string }) {
   if (!file.id) { window.open(file.secureUrl, '_blank', 'noopener,noreferrer'); return }
@@ -679,4 +740,14 @@ function handleStorageEvent(event: StorageEvent) {
 .modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 .menu-fade-enter-active, .menu-fade-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
 .menu-fade-enter-from, .menu-fade-leave-to { opacity: 0; transform: translateY(-6px) scale(0.97); }
+
+/* ── Image preview modal sizing ───────────────────────────────────────── */
+.image-preview-panel {
+  width: min(94vw, 980px);
+  max-width: 980px;
+  padding: 24px;
+}
+@media (max-width: 640px) {
+  .image-preview-panel { width: 94vw; padding: 18px; }
+}
 </style>

@@ -52,36 +52,58 @@ export class ProjectsService {
       }
     }
 
-    const project = await this.prisma.project.create({
-      data: {
-        name: createProjectDto.name,
-        description: createProjectDto.description,
-        status: createProjectDto.status || 'ACTIVE',
-        color: createProjectDto.color,
-        icon: createProjectDto.icon,
-        createdBy: userId,
-        members: {
-          create: [
-            {
-              userId,
-              role: 'OWNER',
+    const project = await this.prisma.$transaction(async (tx) => {
+      const createdProject = await tx.project.create({
+        data: {
+          name: createProjectDto.name,
+          description: createProjectDto.description,
+          status: createProjectDto.status || 'ACTIVE',
+          color: createProjectDto.color,
+          icon: createProjectDto.icon,
+          createdBy: userId,
+          members: {
+            create: [
+              {
+                userId,
+                role: 'OWNER',
+                addedBy: userId,
+              },
+              ...requestedMemberIds.map((memberId) => ({
+                userId: memberId,
+                role: 'MEMBER' as const,
+                addedBy: userId,
+              })),
+            ],
+          },
+        },
+        include: {
+          creator: {
+            select: SAFE_USER_SELECT,
+          },
+          members: true,
+          _count: { select: { tasks: true, members: true } },
+        },
+      });
+
+      if (requestedMemberIds.length > 0) {
+        await tx.notification.createMany({
+          data: requestedMemberIds.map((memberId) => ({
+            userId: memberId,
+            projectId: createdProject.id,
+            type: NotificationType.SYSTEM,
+            title: 'You were added to a project',
+            content: `You have been added to project "${createdProject.name}" as MEMBER.`,
+            data: {
+              action: 'PROJECT_MEMBER_ADDED',
+              projectId: createdProject.id,
+              role: 'MEMBER',
               addedBy: userId,
             },
-            ...requestedMemberIds.map((memberId) => ({
-              userId: memberId,
-              role: 'MEMBER' as const,
-              addedBy: userId,
-            })),
-          ],
-        },
-      },
-      include: {
-        creator: {
-          select: SAFE_USER_SELECT,
-        },
-        members: true,
-        _count: { select: { tasks: true, members: true } },
-      },
+          })),
+        });
+      }
+
+      return createdProject;
     });
 
     return project;
@@ -181,6 +203,10 @@ export class ProjectsService {
     const requestedMemberIds = Array.from(
       new Set((updateProjectDto.memberIds ?? []).filter((memberId) => memberId !== existingProject.createdBy)),
     );
+    const existingMemberIds = new Set(
+      (existingProject.members ?? []).map((member) => member.userId),
+    );
+    const newMemberIds = requestedMemberIds.filter((memberId) => !existingMemberIds.has(memberId));
 
     if (requestedMemberIds.length > 0) {
       const existingUsersCount = await this.prisma.user.count({
@@ -208,15 +234,31 @@ export class ProjectsService {
         },
       });
 
-      if (requestedMemberIds.length > 0) {
+      if (newMemberIds.length > 0) {
         await tx.projectMember.createMany({
-          data: requestedMemberIds.map((memberId) => ({
+          data: newMemberIds.map((memberId) => ({
             projectId: id,
             userId: memberId,
             role: 'MEMBER',
             addedBy: userId,
           })),
           skipDuplicates: true,
+        });
+
+        await tx.notification.createMany({
+          data: newMemberIds.map((memberId) => ({
+            userId: memberId,
+            projectId: id,
+            type: NotificationType.SYSTEM,
+            title: 'You were added to a project',
+            content: `You have been added to project "${existingProject.name}" as MEMBER.`,
+            data: {
+              action: 'PROJECT_MEMBER_ADDED',
+              projectId: id,
+              role: 'MEMBER',
+              addedBy: userId,
+            },
+          })),
         });
       }
     });

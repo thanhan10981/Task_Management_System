@@ -901,6 +901,9 @@ const { currentProjectId } = storeToRefs(projectStore)
 const toast = useToast()
 const route = useRoute()
 const router = useRouter()
+const routeProjectId = computed(() =>
+  typeof route.params.projectId === 'string' ? route.params.projectId : null
+)
 
 // ── Sidebar / panel ────────────────────────────────────────────────────────────────────
 const sidebarOpen = ref(false)
@@ -1094,9 +1097,14 @@ const restoringTaskId = ref<string | null>(null)
 const trashCount = computed(() => store.trashTasks.length)
 
 function openTaskModal(id: string) {
+  if (!routeProjectId.value) return
   selectedTaskId.value = id
   modalOpen.value = true
-  void router.replace({ name: 'tasks', query: { ...route.query, taskId: id } })
+  void router.replace({
+    name: 'project-tasks',
+    params: { projectId: routeProjectId.value },
+    query: { ...route.query, taskId: id },
+  })
 }
 
 watch(
@@ -1113,7 +1121,12 @@ watch(modalOpen, (open) => {
   if (open || !route.query.taskId) return
   const nextQuery = { ...route.query }
   delete nextQuery.taskId
-  void router.replace({ name: 'tasks', query: nextQuery })
+  if (!routeProjectId.value) return
+  void router.replace({
+    name: 'project-tasks',
+    params: { projectId: routeProjectId.value },
+    query: nextQuery,
+  })
 })
 
 async function openTrash() {

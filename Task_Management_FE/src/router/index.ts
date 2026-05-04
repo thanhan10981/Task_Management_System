@@ -3,6 +3,30 @@ import { useProjectStore } from '@/stores/project.store'
 import type { RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
 
+const LAST_PROJECT_STORAGE_KEY = 'lastProjectId'
+const LEGACY_PROJECT_STORAGE_KEY = 'current_project_id'
+
+function getStoredProjectId() {
+  return (
+    localStorage.getItem(LAST_PROJECT_STORAGE_KEY) ||
+    localStorage.getItem(LEGACY_PROJECT_STORAGE_KEY)
+  )
+}
+
+function resolveLegacyProjectRoute(name: string, to: { query?: unknown; hash?: string } = {}) {
+  const projectId = getStoredProjectId()
+  if (!projectId) {
+    return { name: 'dashboard' }
+  }
+
+  return {
+    name,
+    params: { projectId },
+    query: to.query,
+    hash: to.hash,
+  }
+}
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
@@ -26,37 +50,74 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Create Project' },
       },
       {
-        path: 'tasks',
-        name: 'tasks',
+        path: 'projects/:projectId/tasks',
+        name: 'project-tasks',
         component: () => import('@/features/tasks/views/TaskListView.vue'),
         meta: { title: 'Tasks', requiresProject: true },
       },
       {
-        path: 'tasks/:id',
-        name: 'task-detail',
+        path: 'projects/:projectId/tasks/:id',
+        name: 'project-task-detail',
         redirect: (to) => ({
-          name: 'tasks',
+          name: 'project-tasks',
+          params: { projectId: to.params.projectId },
           query: { ...to.query, taskId: String(to.params.id) },
         }),
         meta: { title: 'Task Detail', requiresProject: true },
       },
       {
-        path: 'files',
-        name: 'files',
+        path: 'projects/:projectId/files',
+        name: 'project-files',
         component: () => import('@/features/files/views/FilesView.vue'),
         meta: { title: 'Files', requiresProject: true },
       },
       {
-        path: 'board',
-        name: 'board',
+        path: 'projects/:projectId/board',
+        name: 'project-board',
         component: () => import('@/features/tasks/views/BoardView.vue'),
         meta: { title: 'Board', requiresProject: true },
       },
       {
-        path: 'settings',
-        name: 'settings',
+        path: 'projects/:projectId/settings',
+        name: 'project-settings',
         component: () => import('@/features/settings/views/SettingsView.vue'),
-        meta: { title: 'Settings' },
+        meta: { title: 'Settings', requiresProject: true },
+      },
+      {
+        path: 'tasks',
+        name: 'tasks-legacy',
+        redirect: (to) => resolveLegacyProjectRoute('project-tasks', to),
+      },
+      {
+        path: 'tasks/:id',
+        name: 'task-detail-legacy',
+        redirect: (to) => {
+          const projectId = getStoredProjectId()
+          if (!projectId) {
+            return { name: 'dashboard' }
+          }
+
+          return {
+            name: 'project-tasks',
+            params: { projectId },
+            query: { ...to.query, taskId: String(to.params.id) },
+          }
+        },
+      },
+      {
+        path: 'board',
+        name: 'board-legacy',
+        redirect: (to) => resolveLegacyProjectRoute('project-board', to),
+      },
+      {
+        path: 'settings',
+        name: 'settings-legacy',
+        redirect: (to) => resolveLegacyProjectRoute('project-settings', to),
+      },
+      {
+        path: 'files',
+        name: 'files-legacy',
+        redirect: (to) => resolveLegacyProjectRoute('project-files', to),
       },
     ],
   },
@@ -138,7 +199,10 @@ router.beforeEach(async (to) => {
     const projectStore = useProjectStore()
     await projectStore.initializeAfterAuth()
 
-    if (to.meta.requiresProject && !projectStore.hasCurrentProject) {
+    const projectId = typeof to.params.projectId === 'string' ? to.params.projectId : null
+    projectStore.setCurrentProjectId(projectId, { persist: Boolean(projectId) })
+
+    if (to.meta.requiresProject && !projectId) {
       return { name: 'dashboard', query: to.query, hash: to.hash }
     }
   }

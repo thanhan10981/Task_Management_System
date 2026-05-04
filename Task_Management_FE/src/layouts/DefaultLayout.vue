@@ -59,6 +59,7 @@
             style="border: 1.5px solid var(--search-border); background: var(--search-bg); color: var(--text-secondary);"
             type="text"
             placeholder="Search..."
+            :disabled="!routeProjectId"
             @focus="openSearchMenu"
             @keydown.escape="closeSearchMenu"
             @keyup.enter="handleSearch"
@@ -71,8 +72,8 @@
               style="background: var(--dropdown-bg); border-color: var(--border-base); box-shadow: var(--shadow-lg);"
               @click.stop
             >
-              <div v-if="!hasCurrentProject" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
-                Select a project to search tasks.
+              <div v-if="!hasRouteProject" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                Vui long chon project de tim kiem task.
               </div>
               <div v-else-if="searchDebouncing" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
                 Searching tasks...
@@ -485,13 +486,16 @@ const searchDebounceId = ref<number | null>(null)
 const searchMenuOpen = ref(false)
 const searchWrapRef = ref<HTMLElement | null>(null)
 
-const hasCurrentProject = computed(() => Boolean(currentProjectId.value))
+const routeProjectId = computed(() =>
+  typeof route.params.projectId === 'string' ? route.params.projectId : null
+)
+const hasRouteProject = computed(() => Boolean(routeProjectId.value))
 const searchParams = computed(() => {
   const query = debouncedSearchQuery.value.trim()
-  if (!query || !currentProjectId.value) return null
+  if (!query || !routeProjectId.value) return null
 
   return {
-    projectId: currentProjectId.value,
+    projectId: routeProjectId.value,
     search: query,
     limit: 10,
   }
@@ -515,12 +519,12 @@ const shouldShowSearchMenu = computed(() => {
 })
 
 function handleSearch() {
-  if (!searchQuery.value.trim()) return
+  if (!routeProjectId.value || !searchQuery.value.trim()) return
   searchMenuOpen.value = true
 }
 
 function openSearchMenu() {
-  if (!searchQuery.value.trim()) return
+  if (!routeProjectId.value || !searchQuery.value.trim()) return
   searchMenuOpen.value = true
 }
 
@@ -529,9 +533,11 @@ function closeSearchMenu() {
 }
 
 function handleSearchResultClick(task: TaskSearchResult) {
+  if (!routeProjectId.value) return
   searchMenuOpen.value = false
   void router.push({
-    name: 'tasks',
+    name: 'project-tasks',
+    params: { projectId: routeProjectId.value },
     query: {
       ...route.query,
       taskId: task.taskId,
@@ -691,7 +697,7 @@ const currentProjectName = computed(() => {
   return current?.name ?? 'Select Project'
 })
 
-const isBoardRoute = computed(() => route.name === 'board')
+const isBoardRoute = computed(() => route.name === 'project-board')
 
 function toggleUserMenu(e: MouseEvent) {
   e.stopPropagation()
@@ -756,7 +762,7 @@ watch(
 )
 
 watch(
-  hasCurrentProject,
+  routeProjectId,
   (value) => {
     if (value) return
     debouncedSearchQuery.value = ''
@@ -800,10 +806,22 @@ function handleLogout() {
 
 function selectProject(projectId: string) {
   projectMenuOpen.value = false
-  projectStore.setCurrentProjectId(projectId)
-  const routeName  = typeof route.name === 'string' ? route.name : 'dashboard'
-  const targetName = routeName === 'not-found' ? 'dashboard' : routeName
-  void router.push({ name: targetName, query: route.query, hash: route.hash })
+  projectStore.setCurrentProjectId(projectId, { persist: true })
+  const routeName = typeof route.name === 'string' ? route.name : ''
+  const projectRoutes = new Set([
+    'project-tasks',
+    'project-board',
+    'project-settings',
+    'project-files',
+    'project-task-detail',
+  ])
+  const targetName = projectRoutes.has(routeName) ? routeName : 'project-tasks'
+  void router.push({
+    name: targetName,
+    params: { projectId },
+    query: route.query,
+    hash: route.hash,
+  })
 }
 
 function goToCreateProject() {
@@ -875,14 +893,16 @@ function extractErrorMessage(error: unknown) {
 
 function isActive(item: { routeName: string }) {
   const routeName = typeof route.name === 'string' ? route.name : ''
-  if (item.routeName === 'tasks') return routeName === 'tasks' || routeName === 'task-detail'
+  if (item.routeName === 'project-tasks') {
+    return routeName === 'project-tasks' || routeName === 'project-task-detail'
+  }
   return routeName === item.routeName
 }
 
 function navTarget(item: { routeName: string; requiresProject?: boolean }) {
   if (!item.requiresProject) return { name: item.routeName }
-  if (!currentProjectId.value) return { name: 'dashboard' }
-  return { name: item.routeName }
+  if (!routeProjectId.value) return { name: 'dashboard' }
+  return { name: item.routeName, params: { projectId: routeProjectId.value } }
 }
 
 const navItems = [
@@ -894,14 +914,14 @@ const navItems = [
     </svg>`,
   },
   {
-    name: 'board', label: 'Board', routeName: 'board', requiresProject: true,
+    name: 'board', label: 'Board', routeName: 'project-board', requiresProject: true,
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
       <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
     </svg>`,
   },
   {
-    name: 'tasks', label: 'Tasks', routeName: 'tasks', requiresProject: true,
+    name: 'tasks', label: 'Tasks', routeName: 'project-tasks', requiresProject: true,
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
       <polyline points="14 2 14 8 20 8"/>
@@ -909,14 +929,14 @@ const navItems = [
     </svg>`,
   },
   {
-    name: 'settings', label: 'Settings', routeName: 'settings', requiresProject: true,
+    name: 'settings', label: 'Settings', routeName: 'project-settings', requiresProject: true,
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="3"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>`,
   },
   {
-    name: 'files', label: 'Files', routeName: 'files', requiresProject: true,
+    name: 'files', label: 'Files', routeName: 'project-files', requiresProject: true,
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
     </svg>`,

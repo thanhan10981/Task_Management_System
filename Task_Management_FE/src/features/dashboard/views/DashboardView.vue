@@ -714,8 +714,13 @@ function getStatusIconStyle(status: string): string {
 }
 
 function buildTaskRoute(taskId: string) {
+  if (!currentProjectId.value) {
+    return router.resolve({ name: 'dashboard' })
+  }
+
   return router.resolve({
-    name: 'tasks',
+    name: 'project-tasks',
+    params: { projectId: currentProjectId.value },
     query: { taskId },
   })
 }
@@ -737,14 +742,17 @@ async function copyTaskLink(taskId: string) {
 }
 
 function openTask(taskId: string) {
+  if (!currentProjectId.value) return
   void router.push({
-    name: 'tasks',
+    name: 'project-tasks',
+    params: { projectId: currentProjectId.value },
     query: { taskId },
   })
 }
 
 function goToBoard() {
-  void router.push({ name: 'board' })
+  if (!currentProjectId.value) return
+  void router.push({ name: 'project-board', params: { projectId: currentProjectId.value } })
 }
 
 function getReminderThreshold(taskId: string) {

@@ -141,13 +141,13 @@
 
         <!-- Trash -->
         <button
-          class="trash-trigger"
-          :class="{ 'trash-trigger--active': trashOpen }"
+          class="relative w-8 h-8 inline-flex items-center justify-center border-[1.5px] border-[var(--btn-border)] rounded-[10px] bg-[var(--btn-bg)] text-[var(--text-muted)] cursor-pointer transition-all duration-150 flex-shrink-0 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] hover:-translate-y-px"
+          :class="trashOpen ? 'text-[var(--text-primary)] !bg-[var(--bg-surface-2)] !border-indigo-400/40' : ''"
           title="Trash"
           @click="openTrash"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          <span v-if="trashCount" class="trash-count">{{ trashCount }}</span>
+          <span v-if="trashCount" class="absolute -top-[5px] -right-[5px] min-w-[15px] h-[15px] inline-flex items-center justify-center px-1 rounded-full bg-indigo-500 text-white text-[9px] font-bold leading-none border-[1.5px] border-[var(--bg-app)] pointer-events-none">{{ trashCount }}</span>
         </button>
 
         <!-- Toggle panel button -->
@@ -393,6 +393,14 @@
               <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="14" height="14" rx="3"/><polyline points="7 10 9.5 12.5 13 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               New Task
             </button>
+            <button
+              class="sp-tab"
+              :class="{ 'sp-tab--active': activeTab === 'group' }"
+              @click="activeTab = 'group'"
+            >
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="16" height="11" rx="2"/><path d="M6 5V4a2 2 0 014 0v1"/></svg>
+              New Group
+            </button>
             <button class="fp-close ml-auto" @click="sidebarOpen = false" title="Close">
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
             </button>
@@ -400,7 +408,7 @@
           <!-- Title row -->
           <div class="sp-title-row">
             <span class="sp-title-icon">✦</span>
-            <span class="sp-title-text">{{ activeTab === 'task' ? 'Create New Task' : 'Create New Status' }}</span>
+            <span class="sp-title-text">{{ activeTab === 'task' ? 'Create New Task' : activeTab === 'group' ? 'Create New Group' : 'Create New Status' }}</span>
           </div>
         </div>
 
@@ -443,8 +451,9 @@
               <div class="fp-field">
                 <label class="fp-label">Sprint</label>
                 <select v-model="newTask.sprint" class="fp-select">
-                  <option value="">— Backlog</option>
-                  <option v-for="sp in store.sprints" :key="sp.id" :value="sp.id">{{ sp.title }}</option>
+                  <option v-for="sp in sprintOptions" :key="sp.id || '__backlog'" :value="sp.id">
+                    {{ sp.name }}{{ sp.dates ? ' - ' + sp.dates : '' }}
+                  </option>
                 </select>
               </div>
               <div class="fp-field">
@@ -510,43 +519,114 @@
             <div class="fp-field">
               <label class="fp-label">Assignees</label>
               <!-- Search box -->
-              <div class="fp-assignee-search-wrap">
-                <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-subtle);flex-shrink:0"><circle cx="8.5" cy="8.5" r="5"/><line x1="13" y1="13" x2="17" y2="17"/></svg>
+              <div class="flex items-center gap-1.5 bg-[var(--bg-surface-2)] border-[1.5px] border-[var(--btn-border)] rounded-lg px-2 h-[34px] mt-1 transition-colors focus-within:border-indigo-500">
+                <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-[var(--text-subtle)]"><circle cx="8.5" cy="8.5" r="5"/><line x1="13" y1="13" x2="17" y2="17"/></svg>
                 <input
                   v-model="assigneeSearch"
-                  class="fp-assignee-search"
+                  class="flex-1 bg-transparent border-none outline-none text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-subtle)]"
                   placeholder="Search by name or email…"
                 />
               </div>
               <!-- Selected chips -->
-              <div v-if="newTask.assigneeIds.length" class="fp-assignee-chips">
+              <div v-if="newTask.assigneeIds.length" class="flex flex-wrap gap-[5px] mt-1.5">
                 <span
                   v-for="id in newTask.assigneeIds" :key="id"
-                  class="fp-assignee-chip"
+                  class="inline-flex items-center gap-[5px] py-0.5 pl-1 pr-2 rounded-full border-[1.5px] text-[11px] font-semibold"
                   :style="{ background: store.getMember(id)?.color + '22', borderColor: store.getMember(id)?.color, color: store.getMember(id)?.color }"
                 >
-                  <span class="fp-chip-avatar" :style="{ background: store.getMember(id)?.color }">{{ store.getMember(id)?.initials }}</span>
+                  <span class="w-[18px] h-[18px] rounded-full inline-flex items-center justify-center text-[9px] font-bold text-white shrink-0" :style="{ background: store.getMember(id)?.color }">{{ store.getMember(id)?.initials }}</span>
                   {{ store.getMember(id)?.name.split(' ')[0] }}
-                  <button class="fp-chip-remove" @click="toggleNewAssignee(id)" title="Remove">
+                  <button class="bg-transparent border-none cursor-pointer p-0 flex items-center opacity-60 hover:opacity-100 transition-opacity text-inherit" @click="toggleNewAssignee(id)" title="Remove">
                     <svg width="8" height="8" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
                   </button>
                 </span>
               </div>
               <!-- Dropdown results -->
-              <div v-if="filteredAssigneeMembers.length" class="fp-assignee-dropdown">
+              <div v-if="filteredAssigneeMembers.length" class="mt-1 bg-[var(--bg-surface)] border-[1.5px] border-[var(--btn-border)] rounded-lg overflow-hidden max-h-[170px] overflow-y-auto">
                 <button
                   v-for="m in filteredAssigneeMembers" :key="m.id"
-                  class="fp-assignee-option"
-                  :class="{ 'fp-assignee-option--on': newTask.assigneeIds.includes(m.id) }"
+                  class="flex items-center gap-2 w-full px-2.5 py-[7px] border-none bg-transparent cursor-pointer text-left transition-colors hover:bg-[var(--bg-surface-2)]"
+                  :class="{ 'bg-indigo-500/5': newTask.assigneeIds.includes(m.id) }"
                   @click="toggleNewAssignee(m.id)"
                 >
-                  <span class="fp-chip-avatar" :style="{ background: m.color }">{{ m.initials }}</span>
-                  <span class="fp-assignee-option-name">{{ m.name }}</span>
-                  <svg v-if="newTask.assigneeIds.includes(m.id)" width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="color:#6366f1;margin-left:auto;flex-shrink:0"><polyline points="4 10 8.5 14.5 16 7"/></svg>
+                  <span class="w-[18px] h-[18px] rounded-full inline-flex items-center justify-center text-[9px] font-bold text-white shrink-0" :style="{ background: m.color }">{{ m.initials }}</span>
+                  <span class="text-[12px] text-[var(--text-primary)] flex-1">{{ m.name }}</span>
+                  <svg v-if="newTask.assigneeIds.includes(m.id)" width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="text-indigo-500 ml-auto shrink-0"><polyline points="4 10 8.5 14.5 16 7"/></svg>
                 </button>
-                <div v-if="filteredAssigneeMembers.length === 0 && assigneeSearch.trim()" class="fp-assignee-empty">No members found</div>
               </div>
-              <div v-else-if="assigneeSearch.trim()" class="fp-assignee-empty">No members found</div>
+              <div v-else-if="assigneeSearch.trim()" class="p-2.5 text-center text-[11px] text-[var(--text-subtle)]">No members found</div>
+            </div>
+
+            <!-- ── GROUP ── -->
+            <div class="fp-field">
+              <label class="fp-label">Group</label>
+              <div class="relative" :class="{ 'group-open': groupPickerOpen }" ref="groupPickerRef">
+                <!-- Trigger -->
+                <button
+                  type="button"
+                  class="flex items-center gap-[7px] w-full h-[34px] px-2.5 rounded-[9px] border-[1.5px] border-[var(--btn-border)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[12.5px] font-medium cursor-pointer text-left transition-all duration-150 hover:border-indigo-500 hover:shadow-[0_0_0_3px_rgba(99,102,241,0.12)]"
+                  :class="groupPickerOpen ? 'border-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.12)]' : ''"
+                  @click.stop="groupPickerOpen = !groupPickerOpen"
+                >
+                  <template v-if="newTask.groupId">
+                    <span class="w-[9px] h-[9px] rounded-full shrink-0" :style="{ background: taskGroups.find(g => g.id === newTask.groupId)?.color }"></span>
+                    <span class="flex-1 font-semibold text-[var(--text-primary)]">{{ taskGroups.find(g => g.id === newTask.groupId)?.name }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="flex-1 text-[var(--text-subtle)]">— No group —</span>
+                  </template>
+                  <svg class="shrink-0 text-[var(--text-muted)] transition-transform duration-200" :class="groupPickerOpen ? 'rotate-180' : ''" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+
+                <!-- Dropdown -->
+                <Transition name="fp-group-drop">
+                  <div v-if="groupPickerOpen" class="absolute top-[calc(100%+5px)] left-0 right-0 bg-[var(--bg-surface)] border border-[var(--border-medium)] rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.14)] z-[400] p-[5px] overflow-hidden" @click.stop>
+                    <!-- No group option -->
+                    <button
+                      type="button"
+                      class="flex items-center gap-2 w-full px-[9px] py-[7px] rounded-lg border-none text-[var(--text-primary)] text-[12.5px] cursor-pointer text-left transition-colors duration-100 hover:bg-[var(--bg-hover)]"
+                      :class="!newTask.groupId ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent'"
+                      @click="newTask.groupId = ''; groupPickerOpen = false"
+                    >
+                      <span class="w-[9px] h-[9px] rounded-full shrink-0 bg-[var(--bg-surface-3)] border-[1.5px] border-[var(--border-medium)]"></span>
+                      <span class="flex-1 font-medium">No group</span>
+                      <svg v-if="!newTask.groupId" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+
+                    <div class="h-px bg-[var(--border-base)] my-1"></div>
+
+                    <div
+                      v-if="loadingGroups"
+                      class="px-[9px] py-[7px] text-[12px] text-[var(--text-subtle)]"
+                    >
+                      Loading groups...
+                    </div>
+
+                    <!-- Group options -->
+                    <button
+                      v-for="g in taskGroups"
+                      :key="g.id"
+                      type="button"
+                      class="flex items-center gap-2 w-full px-[9px] py-[7px] rounded-lg border-none text-[var(--text-primary)] text-[12.5px] cursor-pointer text-left transition-colors duration-100 hover:bg-[var(--bg-hover)]"
+                      :class="newTask.groupId === g.id ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent'"
+                      @click="newTask.groupId = g.id; groupPickerOpen = false"
+                    >
+                      <span class="w-[9px] h-[9px] rounded-full shrink-0" :style="{ background: g.color }"></span>
+                      <span class="flex-1 font-medium">{{ g.name }}</span>
+                      <svg v-if="newTask.groupId === g.id" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+
+                    <div
+                      v-if="!loadingGroups && taskGroups.length === 0"
+                      class="px-[9px] py-[7px] text-[12px] text-[var(--text-subtle)]"
+                    >
+                      No groups yet
+                    </div>
+                  </div>
+                </Transition>
+              </div>
             </div>
 
             <button class="fp-submit" :disabled="!newTask.title.trim() || submittingTask" @click="addTask">
@@ -615,6 +695,51 @@
 
             <button class="fp-submit" :disabled="!newStatus.title.trim() || submittingStatus" @click="addStatus">
               {{ submittingStatus ? 'Creating...' : 'Create Column' }}
+            </button>
+          </template>
+
+          <!-- ── NEW GROUP FORM ── -->
+          <template v-if="activeTab === 'group'">
+            <div class="fp-section-title">Group details</div>
+
+            <div class="fp-field">
+              <label class="fp-label">Name <span style="color:#ef4444">*</span></label>
+              <input v-model="newGroup.name" class="fp-input" placeholder="e.g. Frontend, Backend, Research…" maxlength="40"/>
+            </div>
+
+            <div class="fp-field">
+              <label class="fp-label">Color</label>
+              <div class="flex flex-wrap gap-2 mt-1">
+                <button
+                  v-for="c in groupColorOptions" :key="c"
+                  class="kb-color-swatch"
+                  :style="{ background: c, outline: newGroup.color === c ? `2.5px solid ${c}` : 'none', outlineOffset: '2px', transform: newGroup.color === c ? 'scale(1.2)' : '' }"
+                  @click="newGroup.color = c"
+                />
+              </div>
+            </div>
+
+            <!-- Preview -->
+            <div class="fp-status-preview">
+              <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: newGroup.color }"/>
+              <span class="text-sm font-semibold" style="color:var(--text-primary)">
+                {{ newGroup.name || 'Group name' }}
+              </span>
+            </div>
+
+            <!-- Existing groups -->
+            <div class="fp-field" v-if="taskGroups.length">
+              <label class="fp-label" style="margin-bottom:6px">Existing groups</label>
+              <div class="flex flex-col gap-1">
+                <div v-for="g in taskGroups" :key="g.id" class="kb-status-item">
+                  <span class="w-2 h-2 rounded-full" :style="{ background: g.color }"/>
+                  <span class="text-[12px] font-medium flex-1" style="color:var(--text-primary)">{{ g.name }}</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="fp-submit" :disabled="!newGroup.name.trim() || submittingGroup" @click="addGroup">
+              {{ submittingGroup ? 'Creating...' : 'Create Group' }}
             </button>
           </template>
 
@@ -691,46 +816,54 @@
 
     <!-- ══ TASK TRASH DRAWER ══════════════════════════════════════════════ -->
     <Transition name="fade">
-      <div v-if="trashOpen" class="trash-overlay" @click.self="trashOpen = false">
-        <div class="trash-panel" @click.stop>
-          <div class="trash-head">
-            <div class="trash-mark">
+      <div v-if="trashOpen" class="fixed inset-0 z-[80] flex justify-end backdrop-blur-[7px]" style="background: radial-gradient(circle at 85% 15%, rgba(239,68,68,0.14), transparent 30%), rgba(15,23,42,0.38)" @click.self="trashOpen = false">
+        <div class="w-[min(430px,100%)] h-full flex flex-col border-l border-red-500/[0.18]" style="background: linear-gradient(180deg,rgba(239,68,68,0.08),transparent 180px),var(--bg-surface); box-shadow: -24px 0 70px rgba(15,23,42,0.28)" @click.stop>
+          <div class="flex items-center gap-3 px-[18px] pt-[18px] pb-[14px] border-b border-[var(--border-base)]">
+            <div class="w-[42px] h-[42px] grid place-items-center rounded-[15px] text-red-500 shrink-0" style="background:linear-gradient(135deg,rgba(239,68,68,0.16),rgba(249,115,22,0.1));box-shadow:inset 0 0 0 1px rgba(239,68,68,0.14)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </div>
             <div class="min-w-0">
-              <p class="trash-title">Task Trash</p>
-              <p class="trash-subtitle">Deleted tasks are hidden from the board and can be restored.</p>
+              <p class="text-[16px] font-black text-[var(--text-heading)]">Task Trash</p>
+              <p class="mt-0.5 text-[11px] leading-[1.35] text-[var(--text-subtle)]">Deleted tasks are hidden from the board and can be restored.</p>
             </div>
             <button class="fp-close ml-auto" @click="trashOpen = false" title="Close">
               <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
             </button>
           </div>
 
-          <div class="trash-body">
-            <div v-if="store.loadingTrash" class="trash-empty">
-              <span class="trash-empty-icon">⌛</span>
-              <p>Loading trash...</p>
+          <div class="flex-1 min-h-0 overflow-y-auto p-3.5">
+            <div v-if="store.loadingTrash" class="min-h-[280px] grid place-items-center text-[var(--text-subtle)]">
+              <span class="w-12 h-12 grid place-items-center rounded-[18px] bg-[var(--bg-surface-2)] text-[20px]">⌛</span>
+              <p class="text-sm font-black text-[var(--text-heading)] mt-2">Loading trash...</p>
             </div>
 
-            <div v-else-if="store.trashTasks.length === 0" class="trash-empty">
-              <span class="trash-empty-icon">✓</span>
-              <p>Trash is clean</p>
-              <span>No deleted tasks in this project.</span>
+            <div v-else-if="store.trashTasks.length === 0" class="min-h-[280px] grid place-items-center text-center text-[var(--text-subtle)]">
+              <span class="w-12 h-12 grid place-items-center rounded-[18px] bg-[var(--bg-surface-2)] text-emerald-500 text-[20px] font-black">✓</span>
+              <p class="text-sm font-black text-[var(--text-heading)] mt-2">Trash is clean</p>
+              <span class="text-xs">No deleted tasks in this project.</span>
             </div>
 
-            <div v-else class="trash-list">
-              <div v-for="task in store.trashTasks" :key="task.id" class="trash-card">
-                <div class="trash-card-top">
+            <div v-else class="flex flex-col gap-2.5">
+              <div v-for="task in store.trashTasks" :key="task.id" class="relative overflow-hidden p-3 border border-[var(--border-base)] rounded-2xl bg-[var(--bg-surface)] shadow-[0_10px_28px_rgba(15,23,42,0.08)]">
+                <div class="absolute inset-y-0 left-0 w-[3px] rounded-r bg-gradient-to-b from-red-500 to-orange-400"></div>
+                <div class="flex items-center justify-between gap-2 mb-2">
                   <span v-if="task.label" class="kb-card-label" :style="{ background: task.labelBg, color: task.labelColor }">{{ task.label }}</span>
-                  <span v-else class="trash-code">T-{{ task.id.slice(-5) }}</span>
-                  <span class="trash-priority" :class="`trash-priority--${task.priority}`">{{ priorityBadge[task.priority].label }}</span>
+                  <span v-else class="text-[10px] font-extrabold text-[var(--text-subtle)]">T-{{ task.id.slice(-5) }}</span>
+                  <span
+                    class="px-[7px] py-0.5 rounded-full text-[9px] font-black uppercase"
+                    :class="{
+                      'text-red-500 bg-red-500/10': task.priority === 'urgent' || task.priority === 'high',
+                      'text-amber-500 bg-amber-500/10': task.priority === 'medium',
+                      'text-emerald-500 bg-emerald-500/10': task.priority === 'low'
+                    }"
+                  >{{ priorityBadge[task.priority].label }}</span>
                 </div>
-                <p class="trash-card-title">{{ task.title }}</p>
-                <p v-if="task.description && !task.description.startsWith('<')" class="trash-card-desc">{{ task.description }}</p>
-                <div class="trash-card-foot">
+                <p class="mt-2 text-[13px] font-black text-[var(--text-heading)]">{{ task.title }}</p>
+                <p v-if="task.description && !task.description.startsWith('<')" class="mt-1 line-clamp-2 text-[11px] leading-[1.45] text-[var(--text-muted)]">{{ task.description }}</p>
+                <div class="flex items-center justify-between gap-2 mt-3 text-[10px] text-[var(--text-subtle)]">
                   <span>{{ task.due ? `Due ${formatDate(task.due)}` : 'No due date' }}</span>
                   <button
-                    class="trash-restore"
+                    class="h-7 px-2.5 border-0 rounded-[10px] bg-gradient-to-br from-emerald-500 to-cyan-500 text-white text-[11px] font-black cursor-pointer shadow-[0_8px_18px_rgba(16,185,129,0.2)] disabled:opacity-60 disabled:cursor-not-allowed"
                     :disabled="restoringTaskId === task.id"
                     @click="restoreTrashTask(task.id)"
                   >
@@ -750,6 +883,8 @@
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
+import { listProjectSprints, type SprintSummary } from '@/api/sprints'
+import { listProjectGroups, createProjectGroup, type TaskGroup } from '@/api/tasks'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
 import type { Column, Task } from '@/stores/task.store'
@@ -769,7 +904,7 @@ const router = useRouter()
 
 // ── Sidebar / panel ────────────────────────────────────────────────────────────────────
 const sidebarOpen = ref(false)
-const activeTab = ref<'task' | 'status'>('task')
+const activeTab = ref<'task' | 'status' | 'group'>('task')
 
 // ── Column context menu ───────────────────────────────────────────────────────────────
 const openColMenuId = ref<string | null>(null)
@@ -941,11 +1076,13 @@ onMounted(() => {
   document.addEventListener('click', onDocClick)
   document.addEventListener('click', onFpLabelDocClick)
   document.addEventListener('click', onDocColMenuClick)
+  document.addEventListener('click', onGroupPickerDocClick)
 })
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('click', onFpLabelDocClick)
   document.removeEventListener('click', onDocColMenuClick)
+  document.removeEventListener('click', onGroupPickerDocClick)
 })
 
 
@@ -1065,7 +1202,82 @@ const newTask = ref({
   due: '',
   sprint: '',
   assigneeIds: [] as string[],
+  groupId: '',
 })
+
+// ── Group picker ──────────────────────────────────────────────────
+const remoteSprints = ref<SprintSummary[]>([])
+
+function formatSprintDates(start: string, end: string): string {
+  if (!start && !end) return ''
+  const fmt = (date: string) => {
+    if (!date) return ''
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  if (start && end) return `${fmt(start)} - ${fmt(end)}`
+  if (start) return `From ${fmt(start)}`
+  return `Until ${fmt(end)}`
+}
+
+const sprintOptions = computed(() => [
+  { id: '', name: 'Backlog', dates: 'No sprint' },
+  ...remoteSprints.value.map((sprint) => ({
+    id: sprint.id,
+    name: sprint.name,
+    dates: formatSprintDates(sprint.startDate ?? '', sprint.endDate ?? ''),
+  })),
+])
+
+async function loadTaskSprints(projectId: string | null) {
+  if (!projectId) {
+    remoteSprints.value = []
+    newTask.value.sprint = ''
+    return
+  }
+
+  remoteSprints.value = await listProjectSprints(projectId)
+  if (newTask.value.sprint && !remoteSprints.value.some((sprint) => sprint.id === newTask.value.sprint)) {
+    newTask.value.sprint = ''
+  }
+}
+
+const groupPickerOpen = ref(false)
+const groupPickerRef = ref<HTMLElement | null>(null)
+const taskGroups = ref<TaskGroup[]>([])
+const loadingGroups = ref(false)
+
+async function loadTaskGroups(projectId: string | null) {
+  if (!projectId) {
+    taskGroups.value = []
+    return
+  }
+
+  loadingGroups.value = true
+  try {
+    taskGroups.value = await listProjectGroups(projectId)
+  } catch (error) {
+    console.error('Failed to load groups:', error)
+    taskGroups.value = []
+    toast.error('Failed to load task groups')
+  } finally {
+    loadingGroups.value = false
+  }
+}
+
+// Fetch groups when project changes
+watch(
+  currentProjectId,
+  async (projectId) => {
+    await loadTaskGroups(projectId)
+  },
+  { immediate: true }
+)
+
+function onGroupPickerDocClick(e: MouseEvent) {
+  if (groupPickerRef.value && !groupPickerRef.value.contains(e.target as Node))
+    groupPickerOpen.value = false
+}
 
 // ── Label picker (same pattern as TaskDetailModal) ───────────────────────────
 const customLabels = ref<Record<string, { bg: string; color: string }>>({})
@@ -1174,7 +1386,9 @@ async function addTask() {
       labelBg: newTask.value.label ? resolvedLabelBg(newTask.value.label) : undefined,
       labelColor: newTask.value.label ? resolvedLabelColor(newTask.value.label) : undefined,
       dueDate: newTask.value.due || undefined,
+      sprintId: newTask.value.sprint || undefined,
       assigneeIds: newTask.value.assigneeIds,
+      groupId: newTask.value.groupId || undefined,
     })
 
     newTask.value = {
@@ -1186,6 +1400,7 @@ async function addTask() {
       due: '',
       sprint: '',
       assigneeIds: [],
+      groupId: '',
     }
     sidebarOpen.value = false
     toast.success('Task created successfully')
@@ -1314,6 +1529,7 @@ async function addStatus() {
       projectId: currentProjectId.value,
       title: newStatus.value.title.trim(),
       color: newStatus.value.color,
+      icon: newStatus.value.iconId,
     })
 
     newStatus.value = { title: '', color: '#6366f1', iconId: 'list' }
@@ -1326,6 +1542,39 @@ async function addStatus() {
     toast.error('Cannot create status')
   } finally {
     submittingStatus.value = false
+  }
+}
+
+// ── New Group form ──────────────────────────────────────────────────────────────
+const groupColorOptions = [
+  '#6366f1', '#8b5cf6', '#0ea5e9', '#10b981',
+  '#f59e0b', '#ef4444', '#ec4899', '#64748b',
+]
+const newGroup = ref({ name: '', color: '#6366f1' })
+const submittingGroup = ref(false)
+
+async function addGroup() {
+  if (!newGroup.value.name.trim()) return
+  if (!currentProjectId.value) {
+    toast.error('Please select a project first')
+    return
+  }
+
+  submittingGroup.value = true
+  try {
+    const created = await createProjectGroup(currentProjectId.value, {
+      name: newGroup.value.name.trim(),
+      color: newGroup.value.color,
+    })
+    taskGroups.value = created?.id ? [...taskGroups.value, created] : taskGroups.value
+    await loadTaskGroups(currentProjectId.value)
+    newGroup.value = { name: '', color: '#6366f1' }
+    activeTab.value = 'task'
+    toast.success('Group created successfully')
+  } catch (_error) {
+    toast.error('Cannot create group')
+  } finally {
+    submittingGroup.value = false
   }
 }
 
@@ -1355,13 +1604,18 @@ function taskFileCount(taskId: string) {
 async function syncProjectTasks(projectId: string | null) {
   if (!projectId) {
     store.resetProjectBoard()
+    remoteSprints.value = []
     newTask.value.status = defaultStatusId.value
+    newTask.value.sprint = ''
     return
   }
 
   try {
-    await store.loadProjectBoard(projectId)
-    await store.loadProjectTrash(projectId)
+    await Promise.all([
+      store.loadProjectBoard(projectId),
+      store.loadProjectTrash(projectId),
+      loadTaskSprints(projectId),
+    ])
 
     if (!store.columns.some((col) => col.id === newTask.value.status)) {
       newTask.value.status = defaultStatusId.value
@@ -1385,357 +1639,13 @@ watch(
 .fade-enter-active, .fade-leave-active { transition: opacity 0.18s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
-/* ── Assignee search picker ──────────────────────────────────────────── */
-.fp-assignee-search-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-surface-2);
-  border: 1.5px solid var(--btn-border);
-  border-radius: 8px;
-  padding: 0 8px;
-  height: 34px;
-  margin-top: 4px;
-  transition: border-color 0.15s;
-}
-.fp-assignee-search-wrap:focus-within {
-  border-color: #6366f1;
-}
-.fp-assignee-search {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  font-size: 12px;
-  color: var(--text-primary);
-}
-.fp-assignee-search::placeholder { color: var(--text-subtle); }
+/* Group picker dropdown animation */
+.fp-group-drop-enter-active { animation: fpGrpIn 0.16s ease; }
+.fp-group-drop-leave-active { animation: fpGrpOut 0.12s ease forwards; }
+@keyframes fpGrpIn  { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes fpGrpOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-4px) scale(0.97); } }
 
-.fp-assignee-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 6px;
-}
-.fp-assignee-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 6px 2px 4px;
-  border-radius: 20px;
-  border: 1.5px solid;
-  font-size: 11px;
-  font-weight: 600;
-}
-.fp-chip-avatar {
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-}
-.fp-chip-remove {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-  color: inherit;
-}
-.fp-chip-remove:hover { opacity: 1; }
-
-.fp-assignee-dropdown {
-  margin-top: 4px;
-  background: var(--bg-surface);
-  border: 1.5px solid var(--btn-border);
-  border-radius: 8px;
-  overflow: hidden;
-  max-height: 170px;
-  overflow-y: auto;
-}
-.fp-assignee-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 10px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
-}
-.fp-assignee-option:hover { background: var(--bg-surface-2); }
-.fp-assignee-option--on { background: rgba(99,102,241,0.06); }
-.fp-assignee-option-name {
-  font-size: 12px;
-  color: var(--text-primary);
-  flex: 1;
-}
-.fp-assignee-empty {
-  padding: 10px;
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-subtle);
-}
-
-/* ── Trash system ───────────────────────────────────────────────────── */
-.trash-trigger {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1.5px solid var(--btn-border);
-  border-radius: 10px;
-  background: var(--btn-bg);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, transform 0.14s ease;
-  flex-shrink: 0;
-}
-.trash-trigger:hover {
-  color: var(--text-primary);
-  background: var(--bg-surface-2);
-  border-color: var(--border-subtle, var(--btn-border));
-  transform: translateY(-1px);
-}
-.trash-trigger--active {
-  color: var(--text-primary);
-  background: var(--bg-surface-2);
-  border-color: rgba(99,102,241,0.4);
-}
-.trash-count {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 15px;
-  height: 15px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #6366f1;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-  border: 1.5px solid var(--bg-app);
-  pointer-events: none;
-}
-.trash-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  justify-content: flex-end;
-  background:
-    radial-gradient(circle at 85% 15%, rgba(239, 68, 68, 0.14), transparent 30%),
-    rgba(15, 23, 42, 0.38);
-  backdrop-filter: blur(7px);
-}
-.trash-panel {
-  width: min(430px, 100%);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid rgba(239, 68, 68, 0.18);
-  background:
-    linear-gradient(180deg, rgba(239, 68, 68, 0.08), transparent 180px),
-    var(--bg-surface);
-  box-shadow: -24px 0 70px rgba(15, 23, 42, 0.28);
-}
-.trash-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid var(--border-base);
-}
-.trash-mark {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 15px;
-  color: #ef4444;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.16), rgba(249, 115, 22, 0.1));
-  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.14);
-}
-.trash-title {
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--text-heading);
-}
-.trash-subtitle {
-  margin-top: 2px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--text-subtle);
-}
-.trash-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 14px;
-}
-.trash-empty {
-  min-height: 280px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 6px;
-  text-align: center;
-  color: var(--text-subtle);
-}
-.trash-empty p {
-  font-size: 14px;
-  font-weight: 900;
-  color: var(--text-heading);
-}
-.trash-empty span:not(.trash-empty-icon) {
-  font-size: 12px;
-}
-.trash-empty-icon {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 18px;
-  background: var(--bg-surface-2);
-  color: #10b981;
-  font-size: 20px;
-  font-weight: 900;
-}
-.trash-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.trash-card {
-  position: relative;
-  overflow: hidden;
-  padding: 12px;
-  border: 1px solid var(--border-base);
-  border-radius: 16px;
-  background: var(--bg-surface);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
-}
-.trash-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: linear-gradient(180deg, #ef4444, #f97316);
-}
-.trash-card-top,
-.trash-card-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.trash-code {
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--text-subtle);
-}
-.trash-priority {
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 900;
-  text-transform: uppercase;
-  background: var(--bg-surface-2);
-  color: var(--text-muted);
-}
-.trash-priority--urgent,
-.trash-priority--high {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
-}
-.trash-priority--medium {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.12);
-}
-.trash-priority--low {
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.12);
-}
-.trash-card-title {
-  margin-top: 9px;
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--text-heading);
-}
-.trash-card-desc {
-  margin-top: 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--text-muted);
-}
-.trash-card-foot {
-  margin-top: 12px;
-  font-size: 10px;
-  color: var(--text-subtle);
-}
-.trash-restore {
-  height: 28px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #10b981, #06b6d4);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 900;
-  cursor: pointer;
-  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.2);
-}
-.trash-restore:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* ── Inline label creator ────────────────────────────────────────────── */
-.fp-new-label-row {
-  margin-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-/* ── fp-label popover positioning ───────────────────────────────────── */
-.fp-label-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 180px;
-  z-index: 50;
-}
-
-/* ── Icon hint label ─────────────────────────────────────────────────── */
-.fp-label-hint {
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--text-subtle);
-  margin-left: 4px;
-}
-
-
-/* Drag states */
+/* Drag ghost / chosen states (require :deep to pierce vuedraggable) */
 :deep(.kb-col-ghost) {
   opacity: 0.4;
   border: 2px dashed #6366f1 !important;

@@ -2,7 +2,10 @@ export type TaskChartPeriod = 'daily' | 'weekly' | 'monthly';
 
 export type TaskChartTaskRow = {
   createdAt: Date;
-  statusId: string;
+  status: {
+    isDone: boolean;
+    name: string;
+  };
 };
 
 export type TaskChartBucket = {

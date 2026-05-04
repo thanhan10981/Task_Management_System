@@ -27,6 +27,7 @@ export class TasksRepository {
         id: true,
         projectId: true,
         sprintId: true,
+        groupId: true,
         parentTaskId: true,
         title: true,
         description: true,
@@ -45,6 +46,7 @@ export class TasksRepository {
         updatedAt: true,
         status: true,
         project: true,
+        group: true,
         assignees: {
           include: {
             user: true,
@@ -64,6 +66,7 @@ export class TasksRepository {
         id: true,
         projectId: true,
         statusId: true,
+        groupId: true,
         createdBy: true,
         title: true,
         description: true,
@@ -78,8 +81,29 @@ export class TasksRepository {
             name: true,
           },
         },
+        group: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
+  }
+
+  findGroupById(id: string) {
+    return this.prisma.taskGroup.findUnique({ where: { id } });
+  }
+
+  listProjectGroups(projectId: string) {
+    return this.prisma.taskGroup.findMany({
+      where: { projectId },
+      orderBy: { position: 'asc' },
+    });
+  }
+
+  createTaskGroup(data: Prisma.TaskGroupCreateInput) {
+    return this.prisma.taskGroup.create({ data });
   }
 
   createTask(data: Prisma.TaskCreateInput, tx?: TxClient) {
@@ -90,6 +114,7 @@ export class TasksRepository {
         createdByUser: true,
         status: true,
         project: true,
+        group: true,
       },
     });
   }
@@ -103,6 +128,7 @@ export class TasksRepository {
         createdByUser: true,
         status: true,
         project: true,
+        group: true,
         assignees: {
           include: {
             user: true,
@@ -135,6 +161,7 @@ export class TasksRepository {
         createdByUser: true,
         status: true,
         project: true,
+        group: true,
         assignees: {
           include: {
             user: true,
@@ -159,9 +186,29 @@ export class TasksRepository {
         createdByUser: true,
         status: true,
         project: true,
+        group: true,
         assignees: {
           include: {
             user: true,
+          },
+        },
+        _count: {
+          select: {
+            subtasks: {
+              where: { isDeleted: false },
+            },
+          },
+        },
+        subtasks: {
+          where: { isDeleted: false },
+          select: {
+            id: true,
+            status: {
+              select: {
+                isDone: true,
+                name: true,
+              },
+            },
           },
         },
       },

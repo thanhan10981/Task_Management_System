@@ -11,6 +11,7 @@ import {
 } from '../../../common/helpers/pagination.helper';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import {
+  CreateTaskGroupDto,
   CreateTaskDto,
   TaskQueryDto,
   UpdateTaskDto,
@@ -37,6 +38,13 @@ export class TaskService {
     const status = await this.tasksRepository.findStatusById(createTaskDto.statusId);
     if (!status || status.projectId !== createTaskDto.projectId) {
       throw new NotFoundException('Task status not found in project');
+    }
+
+    if (createTaskDto.groupId) {
+      const group = await this.tasksRepository.findGroupById(createTaskDto.groupId);
+      if (!group || group.projectId !== createTaskDto.projectId) {
+        throw new NotFoundException('Task group not found in project');
+      }
     }
 
     const assigneeIds = Array.from(
@@ -69,6 +77,12 @@ export class TaskService {
           tags: createTaskDto.tags as Prisma.InputJsonObject | undefined,
           project: { connect: { id: createTaskDto.projectId } },
           status: { connect: { id: createTaskDto.statusId } },
+          group: createTaskDto.groupId
+            ? { connect: { id: createTaskDto.groupId } }
+            : undefined,
+          sprint: createTaskDto.sprintId
+            ? { connect: { id: createTaskDto.sprintId } }
+            : undefined,
           parentTask: createTaskDto.parentTaskId
             ? { connect: { id: createTaskDto.parentTaskId } }
             : undefined,
@@ -77,7 +91,7 @@ export class TaskService {
             : null,
           dueDate: createTaskDto.dueDate ? new Date(createTaskDto.dueDate) : null,
           createdByUser: { connect: { id: userId } },
-        },
+        } as any,
         tx,
       );
 
@@ -149,6 +163,10 @@ export class TaskService {
       where.projectId = queryDto.projectId;
     }
 
+    if (queryDto.groupId) {
+      (where as any).groupId = queryDto.groupId;
+    }
+
     if (queryDto.status) {
       where.status = {
         name: queryDto.status,
@@ -199,6 +217,10 @@ export class TaskService {
       where.priority = queryDto.priority;
     }
 
+    if (queryDto.groupId) {
+      (where as any).groupId = queryDto.groupId;
+    }
+
     if (queryDto.search) {
       where.OR = [
         { title: { contains: queryDto.search, mode: 'insensitive' } },
@@ -244,6 +266,13 @@ export class TaskService {
       }
     }
 
+    if (taskPatch.groupId) {
+      const nextGroup = await this.tasksRepository.findGroupById(taskPatch.groupId);
+      if (!nextGroup || nextGroup.projectId !== existingTask.projectId) {
+        throw new NotFoundException('Task group not found in project');
+      }
+    }
+
     if (assigneeIds?.length) {
       await this.projectAccessService.ensureProjectAdminOrOwner(
         userId,
@@ -262,6 +291,8 @@ export class TaskService {
 
     const {
       statusId,
+      groupId,
+      sprintId,
       parentTaskId,
       dueDate,
       startDate,
@@ -269,12 +300,24 @@ export class TaskService {
       ...taskScalarPatch
     } = taskPatch;
 
-    const updateData: Prisma.TaskUpdateInput = {
+    const updateData = {
       ...taskScalarPatch,
       tags: tags === undefined ? undefined : (tags as Prisma.InputJsonObject | null),
       dueDate: dueDate ? new Date(dueDate) : undefined,
       startDate: startDate ? new Date(startDate) : undefined,
       status: statusId ? { connect: { id: statusId } } : undefined,
+      group:
+        groupId === undefined
+          ? undefined
+          : groupId
+            ? { connect: { id: groupId } }
+            : { disconnect: true },
+      sprint:
+        sprintId === undefined
+          ? undefined
+          : sprintId
+            ? { connect: { id: sprintId } }
+            : { disconnect: true },
       parentTask:
         parentTaskId === undefined
           ? undefined
@@ -282,10 +325,11 @@ export class TaskService {
             ? { connect: { id: parentTaskId } }
             : { disconnect: true },
       updatedByUser: { connect: { id: userId } },
-    };
+    } as any;
 
     const updatedTask = await this.tasksRepository.withTransaction(async (tx) => {
       const task = await this.tasksRepository.updateTask(id, updateData, tx);
+      const taskWithGroup = task as any;
       const updateChanges: Record<string, { old: unknown; new: unknown }> = {};
 
       if (
@@ -305,6 +349,17 @@ export class TaskService {
         updateChanges.priority = {
           old: existingTask.priority,
           new: task.priority,
+        };
+      }
+
+      if (taskPatch.groupId !== undefined && taskPatch.groupId !== existingTask.groupId) {
+        updateChanges.groupId = {
+          old: existingTask.group
+            ? { id: existingTask.group.id, name: existingTask.group.name }
+            : null,
+          new: taskWithGroup.group
+            ? { id: taskWithGroup.group.id, name: taskWithGroup.group.name }
+            : null,
         };
       }
 
@@ -479,6 +534,53 @@ export class TaskService {
     ]);
 
     return createPaginatedResponse(history, total, queryDto);
+  }
+
+  async listProjectGroups(userId: string, projectId: string) {
+    // Ensure user is a member of the project before listing groups
+    await this.projectAccessService.ensureProjectMember(userId, projectId);
+    
+    const groups = await this.tasksRepository.listProjectGroups(projectId);
+    
+    return groups.map(group => ({
+      id: group.id,
+      name: group.name,
+      color: group.color,
+      position: group.position,
+      projectId: group.projectId,
+    }));
+  }
+
+  async createProjectGroup(
+    userId: string,
+    projectId: string,
+    dto: CreateTaskGroupDto,
+  ) {
+    await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
+
+    const existingGroups = await this.tasksRepository.listProjectGroups(projectId);
+    const nextPosition =
+      Math.max(0, ...existingGroups.map((group) => group.position ?? 0)) + 1;
+
+    try {
+      return await this.tasksRepository.createTaskGroup({
+        project: { connect: { id: projectId } },
+        name: dto.name.trim(),
+        color: dto.color,
+        position: nextPosition,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Group name or position already exists in this project',
+        );
+      }
+
+      throw error;
+    }
   }
 
   private async recordHistoryAndActivity(

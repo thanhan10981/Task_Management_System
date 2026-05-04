@@ -120,7 +120,36 @@
       <div class="card rounded-xl border px-6 py-5 pb-3.5 max-[540px]:px-3 max-[540px]:py-4 max-[540px]:pb-3" style="background: var(--bg-surface) !important; border-color: var(--border-base) !important; box-shadow: var(--shadow-sm) !important;">
         <div class="flex items-center justify-between flex-wrap gap-2.5 mb-4">
           <h3 class="text-lg font-bold m-0" style="color: var(--text-heading);">Task Done</h3>
-          <div class="flex gap-1 rounded-[10px] p-1" style="background: var(--bg-surface-2);">
+          <div class="flex items-center gap-3 flex-wrap">
+            <!-- Month Picker: only visible on Daily / Weekly -->
+            <div
+              v-if="activeTab !== 'monthly'"
+              class="flex items-center gap-1 rounded-[10px] px-2 py-1.5 border select-none"
+              style="background: var(--bg-surface-2); border-color: var(--border-medium);"
+            >
+              <button
+                type="button"
+                class="w-6 h-6 flex items-center justify-center rounded-md border-none bg-transparent cursor-pointer transition-colors duration-150 hover:bg-white/10"
+                style="color: var(--text-secondary);"
+                :disabled="isAtMinMonth"
+                :style="isAtMinMonth ? 'opacity:0.35;cursor:not-allowed;' : ''"
+                @click="prevMonth"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span class="text-[0.8125rem] font-semibold min-w-[88px] text-center" style="color: var(--text-primary);">{{ monthPickerLabel }}</span>
+              <button
+                type="button"
+                class="w-6 h-6 flex items-center justify-center rounded-md border-none bg-transparent cursor-pointer transition-colors duration-150 hover:bg-white/10"
+                style="color: var(--text-secondary);"
+                :disabled="isAtMaxMonth"
+                :style="isAtMaxMonth ? 'opacity:0.35;cursor:not-allowed;' : ''"
+                @click="nextMonth"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+            <div class="flex gap-1 rounded-[10px] p-1" style="background: var(--bg-surface-2);">
             <button
               v-for="tab in chartTabs"
               :key="tab.value"
@@ -133,6 +162,7 @@
                 : `background: transparent; color: var(--text-subtle);`"
               @click="activeTab = tab.value"
             >{{ tab.label }}</button>
+            </div>
           </div>
         </div>
 
@@ -231,12 +261,19 @@
 
             <!-- Progress -->
             <div class="flex flex-col gap-1.5 min-w-[130px] max-[640px]:min-w-[100px] max-[640px]:flex-1 max-[480px]:min-w-0 max-[480px]:w-full">
-              <span class="text-xs font-semibold" style="color: var(--text-primary);">{{ getProgress(task.status) }}% complete</span>
+              <span class="text-xs font-semibold" style="color: var(--text-primary);">
+                {{ getProgress(task) }}% complete
+                <span
+                  v-if="task.subtaskCount > 0"
+                  class="font-normal ml-1"
+                  style="color: var(--text-subtle);"
+                >({{ task.doneSubtaskCount }}/{{ task.subtaskCount }})</span>
+              </span>
               <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--bg-surface-3);">
                 <div
                   class="h-full rounded-full transition-all duration-[600ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-                  :class="getProgressClass(task.status)"
-                  :style="{ width: getProgress(task.status) + '%' }"
+                  :class="getProgressClass(task)"
+                  :style="{ width: getProgress(task) + '%' }"
                 />
               </div>
             </div>
@@ -409,9 +446,51 @@ const chartTabs = [
 ] as const
 const activeTab = ref<TaskChartPeriod>('monthly')
 
+// ── Month Picker ──────────────────────────────────────────────────
+// Format: YYYY-MM. Only used for daily/weekly views.
+const now = new Date()
+const toMonthStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+const activeMonth = ref<string>(toMonthStr(now))
+
+// Allow navigating up to 24 months back, and up to current month
+const MIN_MONTH = toMonthStr(new Date(now.getFullYear() - 2, now.getMonth(), 1))
+const MAX_MONTH = toMonthStr(now)
+
+const monthPickerLabel = computed(() => {
+  const [year, mon] = activeMonth.value.split('-')
+  const d = new Date(Number(year), Number(mon) - 1, 1)
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(d)
+})
+
+const isAtMinMonth = computed(() => activeMonth.value <= MIN_MONTH)
+const isAtMaxMonth = computed(() => activeMonth.value >= MAX_MONTH)
+
+function prevMonth() {
+  const [year, mon] = activeMonth.value.split('-').map(Number)
+  const d = new Date(year, mon - 2, 1) // go back 1 month
+  activeMonth.value = toMonthStr(d)
+}
+
+function nextMonth() {
+  const [year, mon] = activeMonth.value.split('-').map(Number)
+  const d = new Date(year, mon, 1) // go forward 1 month
+  activeMonth.value = toMonthStr(d)
+}
+
+// Reset month picker when switching tabs
+watch(activeTab, () => {
+  activeMonth.value = toMonthStr(new Date())
+})
+
+const activeMonthForQuery = computed(() =>
+  activeTab.value !== 'monthly' ? activeMonth.value : undefined
+)
+
 const { data: taskChartResponse } = useTaskAnalyticsChartQuery(
   activeTab,
-  computed(() => Boolean(currentProjectId.value))
+  computed(() => Boolean(currentProjectId.value)),
+  currentProjectId,
+  activeMonthForQuery,
 )
 
 const chartDataFromApi = computed(() => taskChartResponse.value?.data)
@@ -589,32 +668,19 @@ function formatTime(dateStr: string) {
   }
 }
 
-function getProgress(status: string): number {
-  switch (status) {
-    case 'done':
-      return 100
-    case 'in_progress':
-      return 60
-    case 'todo':
-      return 24
-    case 'cancelled':
-      return 10
-    default:
-      return 0
+function getProgress(task: Task): number {
+  if (task.subtaskCount > 0) {
+    return Math.round((task.doneSubtaskCount / task.subtaskCount) * 100)
   }
+  return task.status === 'done' ? 100 : 0
 }
 
-function getProgressClass(status: string): string {
-  switch (status) {
-    case 'done':
-      return 'bg-gradient-to-r from-indigo-500 to-violet-500'
-    case 'in_progress':
-      return 'bg-gradient-to-r from-cyan-500 to-cyan-400'
-    case 'todo':
-      return 'bg-gradient-to-r from-amber-400 to-amber-300'
-    default:
-      return 'bg-slate-300'
-  }
+function getProgressClass(task: Task): string {
+  const pct = getProgress(task)
+  if (pct === 100) return 'bg-gradient-to-r from-indigo-500 to-violet-500'
+  if (pct >= 60)   return 'bg-gradient-to-r from-cyan-500 to-cyan-400'
+  if (pct >= 1)    return 'bg-gradient-to-r from-amber-400 to-amber-300'
+  return 'bg-slate-400/40'
 }
 
 function getStatusIconClass(status: string): string {

@@ -11,8 +11,8 @@ export const QUERY_KEYS = {
   },
   taskAnalytics: {
     all: ['task-analytics'] as const,
-    chart: (period: 'daily' | 'weekly' | 'monthly') =>
-      [...QUERY_KEYS.taskAnalytics.all, 'chart', period] as const,
+    chart: (period: 'daily' | 'weekly' | 'monthly', projectId?: string | null, month?: string) =>
+      [...QUERY_KEYS.taskAnalytics.all, 'chart', period, projectId ?? 'all', month ?? 'current'] as const,
   },
   files: {
     all: ['files'] as const,

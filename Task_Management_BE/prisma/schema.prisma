@@ -130,6 +130,7 @@ model Project {
   // Relations
   creator       User            @relation("createdBy", fields: [createdBy], references: [id], onDelete: Cascade)
   members       ProjectMember[]
+  taskGroups    TaskGroup[]
   tasks         Task[]
   taskStatuses  TaskStatus[]
   files         File[]
@@ -199,10 +200,32 @@ model TaskStatus {
   @@map("task_statuses")
 }
 
+model TaskGroup {
+  id          String   @id @default(uuid())
+  projectId   String
+  name        String   @db.VarChar(120)
+  description String?  @db.Text
+  color       String?   @db.VarChar(20)
+  position    Int
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@unique([projectId, name])
+  @@unique([projectId, position])
+  @@index([projectId])
+  @@map("task_groups")
+}
+
 model Task {
   id           String       @id @default(uuid())
   projectId    String
   sprintId     String?
+  groupId      String?
   parentTaskId String?
   title        String       @db.VarChar(255)
   description  String?      @db.Text
@@ -223,6 +246,7 @@ model Task {
   // Relations
   project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sprint        Sprint?        @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  group         TaskGroup?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
   parentTask    Task?          @relation("parentSubtasks", fields: [parentTaskId], references: [id], onDelete: SetNull)
   subtasks      Task[]         @relation("parentSubtasks")
   status        TaskStatus     @relation(fields: [statusId], references: [id], onDelete: Restrict)
@@ -237,6 +261,7 @@ model Task {
   @@index([statusId])
   @@index([createdBy])
   @@index([projectId, sprintId])
+  @@index([groupId])
   @@index([sprintId, statusId])
   @@map("tasks")
 }

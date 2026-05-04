@@ -60,6 +60,7 @@ export interface ActivityLog {
 export interface Task {
   id: string
   parentTaskId?: string | null
+  groupId?: string | null
   title: string
   description: string
   tags?: unknown
@@ -95,9 +96,17 @@ type RawTaskStatus = {
   isDone?: boolean | null
 }
 
+type RawTaskGroup = {
+  id?: string
+  name?: string | null
+  color?: string | null
+}
+
 type RawTask = {
   id?: string
   projectId?: string | null
+  sprintId?: string | null
+  groupId?: string | null
   parentTaskId?: string | null
   title?: string | null
   description?: string | null
@@ -108,6 +117,7 @@ type RawTask = {
   createdAt?: string | null
   updatedAt?: string | null
   status?: RawTaskStatus | null
+  group?: RawTaskGroup | null
   assignees?: RawTaskAssignee[] | null
 }
 
@@ -155,6 +165,7 @@ type CreateProjectTaskPayload = {
   title: string
   description?: string
   statusId: string
+  sprintId?: string
   priority: Task['priority']
   label?: string
   labelBg?: string
@@ -162,12 +173,32 @@ type CreateProjectTaskPayload = {
   startDate?: string
   dueDate?: string
   assigneeIds?: string[]
+  groupId?: string
 }
 
 type CreateProjectStatusPayload = {
   projectId: string
   title: string
   color: string
+  icon?: string
+}
+
+// localStorage helpers for persisting icon choices (backend doesn't store icons)
+const STATUS_ICON_KEY = 'task_status_icons'
+function loadIconMap(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(STATUS_ICON_KEY) ?? '{}') } catch { return {} }
+}
+function saveIconMap(map: Record<string, string>) {
+  localStorage.setItem(STATUS_ICON_KEY, JSON.stringify(map))
+}
+function getStatusIcon(statusId: string, inferredIcon: string): string {
+  const map = loadIconMap()
+  return map[statusId] ?? inferredIcon
+}
+function setStatusIcon(statusId: string, iconId: string) {
+  const map = loadIconMap()
+  map[statusId] = iconId
+  saveIconMap(map)
 }
 
 const DEFAULT_COLUMNS: Column[] = [
@@ -322,6 +353,7 @@ export const useTaskStore = defineStore('tasks', () => {
     return {
       id: rawTask.id ?? '',
       parentTaskId: rawTask.parentTaskId ?? null,
+      groupId: rawTask.groupId ?? rawTask.group?.id ?? null,
       title: rawTask.title ?? '',
       description: rawTask.description ?? '',
       tags: rawTask.tags ?? null,
@@ -332,7 +364,7 @@ export const useTaskStore = defineStore('tasks', () => {
       labelColor: taskLabel.labelColor,
       start: rawTask.startDate ?? '',
       due: rawTask.dueDate ?? '',
-      sprint: '',
+      sprint: rawTask.sprintId ?? '',
       assignees,
       comments: 0,
       files: 0,
@@ -490,8 +522,12 @@ export const useTaskStore = defineStore('tasks', () => {
   function formatFieldChange(field: string, change?: HistoryChange) {
     if (!change) return ''
     const label = formatHistoryField(field)
-    const oldValue = formatHistoryValue(change.old, field)
-    const newValue = formatHistoryValue(change.new, field)
+    const oldValue = isGroupHistoryField(field)
+      ? formatGroupHistoryValue(change.old)
+      : formatHistoryValue(change.old, field)
+    const newValue = isGroupHistoryField(field)
+      ? formatGroupHistoryValue(change.new)
+      : formatHistoryValue(change.new, field)
 
     if (oldValue && newValue) return `${label} from ${oldValue} to ${newValue}`
     if (newValue) return `${label} to ${newValue}`
@@ -506,6 +542,8 @@ export const useTaskStore = defineStore('tasks', () => {
       priority: 'priority',
       status: 'status',
       statusId: 'status',
+      groupId: 'group',
+      group: 'group',
       startDate: 'start date',
       dueDate: 'due date',
       parentTaskId: 'parent task',
@@ -526,6 +564,24 @@ export const useTaskStore = defineStore('tasks', () => {
     if (value === null || value === undefined || value === '') return 'someone'
     const id = String(value)
     return getMember(id)?.name ?? shortId(id)
+  }
+
+  function isGroupHistoryField(field: string) {
+    return field === 'group' || field === 'groupId'
+  }
+
+  function formatGroupHistoryValue(value: unknown) {
+    if (value === null || value === undefined || value === '') return 'No group'
+
+    if (typeof value === 'object') {
+      const record = value as Record<string, unknown>
+      const name = record.name ?? record.title
+      if (name) return quoteIfNeeded(String(name))
+      if ('id' in record && record.id) return shortId(String(record.id))
+      return 'No group'
+    }
+
+    return shortId(String(value))
   }
 
   function formatHistoryValue(value: unknown, field = '') {
@@ -717,7 +773,7 @@ export const useTaskStore = defineStore('tasks', () => {
         ? rawStatuses.map((status) => ({
             id: status.id ?? '',
             title: status.name ?? 'Untitled',
-            icon: inferColumnIcon(status.name ?? '', Boolean(status.isDone)),
+            icon: getStatusIcon(status.id ?? '', inferColumnIcon(status.name ?? '', Boolean(status.isDone))),
             color: status.color?.trim() || '#94a3b8',
           }))
         : []
@@ -783,17 +839,22 @@ export const useTaskStore = defineStore('tasks', () => {
       description: payload.description || undefined,
       projectId: payload.projectId,
       statusId: payload.statusId,
+      sprintId: payload.sprintId || undefined,
       priority,
       tags: labelTags(payload.label ?? '', payload.labelBg, payload.labelColor) ?? undefined,
       startDate,
       dueDate,
       assigneeIds: payload.assigneeIds?.length ? payload.assigneeIds : undefined,
+      groupId: payload.groupId || undefined,
     })
 
     await loadProjectBoard(payload.projectId)
   }
 
   async function createStatusInProject(payload: CreateProjectStatusPayload) {
+    // Snapshot current columns to detect the newly created status after reload
+    const existingIds = new Set(columns.value.map((c) => c.id))
+
     await taskService.createProjectStatus(payload.projectId, {
       name: payload.title,
       color: payload.color,
@@ -802,6 +863,16 @@ export const useTaskStore = defineStore('tasks', () => {
     })
 
     await loadProjectBoard(payload.projectId)
+
+    // Persist the chosen icon for the newly created column
+    if (payload.icon) {
+      const newCol = columns.value.find((c) => !existingIds.has(c.id))
+      if (newCol) setStatusIcon(newCol.id, payload.icon)
+      // Re-apply so the column in memory shows the right icon immediately
+      columns.value = columns.value.map((c) =>
+        c.id === newCol?.id ? { ...c, icon: payload.icon! } : c
+      )
+    }
   }
 
   async function updateStatusPosition(projectId: string, statusId: string, position: number) {

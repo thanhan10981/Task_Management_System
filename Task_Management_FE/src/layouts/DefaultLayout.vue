@@ -45,7 +45,7 @@
         </div>
 
         <!-- Search -->
-        <div class="flex-1 max-w-[420px] mx-auto relative flex items-center">
+        <div ref="searchWrapRef" class="flex-1 max-w-[420px] mx-auto relative flex items-center">
           <svg
             class="absolute left-3 md:left-3.5 pointer-events-none flex-shrink-0 text-slate-400"
             width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -59,8 +59,80 @@
             style="border: 1.5px solid var(--search-border); background: var(--search-bg); color: var(--text-secondary);"
             type="text"
             placeholder="Search..."
+            @focus="openSearchMenu"
+            @keydown.escape="closeSearchMenu"
             @keyup.enter="handleSearch"
           >
+
+          <Transition name="dropdown-fade">
+            <div
+              v-if="shouldShowSearchMenu"
+              class="absolute top-[calc(100%+8px)] left-0 right-0 rounded-2xl border p-2 z-[300] max-h-[60vh] md:max-h-[360px] overflow-y-auto"
+              style="background: var(--dropdown-bg); border-color: var(--border-base); box-shadow: var(--shadow-lg);"
+              @click.stop
+            >
+              <div v-if="!hasCurrentProject" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                Select a project to search tasks.
+              </div>
+              <div v-else-if="searchDebouncing" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                Searching tasks...
+              </div>
+              <div v-else-if="searchLoading" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                Searching tasks...
+              </div>
+              <div v-else-if="searchError" class="px-2.5 py-3 text-[12px] text-red-500">
+                {{ searchError }}
+              </div>
+              <div v-else-if="searchResults.length === 0" class="px-2.5 py-3 text-[12px]" style="color: var(--text-subtle);">
+                No tasks found
+              </div>
+              <div v-else>
+                <button
+                  v-for="task in searchResults"
+                  :key="task.taskId"
+                  class="w-full text-left px-3 py-2 rounded-[10px] border-none cursor-pointer transition-colors"
+                  style="background: transparent;"
+                  @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--bg-active)'"
+                  @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
+                  @click="handleSearchResultClick(task)"
+                >
+                  <div class="flex items-start gap-2.5">
+                    <div class="min-w-0 flex-1">
+                      <p class="text-[12.5px] font-semibold m-0 truncate" style="color: var(--text-heading);">
+                        {{ task.title }}
+                      </p>
+                      <div class="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                        <span
+                          class="px-2 py-0.5 rounded-md font-semibold"
+                          style="background: var(--bg-surface-2); color: var(--text-muted);"
+                        >{{ formatSearchStatus(task.status) }}</span>
+                        <span
+                          class="px-2 py-0.5 rounded-md font-semibold"
+                          style="background: var(--bg-surface-2); color: var(--text-muted);"
+                        >{{ formatSearchPriority(task.priority) }}</span>
+                        <span
+                          v-if="task.dueDate"
+                          class="px-2 py-0.5 rounded-md font-semibold"
+                          style="background: var(--bg-surface-2); color: var(--text-muted);"
+                        >{{ formatSearchDueDate(task.dueDate) }}</span>
+                      </div>
+                    </div>
+                    <div v-if="task.assignees.length" class="flex items-center -space-x-2">
+                      <div
+                        v-for="assignee in task.assignees"
+                        :key="assignee.id"
+                        class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-white"
+                        style="background: #6366f1;"
+                        :title="assignee.name"
+                      >
+                        {{ assigneeInitials(assignee.name) }}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <!-- Right actions -->
@@ -389,6 +461,8 @@ import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
 import OctomLogo from '@/components/common/OctomLogo.vue'
 import { useAuthMeQuery } from '@/features/auth/composables/useAuthQueries'
+import { useTaskSearchQuery } from '@/features/tasks/composables/useTaskSearchQuery'
+import type { TaskSearchResult } from '@/features/tasks/types/task-search.types'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
 import {
   listNotifications,
@@ -406,8 +480,91 @@ const { projects, currentProjectId } = storeToRefs(projectStore)
 
 /* ── Search ─────────────────────────────────────────── */
 const searchQuery = ref('')
+const debouncedSearchQuery = ref('')
+const searchDebounceId = ref<number | null>(null)
+const searchMenuOpen = ref(false)
+const searchWrapRef = ref<HTMLElement | null>(null)
+
+const hasCurrentProject = computed(() => Boolean(currentProjectId.value))
+const searchParams = computed(() => {
+  const query = debouncedSearchQuery.value.trim()
+  if (!query || !currentProjectId.value) return null
+
+  return {
+    projectId: currentProjectId.value,
+    search: query,
+    limit: 10,
+  }
+})
+
+const taskSearchQuery = useTaskSearchQuery(searchParams, {
+  enabled: computed(() => Boolean(searchParams.value)),
+})
+
+const searchResults = computed(() => (searchParams.value ? taskSearchQuery.data.value ?? [] : []))
+const searchLoading = computed(() => Boolean(taskSearchQuery.isFetching.value))
+const searchError = computed(() => (taskSearchQuery.isError.value ? 'Failed to search tasks' : ''))
+const searchDebouncing = computed(() => {
+  const query = searchQuery.value.trim()
+  if (!query) return false
+  return query !== debouncedSearchQuery.value.trim()
+})
+const shouldShowSearchMenu = computed(() => {
+  if (!searchMenuOpen.value) return false
+  return Boolean(searchQuery.value.trim())
+})
+
 function handleSearch() {
-  // wire to global search later
+  if (!searchQuery.value.trim()) return
+  searchMenuOpen.value = true
+}
+
+function openSearchMenu() {
+  if (!searchQuery.value.trim()) return
+  searchMenuOpen.value = true
+}
+
+function closeSearchMenu() {
+  searchMenuOpen.value = false
+}
+
+function handleSearchResultClick(task: TaskSearchResult) {
+  searchMenuOpen.value = false
+  void router.push({
+    name: 'tasks',
+    query: {
+      ...route.query,
+      taskId: task.taskId,
+    },
+  })
+}
+
+function assigneeInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return 'U'
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+}
+
+function formatSearchStatus(status: string) {
+  const normalized = status.trim().replace(/[_-]+/g, ' ')
+  return normalized ? normalized.replace(/\b\w/g, (char) => char.toUpperCase()) : 'Unknown'
+}
+
+function formatSearchPriority(priority: string) {
+  const normalized = priority.trim().replace(/[_-]+/g, ' ')
+  return normalized ? normalized.replace(/\b\w/g, (char) => char.toUpperCase()) : 'Medium'
+}
+
+function formatSearchDueDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'No deadline'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
 }
 
 /* ── Notifications ──────────────────────────────────── */
@@ -552,6 +709,8 @@ function onClickOutside(e: MouseEvent) {
     projectMenuOpen.value = false
   if (notifWrapRef.value && !notifWrapRef.value.contains(e.target as Node))
     notifMenuOpen.value = false
+  if (searchWrapRef.value && !searchWrapRef.value.contains(e.target as Node))
+    searchMenuOpen.value = false
   if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node))
     memberDropdownOpen.value = false
 }
@@ -578,6 +737,33 @@ watch(
   (error) => { if (error) console.error('[DefaultLayout] Cannot hydrate current user', error) },
 )
 
+watch(
+  searchQuery,
+  (value) => {
+    if (searchDebounceId.value) window.clearTimeout(searchDebounceId.value)
+    const query = value.trim()
+    if (!query) {
+      debouncedSearchQuery.value = ''
+      searchMenuOpen.value = false
+      return
+    }
+
+    searchMenuOpen.value = true
+    searchDebounceId.value = window.setTimeout(() => {
+      debouncedSearchQuery.value = query
+    }, 500)
+  },
+)
+
+watch(
+  hasCurrentProject,
+  (value) => {
+    if (value) return
+    debouncedSearchQuery.value = ''
+    searchMenuOpen.value = false
+  },
+)
+
 onMounted(() => {
   document.addEventListener('click', onClickOutside)
   startNotifPolling()
@@ -585,6 +771,10 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', onClickOutside)
   stopNotifPolling()
+  if (searchDebounceId.value) {
+    window.clearTimeout(searchDebounceId.value)
+    searchDebounceId.value = null
+  }
 })
 
 /* ── Auth ──────────────────────────────────────────── */

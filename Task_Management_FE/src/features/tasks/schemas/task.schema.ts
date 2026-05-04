@@ -20,6 +20,10 @@ export const taskSchema = z.object({
   assigneeId: z.string().uuid().optional().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  /** Total number of non-deleted subtasks (0 when task has no children) */
+  subtaskCount: z.number().int().min(0).default(0),
+  /** Number of subtasks whose status has isDone = true */
+  doneSubtaskCount: z.number().int().min(0).default(0),
 })
 
 export type Task = z.infer<typeof taskSchema>

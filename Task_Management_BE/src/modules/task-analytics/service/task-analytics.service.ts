@@ -18,18 +18,18 @@ export class TaskAnalyticsService {
 
   async getTaskChart(userId: string, queryDto: TaskChartQueryDto): Promise<TaskChartResponse> {
     const period = queryDto.period ?? DEFAULT_TASK_CHART_PERIOD;
-    const now = new Date();
-    const buckets = this.buildChartBuckets(period, now);
+    const projectId = queryDto.projectId;
 
-    const [tasks, doneStatuses] = await Promise.all([
-      this.taskAnalyticsRepository.findTasksForChart(
-        userId,
-        buckets[0].start,
-        buckets[buckets.length - 1].end,
-      ),
-      this.taskAnalyticsRepository.findDoneStatusIdsForUserProjects(userId),
-    ]);
-    const doneStatusIdSet = new Set(doneStatuses.map((status) => status.id));
+    // Parse target date from `month` param (YYYY-MM) or fall back to now
+    const targetDate = this.parseTargetDate(queryDto.month);
+    const buckets = this.buildChartBuckets(period, targetDate);
+
+    const tasks = await this.taskAnalyticsRepository.findTasksForChart(
+      userId,
+      buckets[0].start,
+      buckets[buckets.length - 1].end,
+      projectId,
+    );
 
     const series: TaskChartSeriesItem[] = buckets.map((bucket) => ({
       key: bucket.key,
@@ -47,7 +47,7 @@ export class TaskAnalyticsService {
       }
 
       series[index].total += 1;
-      if (this.isTaskDone(task, doneStatusIdSet)) {
+      if (this.isTaskDone(task)) {
         series[index].completed += 1;
       }
     }
@@ -70,33 +70,55 @@ export class TaskAnalyticsService {
     };
   }
 
-  private buildChartBuckets(period: TaskChartPeriod, now: Date): TaskChartBucket[] {
+  private isTaskDone(task: TaskChartTaskRow): boolean {
+    if (task.status.isDone) {
+      return true;
+    }
+
+    return /done|complete/i.test(task.status.name);
+  }
+
+  /**
+   * Parse YYYY-MM string into a Date object (1st of that month).
+   * Falls back to `new Date()` when the string is missing or invalid.
+   */
+  private parseTargetDate(month?: string): Date {
+    if (!month) return new Date();
+    const [yearStr, monthStr] = month.split('-');
+    const year = parseInt(yearStr, 10);
+    const mon = parseInt(monthStr, 10) - 1; // 0-indexed
+    if (Number.isNaN(year) || Number.isNaN(mon)) return new Date();
+    return new Date(year, mon, 1);
+  }
+
+  private buildChartBuckets(period: TaskChartPeriod, targetDate: Date): TaskChartBucket[] {
     if (period === 'monthly') {
-      return this.buildCurrentYearBuckets(now);
+      // Monthly always shows 12 months of the target year
+      return this.buildYearBuckets(targetDate);
     }
 
     if (period === 'weekly') {
-      return this.buildCurrentMonthWeekBuckets(now);
+      return this.buildMonthWeekBuckets(targetDate);
     }
 
-    return this.buildCurrentMonthDailyBuckets(now);
+    return this.buildMonthDailyBuckets(targetDate);
   }
 
-  private buildCurrentMonthDailyBuckets(now: Date): TaskChartBucket[] {
+  private buildMonthDailyBuckets(date: Date): TaskChartBucket[] {
     const buckets: TaskChartBucket[] = [];
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    const year = date.getFullYear();
+    const month = date.getMonth();
     const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
 
     for (let day = 1; day <= lastDayOfMonth; day++) {
-      const date = new Date(year, month, day);
+      const d = new Date(year, month, day);
 
-      const start = this.startOfDay(date);
-      const end = this.endOfDay(date);
+      const start = this.startOfDay(d);
+      const end = this.endOfDay(d);
 
       buckets.push({
-        key: this.toDateKey(date),
-        label: this.formatDayOfMonthLabel(date),
+        key: this.toDateKey(d),
+        label: this.formatDayOfMonthLabel(d),
         start,
         end,
       });
@@ -105,10 +127,10 @@ export class TaskAnalyticsService {
     return buckets;
   }
 
-  private buildCurrentMonthWeekBuckets(now: Date): TaskChartBucket[] {
+  private buildMonthWeekBuckets(date: Date): TaskChartBucket[] {
     const buckets: TaskChartBucket[] = [];
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
+    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
 
     let cursor = this.startOfWeekMonday(monthStart);
     let weekIndex = 1;
@@ -134,18 +156,18 @@ export class TaskAnalyticsService {
     return buckets;
   }
 
-  private buildCurrentYearBuckets(now: Date): TaskChartBucket[] {
+  private buildYearBuckets(date: Date): TaskChartBucket[] {
     const buckets: TaskChartBucket[] = [];
-    const year = now.getFullYear();
+    const year = date.getFullYear();
 
     for (let month = 0; month < 12; month++) {
-      const date = new Date(year, month, 1);
-      const start = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
-      const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+      const d = new Date(year, month, 1);
+      const start = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 
       buckets.push({
-        key: this.toMonthKey(date),
-        label: this.formatMonthLabel(date),
+        key: this.toMonthKey(d),
+        label: this.formatMonthLabel(d),
         start,
         end,
       });
@@ -206,8 +228,5 @@ export class TaskAnalyticsService {
       month: 'short',
     }).format(date);
   }
-
-  private isTaskDone(task: TaskChartTaskRow, doneStatusIdSet: ReadonlySet<string>): boolean {
-    return doneStatusIdSet.has(task.statusId);
-  }
 }
+

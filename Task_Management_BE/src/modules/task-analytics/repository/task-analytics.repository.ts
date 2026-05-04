@@ -20,7 +20,12 @@ export class TaskAnalyticsRepository {
     };
   }
 
-  findTasksForChart(userId: string, startDate: Date, endDate: Date) {
+  findTasksForChart(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    projectId?: string,
+  ) {
     return this.prisma.task.findMany({
       where: {
         isDeleted: false,
@@ -28,23 +33,18 @@ export class TaskAnalyticsRepository {
           gte: startDate,
           lte: endDate,
         },
-        project: this.getProjectAccessWhere(userId),
+        project: projectId
+          ? { id: projectId, ...this.getProjectAccessWhere(userId) }
+          : this.getProjectAccessWhere(userId),
       },
       select: {
         createdAt: true,
-        statusId: true,
-      },
-    });
-  }
-
-  findDoneStatusIdsForUserProjects(userId: string) {
-    return this.prisma.taskStatus.findMany({
-      where: {
-        isDone: true,
-        project: this.getProjectAccessWhere(userId),
-      },
-      select: {
-        id: true,
+        status: {
+          select: {
+            isDone: true,
+            name: true,
+          },
+        },
       },
     });
   }

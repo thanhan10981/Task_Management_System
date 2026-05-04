@@ -192,6 +192,25 @@ export class TasksRepository {
             user: true,
           },
         },
+        _count: {
+          select: {
+            subtasks: {
+              where: { isDeleted: false },
+            },
+          },
+        },
+        subtasks: {
+          where: { isDeleted: false },
+          select: {
+            id: true,
+            status: {
+              select: {
+                isDone: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,

@@ -24,7 +24,7 @@ export class TaskAnalyticsController {
   @Get('chart')
   @ApiOperation({
     summary:
-      'Get task chart data for projects the current user created or joined',
+      'Get task chart data. Optionally filter by a specific project and/or month.',
   })
   @ApiQuery({
     name: 'period',
@@ -32,7 +32,21 @@ export class TaskAnalyticsController {
     enum: ['daily', 'weekly', 'monthly'],
     description: 'Chart filter period',
   })
+  @ApiQuery({
+    name: 'projectId',
+    required: false,
+    type: String,
+    description: 'Filter chart data to a specific project ID',
+  })
+  @ApiQuery({
+    name: 'month',
+    required: false,
+    type: String,
+    description: 'Target month in YYYY-MM format (used for daily/weekly views)',
+    example: '2026-04',
+  })
   @ApiResponse({
+    status: HttpStatus.OK,
     description: 'Task chart data retrieved successfully',
   })
   getTaskChart(@Request() req, @Query() queryDto: TaskChartQueryDto) {

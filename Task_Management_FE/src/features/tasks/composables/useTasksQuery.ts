@@ -78,6 +78,24 @@ function normalizePriority(priority: string): TaskPriority {
 }
 
 function normalizeTask(rawTask: z.infer<typeof rawTaskSchema>) {
+  // _count.subtasks = total non-deleted subtasks
+  const subtaskCount =
+    typeof rawTask['_count'] === 'object' &&
+    rawTask['_count'] !== null &&
+    typeof (rawTask['_count'] as Record<string, unknown>)['subtasks'] === 'number'
+      ? (rawTask['_count'] as Record<string, unknown>)['subtasks'] as number
+      : 0
+
+  // doneSubtaskCount: mirror the same logic as task.store.ts `replaceSubtasks`
+  // completed = isDone=true OR status name matches /done|complete/i
+  const doneSubtaskCount = Array.isArray(rawTask['subtasks'])
+    ? (rawTask['subtasks'] as Array<{ status?: { isDone?: boolean; name?: string } | null }>).filter(
+        (st) =>
+          Boolean(st.status?.isDone) ||
+          /done|complete/i.test(st.status?.name ?? '')
+      ).length
+    : 0
+
   return taskSchema.parse({
     id: rawTask.id,
     parentTaskId: rawTask.parentTaskId ?? null,
@@ -89,6 +107,8 @@ function normalizeTask(rawTask: z.infer<typeof rawTaskSchema>) {
     assigneeId: rawTask.assigneeId ?? null,
     createdAt: rawTask.createdAt,
     updatedAt: rawTask.updatedAt,
+    subtaskCount,
+    doneSubtaskCount,
   })
 }
 

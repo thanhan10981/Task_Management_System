@@ -66,6 +66,7 @@ export class TaskService {
           title: createTaskDto.title,
           description: createTaskDto.description,
           priority: createTaskDto.priority || 'MEDIUM',
+          tags: createTaskDto.tags as Prisma.InputJsonObject | undefined,
           project: { connect: { id: createTaskDto.projectId } },
           status: { connect: { id: createTaskDto.statusId } },
           parentTask: createTaskDto.parentTaskId
@@ -126,6 +127,7 @@ export class TaskService {
 
   async findAll(userId: string, queryDto: TaskQueryDto) {
     const { skip, take } = createPaginationOptions(queryDto);
+    const deletedOnly = queryDto.deleted === 'true';
 
     const where: Prisma.TaskWhereInput = {
       project: {
@@ -165,8 +167,8 @@ export class TaskService {
     }
 
     const [tasks, total] = await Promise.all([
-      this.tasksRepository.findTasks(where, skip, take),
-      this.tasksRepository.countTasks(where),
+      this.tasksRepository.findTasks(where, skip, take, { deletedOnly }),
+      this.tasksRepository.countTasks(where, { deletedOnly }),
     ]);
 
     return createPaginatedResponse(tasks, total, queryDto);
@@ -258,12 +260,27 @@ export class TaskService {
       );
     }
 
+    const {
+      statusId,
+      parentTaskId,
+      dueDate,
+      startDate,
+      tags,
+      ...taskScalarPatch
+    } = taskPatch;
+
     const updateData: Prisma.TaskUpdateInput = {
-      ...taskPatch,
-      dueDate: taskPatch.dueDate ? new Date(taskPatch.dueDate) : undefined,
-      startDate: taskPatch.startDate
-        ? new Date(taskPatch.startDate)
-        : undefined,
+      ...taskScalarPatch,
+      tags: tags === undefined ? undefined : (tags as Prisma.InputJsonObject | null),
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      startDate: startDate ? new Date(startDate) : undefined,
+      status: statusId ? { connect: { id: statusId } } : undefined,
+      parentTask:
+        parentTaskId === undefined
+          ? undefined
+          : parentTaskId
+            ? { connect: { id: parentTaskId } }
+            : { disconnect: true },
       updatedByUser: { connect: { id: userId } },
     };
 
@@ -278,16 +295,6 @@ export class TaskService {
         updateChanges.title = {
           old: existingTask.title,
           new: task.title,
-        };
-      }
-
-      if (
-        taskPatch.description !== undefined &&
-        taskPatch.description !== existingTask.description
-      ) {
-        updateChanges.description = {
-          old: existingTask.description,
-          new: task.description,
         };
       }
 
@@ -436,6 +443,28 @@ export class TaskService {
 
     this.logger.log(`Task ${id} soft deleted by user ${userId}`);
     return { success: true };
+  }
+
+  async restore(userId: string, id: string) {
+    const task = await this.tasksRepository.findTaskBasicById(id, true);
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const access = await this.projectAccessService.ensureProjectMember(
+      userId,
+      task.projectId,
+    );
+
+    if (!access.isOwner && access.role !== 'ADMIN' && task.createdBy !== userId) {
+      throw new ConflictException('Only owner/admin or task creator can restore task');
+    }
+
+    const restoredTask = await this.tasksRepository.restoreTask(id, userId);
+
+    this.logger.log(`Task ${id} restored by user ${userId}`);
+    return restoredTask;
   }
 
   async getHistory(userId: string, taskId: string, queryDto: TaskQueryDto) {

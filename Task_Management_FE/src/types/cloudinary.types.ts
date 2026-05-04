@@ -1,4 +1,5 @@
 export interface CloudinaryUploadResult {
+  id?: string | null
   publicId: string
   url: string
   secureUrl: string
@@ -43,6 +44,7 @@ export interface CloudinaryFileMetadata {
   /** Folder path as stored in DB / Cloudinary (e.g. "tasks/attachments") */
   folderPath?: string | null
   uploadedBy?: string | null
+  taskId?: string | null
   isSaved?: boolean
   canSaveToProject?: boolean
   projectId?: string | null

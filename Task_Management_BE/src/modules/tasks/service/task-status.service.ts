@@ -11,6 +11,44 @@ import {
 } from '../dto/task-status.dto';
 import { TasksRepository } from '../repository/tasks.repository';
 
+const DEFAULT_TASK_STATUSES = [
+  {
+    name: 'Backlog',
+    color: '#94a3b8',
+    position: 1,
+    isDefault: true,
+    isDone: false,
+  },
+  {
+    name: 'To Do',
+    color: '#6366f1',
+    position: 2,
+    isDefault: false,
+    isDone: false,
+  },
+  {
+    name: 'In Progress',
+    color: '#f59e0b',
+    position: 3,
+    isDefault: false,
+    isDone: false,
+  },
+  {
+    name: 'Review',
+    color: '#8b5cf6',
+    position: 4,
+    isDefault: false,
+    isDone: false,
+  },
+  {
+    name: 'Done',
+    color: '#10b981',
+    position: 5,
+    isDefault: false,
+    isDone: true,
+  },
+];
+
 @Injectable()
 export class TaskStatusService {
   constructor(
@@ -20,11 +58,35 @@ export class TaskStatusService {
 
   async listStatuses(userId: string, projectId: string) {
     await this.projectAccessService.ensureProjectMember(userId, projectId);
+    const statuses = await this.tasksRepository.listProjectStatuses(projectId);
+
+    if (statuses.length > 0) {
+      return statuses;
+    }
+
+    await this.tasksRepository.createManyTaskStatuses(
+      DEFAULT_TASK_STATUSES.map((status) => ({
+        projectId,
+        ...status,
+      })),
+    );
+
     return this.tasksRepository.listProjectStatuses(projectId);
   }
 
   async createStatus(userId: string, projectId: string, dto: CreateTaskStatusDto) {
     await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
+
+    const existingStatuses = await this.tasksRepository.listProjectStatuses(projectId);
+    const usedPositions = new Set(
+      existingStatuses.map((status) => status.position),
+    );
+    const nextPosition =
+      Math.max(0, ...existingStatuses.map((status) => status.position ?? 0)) + 1;
+    const position =
+      dto.position && !usedPositions.has(dto.position)
+        ? dto.position
+        : nextPosition;
 
     let createdStatus;
     try {
@@ -32,9 +94,9 @@ export class TaskStatusService {
         project: { connect: { id: projectId } },
         name: dto.name,
         color: dto.color,
-        position: dto.position,
-        isDefault: dto.isDefault || false,
-        isDone: dto.isDone || false,
+        position,
+        isDefault: dto.isDefault ?? existingStatuses.length === 0,
+        isDone: dto.isDone ?? false,
       });
     } catch (error) {
       if (

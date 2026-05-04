@@ -118,6 +118,17 @@ export class TasksController {
     return this.taskService.update(req.user.id, id, updateTaskDto);
   }
 
+  @Patch(':id/restore')
+  @ApiOperation({ summary: 'Restore deleted task by ID' })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Task ID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task restored successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Task not found' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })
+  restore(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.taskService.restore(req.user.id, id);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete task by ID' })
   @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Task ID' })

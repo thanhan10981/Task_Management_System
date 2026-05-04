@@ -1,9 +1,9 @@
 <template>
   <div class="flex min-h-screen" style="background: var(--bg-app); font-family: 'Inter', system-ui, sans-serif;">
 
-    <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
+    <!-- ══ SIDEBAR — hidden on mobile, visible md+ ════════════════════════ -->
     <aside
-      class="w-20 min-h-screen h-screen sticky top-0 z-50 flex flex-col items-center pt-4 pb-6 flex-shrink-0"
+      class="hidden md:flex w-20 min-h-screen h-screen sticky top-0 z-50 flex-col items-center pt-4 pb-6 flex-shrink-0"
       style="background: var(--sidebar-bg); border-right: 1px solid var(--sidebar-border); box-shadow: 2px 0 12px rgba(0,0,0,0.03);"
     >
       <!-- Logo -->
@@ -36,40 +36,45 @@
 
       <!-- ── TOP HEADER ─────────────────────────────────────── -->
       <header
-        class="h-16 flex items-center px-7 gap-5 sticky top-0 z-40"
+        class="h-12 md:h-16 flex items-center px-3 md:px-7 gap-2 md:gap-5 sticky top-0 z-40"
         style="background: var(--header-bg); border-bottom: 1px solid var(--header-border); box-shadow: var(--shadow-sm);"
       >
+        <!-- Mobile: logo -->
+        <div class="flex md:hidden items-center mr-1 shrink-0">
+          <OctomLogo size="sm" orientation="col" />
+        </div>
+
         <!-- Search -->
         <div class="flex-1 max-w-[420px] mx-auto relative flex items-center">
           <svg
-            class="absolute left-3.5 pointer-events-none flex-shrink-0 text-slate-400"
-            width="16" height="16" viewBox="0 0 24 24" fill="none"
+            class="absolute left-3 md:left-3.5 pointer-events-none flex-shrink-0 text-slate-400"
+            width="15" height="15" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
           >
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
             v-model="searchQuery"
-            class="search-input w-full h-[38px] rounded-xl pl-10 pr-3.5 text-[13px] outline-none font-[inherit] transition-all duration-200"
+            class="search-input w-full h-[34px] md:h-[38px] rounded-xl pl-9 md:pl-10 pr-3 text-[13px] outline-none font-[inherit] transition-all duration-200"
             style="border: 1.5px solid var(--search-border); background: var(--search-bg); color: var(--text-secondary);"
             type="text"
-            placeholder="Search anything..."
+            placeholder="Search..."
             @keyup.enter="handleSearch"
           >
         </div>
 
         <!-- Right actions -->
-        <div class="flex items-center gap-2.5 flex-shrink-0">
+        <div class="flex items-center gap-1.5 md:gap-2.5 flex-shrink-0">
 
           <!-- Project selector -->
           <div ref="projectMenuWrapRef" class="relative">
             <button
-              class="h-10 inline-flex items-center gap-2 rounded-xl px-3 text-[13px] font-semibold cursor-pointer max-w-[220px] transition-all duration-200"
+              class="h-8 md:h-10 inline-flex items-center gap-1 md:gap-2 rounded-xl px-2 md:px-3 text-[11px] md:text-[13px] font-semibold cursor-pointer max-w-[110px] md:max-w-[220px] transition-all duration-200"
               style="border: 1.5px solid var(--btn-border); background: var(--btn-bg); color: var(--text-secondary);"
               @click.stop="toggleProjectMenu"
             >
-              <span class="overflow-hidden text-ellipsis whitespace-nowrap max-w-[170px]">{{ currentProjectName }}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ currentProjectName }}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="flex-shrink-0">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
@@ -111,7 +116,7 @@
 
           <!-- Notification bell -->
           <button
-            class="notif-btn relative w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer text-indigo-500 flex-shrink-0 transition-all duration-200"
+            class="notif-btn relative w-8 h-8 md:w-10 md:h-10 rounded-xl flex items-center justify-center cursor-pointer text-indigo-500 flex-shrink-0 transition-all duration-200"
             style="border: 1.5px solid var(--btn-border); background: var(--btn-bg);"
             title="Notifications"
             @click="toggleNotif"
@@ -183,12 +188,30 @@
 
       <!-- ── PAGE CONTENT ─────────────────────────────────────── -->
       <main
-        class="flex-1 flex flex-col overflow-hidden"
-        :class="isBoardRoute ? 'p-0' : 'p-6 px-7 pb-8 max-md:p-5 max-md:px-4.5 max-sm:p-4 max-sm:px-3.5'"
+        class="flex-1 flex flex-col overflow-hidden pb-14 md:pb-0"
+        :class="isBoardRoute ? 'p-0' : 'p-4 md:p-6 md:px-7 md:pb-8'"
       >
         <RouterView />
       </main>
     </div>
+
+    <!-- ══ BOTTOM NAV — mobile only ═══════════════════════════════════════ -->
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-50 flex items-center justify-around
+                h-14 border-t"
+         style="background:var(--sidebar-bg); border-color:var(--sidebar-border); box-shadow:0 -2px 12px rgba(0,0,0,0.08);">
+      <RouterLink
+        v-for="item in navItems"
+        :key="item.name"
+        :to="navTarget(item)"
+        class="bottom-nav-item flex flex-col items-center justify-center gap-0.5 flex-1 h-full
+               text-[10px] font-semibold cursor-pointer no-underline transition-all duration-150"
+        :class="isActive(item) ? 'bottom-nav-item--active' : ''"
+        active-class=""
+      >
+        <span class="nav-icon flex items-center justify-center" v-html="item.icon" />
+        <span>{{ item.label }}</span>
+      </RouterLink>
+    </nav>
 
     <!-- ══ CREATE PROJECT MODAL ═══════════════════════════════ -->
     <Teleport to="body">
@@ -634,5 +657,15 @@ const navItems = [
   border-color: #a5b4fc !important;
   background: var(--bg-active) !important;
   transform: translateY(-1px);
+}
+
+/* 9. Bottom nav — mobile only */
+.bottom-nav-item { color: var(--text-subtle); }
+.bottom-nav-item :deep(svg) { width: 20px; height: 20px; }
+.bottom-nav-item--active {
+  color: #6366f1;
+}
+.bottom-nav-item--active :deep(svg) {
+  stroke: #6366f1;
 }
 </style>

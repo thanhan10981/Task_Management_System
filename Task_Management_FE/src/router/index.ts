@@ -34,7 +34,10 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'tasks/:id',
         name: 'task-detail',
-        component: () => import('@/features/tasks/views/TaskDetailView.vue'),
+        redirect: (to) => ({
+          name: 'tasks',
+          query: { ...to.query, taskId: String(to.params.id) },
+        }),
         meta: { title: 'Task Detail', requiresProject: true },
       },
       {

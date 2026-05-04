@@ -23,7 +23,26 @@ export class TasksRepository {
         id,
         ...(includeDeleted ? {} : { isDeleted: false }),
       },
-      include: {
+      select: {
+        id: true,
+        projectId: true,
+        sprintId: true,
+        parentTaskId: true,
+        title: true,
+        description: true,
+        statusId: true,
+        priority: true,
+        progress: true,
+        startDate: true,
+        dueDate: true,
+        tags: true,
+        checklist: true,
+        coverFileId: true,
+        isDeleted: true,
+        createdBy: true,
+        updatedBy: true,
+        createdAt: true,
+        updatedAt: true,
         status: true,
         project: true,
         assignees: {
@@ -49,6 +68,7 @@ export class TasksRepository {
         title: true,
         description: true,
         priority: true,
+        tags: true,
         startDate: true,
         dueDate: true,
         parentTaskId: true,
@@ -103,16 +123,47 @@ export class TasksRepository {
     });
   }
 
-  findTasks(where: Prisma.TaskWhereInput, skip: number, take: number) {
+  restoreTask(id: string, updatedBy: string, tx?: TxClient) {
+    const client = tx ?? this.prisma;
+    return client.task.update({
+      where: { id },
+      data: {
+        isDeleted: false,
+        updatedBy,
+      },
+      include: {
+        createdByUser: true,
+        status: true,
+        project: true,
+        assignees: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+  }
+
+  findTasks(
+    where: Prisma.TaskWhereInput,
+    skip: number,
+    take: number,
+    options: { deletedOnly?: boolean } = {},
+  ) {
     return this.prisma.task.findMany({
       where: {
-        isDeleted: false,
+        isDeleted: options.deletedOnly ? true : false,
         ...where,
       },
       include: {
         createdByUser: true,
         status: true,
         project: true,
+        assignees: {
+          include: {
+            user: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -120,10 +171,13 @@ export class TasksRepository {
     });
   }
 
-  countTasks(where: Prisma.TaskWhereInput) {
+  countTasks(
+    where: Prisma.TaskWhereInput,
+    options: { deletedOnly?: boolean } = {},
+  ) {
     return this.prisma.task.count({
       where: {
-        isDeleted: false,
+        isDeleted: options.deletedOnly ? true : false,
         ...where,
       },
     });
@@ -142,6 +196,13 @@ export class TasksRepository {
 
   createTaskStatus(data: Prisma.TaskStatusCreateInput) {
     return this.prisma.taskStatus.create({ data });
+  }
+
+  createManyTaskStatuses(data: Prisma.TaskStatusCreateManyInput[]) {
+    return this.prisma.taskStatus.createMany({
+      data,
+      skipDuplicates: true,
+    });
   }
 
   updateTaskStatus(id: string, data: Prisma.TaskStatusUpdateInput) {
@@ -269,13 +330,23 @@ export class TasksRepository {
     const safePosition = Math.max(1, Math.min(newPosition, filtered.length + 1));
     filtered.splice(safePosition - 1, 0, target);
 
+    const tempPositionOffset = statuses.length + 1000;
+
     await this.prisma.$transaction(
-      filtered.map((status, index) =>
-        this.prisma.taskStatus.update({
-          where: { id: status.id },
-          data: { position: index + 1 },
-        }),
-      ),
+      [
+        ...filtered.map((status, index) =>
+          this.prisma.taskStatus.update({
+            where: { id: status.id },
+            data: { position: tempPositionOffset + index + 1 },
+          }),
+        ),
+        ...filtered.map((status, index) =>
+          this.prisma.taskStatus.update({
+            where: { id: status.id },
+            data: { position: index + 1 },
+          }),
+        ),
+      ],
     );
 
     return this.listProjectStatuses(projectId);

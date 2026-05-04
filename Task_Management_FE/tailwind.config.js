@@ -38,6 +38,9 @@ export default {
         sans: ['Inter', 'ui-sans-serif', 'system-ui'],
         mono: ['Fira Code', 'ui-monospace', 'SFMono-Regular'],
       },
+      screens: {
+        'xs': '480px',
+      },
     },
   },
   plugins: [],

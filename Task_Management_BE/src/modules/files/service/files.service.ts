@@ -256,15 +256,22 @@ export class FilesService {
     };
   }
 
-  async list(userId: string, projectId: string, folderPath?: string) {
+  async list(userId: string, projectId: string, folderPath?: string, taskId?: string) {
     await this.ensureProjectAccess(userId, projectId);
 
     const normalizedFolderPath = this.cloudinaryFileManagerService.normalizePath(folderPath);
+    if (taskId) {
+      const task = await this.ensureTaskAccess(userId, taskId);
+      if (task.projectId !== projectId) {
+        throw new BadRequestException('Task does not belong to the provided project');
+      }
+    }
 
     const files = await this.prisma.file.findMany({
       where: {
         projectId,
         isDeleted: false,
+        ...(taskId ? { taskId } : {}),
         ...(normalizedFolderPath
           ? {
               folderPath: {
@@ -285,6 +292,8 @@ export class FilesService {
         sizeBytes: true,
         createdAt: true,
         uploadedBy: true,
+        taskId: true,
+        folderPath: true,
       },
     });
 
@@ -303,6 +312,8 @@ export class FilesService {
         bytes: this.serializeSizeBytes(file.sizeBytes),
         createdAt: file.createdAt,
         uploadedBy: file.uploadedBy,
+        taskId: file.taskId,
+        folderPath: file.folderPath,
         isSaved: true,
         canSaveToProject: true,
       })),

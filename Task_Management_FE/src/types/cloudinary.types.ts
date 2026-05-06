@@ -10,6 +10,20 @@ export interface CloudinaryUploadResult {
   height?: number
   folder?: string
   originalFilename: string
+  uploadedBy?: string | null
+  uploader?: SharedMember | null
+}
+
+export interface SignedUploadParams {
+  uploadId: string
+  apiKey: string
+  cloudName: string
+  uploadUrl: string
+  uploadParams: Record<string, string | number | boolean>
+  resourceType: string
+  folder: string
+  expiresAt: number
+  expiresInSeconds: number
 }
 
 export interface SaveFileMetadataPayload {
@@ -44,6 +58,7 @@ export interface CloudinaryFileMetadata {
   /** Folder path as stored in DB / Cloudinary (e.g. "tasks/attachments") */
   folderPath?: string | null
   uploadedBy?: string | null
+  uploader?: SharedMember | null
   taskId?: string | null
   isSaved?: boolean
   canSaveToProject?: boolean

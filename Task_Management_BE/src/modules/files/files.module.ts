@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../common/prisma/prisma.module';
+import { RedisModule } from '../../config/redis/redis.module';
 import { FilesController } from './controller/files.controller';
 import { FilesRepository } from './repository/files.repository';
 
@@ -12,7 +13,7 @@ import { CloudinaryFileManagerService } from './service/cloudinary-file-manager.
 import { CloudinaryAccessHelper } from './utils/cloudinary-access.helper';
 
 @Module({
-  imports: [PrismaModule, ConfigModule],
+  imports: [PrismaModule, ConfigModule, RedisModule],
   controllers: [FilesController],
   providers: [
     FilesService,

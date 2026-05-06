@@ -466,11 +466,13 @@ import { useTaskSearchQuery } from '@/features/tasks/composables/useTaskSearchQu
 import type { TaskSearchResult } from '@/features/tasks/types/task-search.types'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
 import {
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
   type NotificationItem,
 } from '@/api/notifications'
+import {
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  useNotificationsQuery,
+} from '@/features/notifications/composables/useNotificationsQuery'
 import type { User } from '@/types/user.types'
 
 const router = useRouter()
@@ -578,42 +580,39 @@ function formatSearchDueDate(value: string) {
 /* ── Notifications ──────────────────────────────────── */
 const notifMenuOpen = ref(false)
 const notifWrapRef = ref<HTMLElement | null>(null)
-const notifications = ref<NotificationItem[]>([])
-const notificationsLoading = ref(false)
 const notificationsError = ref('')
-const notifPollId = ref<number | null>(null)
+const notificationListQuery = useNotificationsQuery(
+  { page: 1, limit: 20 },
+  {
+    enabled: computed(() => authStore.isAuthenticated),
+    refetchInterval: computed(() => (authStore.isAuthenticated ? 30000 : false)),
+  },
+)
+const markNotificationReadMutation = useMarkNotificationReadMutation()
+const markAllNotificationsReadMutation = useMarkAllNotificationsReadMutation()
+const notifications = computed<NotificationItem[]>(() => notificationListQuery.data.value ?? [])
+const notificationsLoading = computed(() => notificationListQuery.isFetching.value)
 
 const unreadCount = computed(() =>
   notifications.value.filter((note) => !note.isRead).length
 )
 
 async function loadNotifications() {
-  if (notificationsLoading.value) return
-  notificationsLoading.value = true
   notificationsError.value = ''
   try {
-    notifications.value = await listNotifications({ page: 1, limit: 20 })
+    await notificationListQuery.refetch()
   } catch {
     notificationsError.value = 'Failed to load notifications'
-  } finally {
-    notificationsLoading.value = false
   }
 }
 
 function startNotifPolling() {
   if (!authStore.isAuthenticated) return
-  if (notifPollId.value) return
   void loadNotifications()
-  notifPollId.value = window.setInterval(() => {
-    void loadNotifications()
-  }, 30000)
 }
 
 function stopNotifPolling() {
-  if (notifPollId.value) {
-    window.clearInterval(notifPollId.value)
-    notifPollId.value = null
-  }
+  notificationsError.value = ''
 }
 
 function toggleNotif() {
@@ -626,8 +625,7 @@ function toggleNotif() {
 async function handleNotificationClick(note: NotificationItem) {
   if (!note.isRead) {
     try {
-      await markNotificationRead(note.id)
-      note.isRead = true
+      await markNotificationReadMutation.mutateAsync(note.id)
     } catch {
       notificationsError.value = 'Failed to mark notification as read'
     }
@@ -637,11 +635,7 @@ async function handleNotificationClick(note: NotificationItem) {
 async function markAllRead() {
   if (unreadCount.value === 0) return
   try {
-    await markAllNotificationsRead()
-    notifications.value = notifications.value.map((note) => ({
-      ...note,
-      isRead: true,
-    }))
+    await markAllNotificationsReadMutation.mutateAsync()
   } catch {
     notificationsError.value = 'Failed to mark all as read'
   }
@@ -738,7 +732,6 @@ watch(
       startNotifPolling()
     } else {
       stopNotifPolling()
-      notifications.value = []
     }
   },
   { immediate: true },

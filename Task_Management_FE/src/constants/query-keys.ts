@@ -24,6 +24,14 @@ export const QUERY_KEYS = {
     access: (fileId: string, mode: 'preview' | 'download') =>
       [...QUERY_KEYS.files.all, 'access', fileId, mode] as const,
   },
+  notifications: {
+    all: ['notifications'] as const,
+    list: (params: Record<string, unknown>) => [...QUERY_KEYS.notifications.all, 'list', params] as const,
+  },
+  reminders: {
+    all: ['reminders'] as const,
+    sendTask: (taskId: string) => [...QUERY_KEYS.reminders.all, 'tasks', taskId, 'send'] as const,
+  },
   auth: {
     me: ['auth', 'me'] as const,
     login: ['auth', 'login'] as const,

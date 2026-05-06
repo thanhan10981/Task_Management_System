@@ -3,6 +3,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiCookieAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateCloudinaryFolderDto } from '../dto/create-cloudinary-folder.dto';
 import { CreateFileRecordDto } from '../dto/create-file-record.dto';
+import { CreateUploadSignatureDto } from '../dto/create-upload-signature.dto';
+import { FinalizeUploadDto } from '../dto/finalize-upload.dto';
 import { ProjectScopedFilesQueryDto } from '../dto/project-scoped-files-query.dto';
 import { UploadProjectFileDto } from '../dto/upload-project-file.dto';
 import { FilesService } from '../service/files.service';
@@ -43,6 +45,22 @@ export class FilesController {
   @ApiResponse({ status: HttpStatus.CREATED, description: 'File metadata saved successfully' })
   create(@Request() req, @Body() dto: CreateFileRecordDto) {
     return this.filesService.create(req.user.id, dto);
+  }
+
+  @Post('upload-signature')
+  @ApiOperation({ summary: 'Create signed Cloudinary upload params after validating project/task access' })
+  @ApiBody({ type: CreateUploadSignatureDto })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Signed upload params created successfully' })
+  createUploadSignature(@Request() req, @Body() dto: CreateUploadSignatureDto) {
+    return this.filesService.createUploadSignature(req.user.id, dto);
+  }
+
+  @Post('upload-finalize')
+  @ApiOperation({ summary: 'Verify a signed Cloudinary upload and save file metadata' })
+  @ApiBody({ type: FinalizeUploadDto })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Uploaded file verified and saved successfully' })
+  finalizeUpload(@Request() req, @Body() dto: FinalizeUploadDto) {
+    return this.filesService.finalizeUpload(req.user.id, dto);
   }
 
   @Post('upload')

@@ -1,6 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import {
-  deleteFileMetadata,
   getUploadedFileMetadata,
   normalizeFolderPath,
   type CloudinaryUploadResult,
@@ -8,6 +7,7 @@ import {
 import { QUERY_KEYS } from '@/constants/query-keys'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { CloudinaryFile, CloudinaryFolder } from '../types/files-view.types'
+import { useDeleteFileMutation } from './useFileMutations'
 
 interface UseFilesOptions {
   currentFolder: Ref<string>
@@ -24,6 +24,7 @@ interface UseFilesOptions {
 export function useFiles(options: UseFilesOptions) {
   const { currentFolder, currentProjectId, folders, loadFolders, toast, errorMessage } = options
   const queryClient = useQueryClient()
+  const deleteFileMutation = useDeleteFileMutation()
   const recentFiles = ref<CloudinaryFile[]>([])
   const allFiles = ref<CloudinaryFile[]>([])
   const deletingFile = ref<string | null>(null)
@@ -182,7 +183,7 @@ export function useFiles(options: UseFilesOptions) {
 
     deletingFile.value = fileId
     try {
-      await deleteFileMetadata(fileId)
+      await deleteFileMutation.mutateAsync(fileId)
       if (currentProjectId.value) {
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
       }
@@ -231,7 +232,8 @@ export function useFiles(options: UseFilesOptions) {
         bytes: result.bytes,
         secureUrl: result.secureUrl,
         createdAt: new Date().toISOString(),
-        uploadedBy: null,
+        uploadedBy: result.uploadedBy ?? null,
+        uploader: result.uploader ?? null,
         isSaved: false,
         canSaveToProject: true,
         projectId: currentProjectId.value,

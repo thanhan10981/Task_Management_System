@@ -1,5 +1,7 @@
+import { get } from '@/api/client'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
+import type { User } from '@/types/user.types'
 import type { LocationQueryRaw, RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
 
@@ -24,6 +26,20 @@ function resolveLegacyProjectRoute(name: string, to: { query?: LocationQueryRaw;
     params: { projectId },
     query: to.query,
     hash: to.hash,
+  }
+}
+
+async function restoreAuthFromCookie(authStore: ReturnType<typeof useAuthStore>) {
+  try {
+    const response = await get<{ data: User }>('/auth/me')
+    if (!response.data?.id) {
+      return false
+    }
+
+    authStore.setAuth(null, response.data)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -183,6 +199,11 @@ router.beforeEach(async (to) => {
   document.title = pageTitle ? `${pageTitle} | OCTOM` : 'OCTOM'
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    const restored = await restoreAuthFromCookie(authStore)
+    if (restored) {
+      return
+    }
+
     return {
       name: 'login',
       query: {

@@ -21,6 +21,11 @@ export interface EnvVariables {
   MAIL_PUBLIC_FROM_ADDRESS?: string;
   REMINDER_THRESHOLDS_MINUTES?: string;
   RESET_PASSWORD_CODE_EXPIRES_MINUTES?: number;
+  REDIS_HOST: string;
+  REDIS_PORT: number;
+  REDIS_PASSWORD?: string;
+  REDIS_DB: number;
+  MAIL_QUEUE_NAME: string;
 }
 
 function parseEmailAddress(value?: string): string | undefined {
@@ -69,6 +74,14 @@ function readNumber(config: RawConfig, key: string, fallback: number): number {
   }
 
   return value;
+}
+
+function readRequiredNumber(config: RawConfig, key: string): number {
+  if (config[key] == null || config[key] === '') {
+    throw new Error(`Environment variable ${key} is required`);
+  }
+
+  return readNumber(config, key, 0);
 }
 
 export function validate(config: RawConfig): EnvVariables {
@@ -122,6 +135,17 @@ export function validate(config: RawConfig): EnvVariables {
     }
   }
 
+  const redisHost = readString(config, 'REDIS_HOST');
+  const mailQueueName = readString(config, 'MAIL_QUEUE_NAME');
+
+  if (!redisHost) {
+    throw new Error('REDIS_HOST is required');
+  }
+
+  if (!mailQueueName) {
+    throw new Error('MAIL_QUEUE_NAME is required');
+  }
+
   return {
     NODE_ENV: nodeEnv as EnvVariables['NODE_ENV'],
     PORT: readNumber(config, 'PORT', 3001),
@@ -146,5 +170,10 @@ export function validate(config: RawConfig): EnvVariables {
     RESET_PASSWORD_CODE_EXPIRES_MINUTES: config.RESET_PASSWORD_CODE_EXPIRES_MINUTES
       ? readNumber(config, 'RESET_PASSWORD_CODE_EXPIRES_MINUTES', 15)
       : undefined,
+    REDIS_HOST: redisHost,
+    REDIS_PORT: readRequiredNumber(config, 'REDIS_PORT'),
+    REDIS_PASSWORD: readString(config, 'REDIS_PASSWORD') || undefined,
+    REDIS_DB: readRequiredNumber(config, 'REDIS_DB'),
+    MAIL_QUEUE_NAME: mailQueueName,
   };
 }

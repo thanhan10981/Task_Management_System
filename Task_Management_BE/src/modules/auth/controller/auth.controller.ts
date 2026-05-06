@@ -146,8 +146,6 @@ export class AuthController {
   @ApiCookieAuth('accessToken')
   @ApiResponse({ status: HttpStatus.OK, description: 'User profile retrieved successfully' })
   getProfile(@Request() req: any) {
-    return {
-      data: req.user,
-    };
+    return req.user;
   }
 }

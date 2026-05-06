@@ -673,7 +673,7 @@ const selectedMembers   = ref<User[]>([])
 const createProjectForm = reactive({ name: '', description: '' })
 
 const selectedMemberIds = computed(() => new Set(selectedMembers.value.map((m) => m.id)))
-const shouldHydrateCurrentUser = computed(() => Boolean(authStore.accessToken))
+const shouldHydrateCurrentUser = computed(() => authStore.isAuthenticated)
 const authMeQuery = useAuthMeQuery(shouldHydrateCurrentUser)
 const assignableUsersQuery = useUsersQuery(memberSearchQuery, {
   enabled: computed(() => createProjectModalOpen.value),

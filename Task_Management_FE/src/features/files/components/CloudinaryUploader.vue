@@ -17,7 +17,7 @@
           id="cloudinary-upload-input"
           type="file"
           multiple
-          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z"
           class="cu-hidden-input"
           @change="handleFileSelect"
         />
@@ -61,14 +61,11 @@
 </template>
 
 <script setup lang="ts">
-import {
-  normalizeFolderPath,
-  type CloudinaryUploadResult,
-  uploadProjectFileToBackend,
-} from '@/api/cloudinary'
+import { normalizeFolderPath, type CloudinaryUploadResult } from '@/api/cloudinary'
 import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
 import { reactive, ref } from 'vue'
+import { useSignedFileUploadMutation } from '../composables/useFileMutations'
 import type { UploadQueueItem } from '../types/files-view.types'
 
 const props = defineProps<{
@@ -83,6 +80,7 @@ const isDragging = ref(false)
 const uploadQueue = ref<UploadQueueItem[]>([])
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
+const signedFileUploadMutation = useSignedFileUploadMutation()
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
 
@@ -139,8 +137,13 @@ async function processFiles(files: File[]) {
     uploadQueue.value.unshift(queueItem)
 
     try {
-      const result = await uploadProjectFileToBackend(projectIdAtStart, file, {
+      const result = await signedFileUploadMutation.mutateAsync({
+        projectId: projectIdAtStart,
+        file,
         folderPath: normalizeFolderPath(props.folder) || undefined,
+        onProgress: (event) => {
+          queueItem.progress = Math.max(1, Math.min(event.percentage, 99))
+        },
       })
       queueItem.progress = 100
       queueItem.status = 'cloudinary-success'

@@ -177,9 +177,9 @@
                   <!-- Members -->
                   <td class="fv-td" style="border-color: var(--border-soft);" data-label="Members">
                     <div class="flex items-center py-0.5">
-                      <template v-if="file.shared_with && file.shared_with.length">
+                      <template v-if="fileMembers(file).length">
                         <div
-                          v-for="(member, idx) in file.shared_with.slice(0, 4)"
+                          v-for="(member, idx) in fileMembers(file).slice(0, 4)"
                           :key="member.id"
                           class="member-avatar w-7 h-7 rounded-full border-2 overflow-hidden flex items-center justify-center text-[9px] font-[800] text-white cursor-default transition-transform duration-150 relative flex-shrink-0 first:ml-0 -ml-2 max-[768px]:-ml-1.5"
                           :style="{ zIndex: 10 - idx, background: member.avatar ? 'transparent' : memberColor(member.id), borderColor: 'var(--bg-surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }"
@@ -189,12 +189,12 @@
                           <span v-else>{{ memberInitials(member.name) }}</span>
                         </div>
                         <div
-                          v-if="file.shared_with.length > 4"
+                          v-if="fileMembers(file).length > 4"
                           class="member-avatar w-7 h-7 rounded-full border-2 overflow-hidden flex items-center justify-center text-[9px] font-[800] cursor-default -ml-2 relative flex-shrink-0"
                           :style="{ zIndex: 6, borderColor: 'var(--bg-surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)', background: 'var(--bg-surface-3)', color: 'var(--text-secondary)' }"
-                          :title="`${file.shared_with.length - 4} more members`"
+                          :title="`${fileMembers(file).length - 4} more members`"
                         >
-                          +{{ file.shared_with.length - 4 }}
+                          +{{ fileMembers(file).length - 4 }}
                         </div>
                       </template>
                       <span v-else class="text-[13px]" style="color: var(--text-muted);">—</span>
@@ -391,7 +391,6 @@ import CloudinaryUploader from '../components/CloudinaryUploader.vue'
 import folderPlusIcon from '@/assets/icons/folder-plus.svg?url'
 import trashIcon from '@/assets/icons/trash.svg?url'
 import {
-  createCloudinaryFolder,
   normalizeFolderPath,
   type CloudinaryUploadResult,
 } from '@/api/cloudinary'
@@ -400,6 +399,7 @@ import { QUERY_KEYS } from '@/constants/query-keys'
 import { useProjectStore } from '@/stores/project.store'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useFiles } from '../composables/useFiles'
+import { useCreateCloudinaryFolderMutation } from '../composables/useFileMutations'
 import { useFolders } from '../composables/useFolders'
 import { useStorageRefined } from '../composables/useStorageRefined'
 import { storeToRefs } from 'pinia'
@@ -450,6 +450,7 @@ const toast = useToast()
 const router = useRouter()
 const route = useRoute()
 const queryClient = useQueryClient()
+const createCloudinaryFolderMutation = useCreateCloudinaryFolderMutation()
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
 const routeProjectId = computed(() =>
@@ -525,7 +526,10 @@ async function createFolder() {
   creatingFolder.value = true
   try {
     if (!effectiveProjectId.value) throw new Error('Missing current project. Please create a project first.')
-    await createCloudinaryFolder(effectiveProjectId.value, path)
+    await createCloudinaryFolderMutation.mutateAsync({
+      projectId: effectiveProjectId.value,
+      folderPath: path,
+    })
     await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
     showCreateFolder.value = false
     newFolderName.value = ''
@@ -616,6 +620,19 @@ async function confirmDelete() {
 }
 
 function displayFolderName(path: string) { return normalizeFolderPath(path).split('/').filter(Boolean).pop() ?? 'Root' }
+
+function fileMembers(file: CloudinaryFile) {
+  const membersById = new Map<string, NonNullable<CloudinaryFile['uploader']>>()
+  if (file.uploader) {
+    membersById.set(file.uploader.id, file.uploader)
+  }
+
+  for (const member of file.shared_with ?? []) {
+    membersById.set(member.id, member)
+  }
+
+  return [...membersById.values()]
+}
 
 function handleStorageEvent(event: StorageEvent) {
   if (event.key !== DOWNLOAD_EVENT_KEY || !event.newValue) return

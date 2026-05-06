@@ -648,10 +648,12 @@
 
 <script setup lang="ts">
 import {
-  deleteFileMetadata,
   getFilePreviewUrl,
-  uploadProjectFileToBackend,
 } from '@/api/cloudinary'
+import {
+  useDeleteFileMutation,
+  useSignedFileUploadMutation,
+} from '@/features/files/composables/useFileMutations'
 import { listProjectGroups, type TaskGroup } from '@/api/tasks'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
@@ -684,6 +686,8 @@ const store = useTaskStore()
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
 const { currentProject, currentProjectId } = storeToRefs(projectStore)
+const signedFileUploadMutation = useSignedFileUploadMutation()
+const deleteFileMutation = useDeleteFileMutation()
 
 // ── Task ref ──────────────────────────────────────────────────────────────────
 const task = computed(() => (props.taskId ? store.getTask(props.taskId) : null))
@@ -1059,7 +1063,9 @@ async function onFileUpload(e: Event) {
     const folderPath = buildTaskAttachmentFolderPath()
     const uploadedFiles = await Promise.all(
       Array.from(files).map(async (file) => {
-        const result = await uploadProjectFileToBackend(currentProjectId.value!, file, {
+        const result = await signedFileUploadMutation.mutateAsync({
+          projectId: currentProjectId.value!,
+          file,
           taskId: task.value!.id,
           folderPath,
         })
@@ -1104,7 +1110,7 @@ async function deleteAttachment(attachment: Attachment) {
   attachmentUploadError.value = ''
 
   try {
-    await deleteFileMetadata(fileId)
+    await deleteFileMutation.mutateAsync(fileId)
     if (previewAttachment.value?.id === attachment.id) {
       closeAttachmentPreview()
     }

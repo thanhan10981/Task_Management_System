@@ -336,9 +336,9 @@
 </template>
 
 <script setup lang="ts">
-import { post } from '@/api/client'
 import { useToast } from '@/composables/useToast'
 import { useTaskAnalyticsChartQuery } from '@/features/dashboard/composables/useTaskAnalyticsChartQuery'
+import { useSendTaskReminderMutation } from '@/features/reminders/composables/useReminderMutations'
 import type { TaskChartPeriod } from '@/features/dashboard/schemas/task-chart.schema'
 import { useTasksQuery } from '@/features/tasks/composables/useTasksQuery'
 import type { Task } from '@/features/tasks/schemas/task.schema'
@@ -372,6 +372,7 @@ Chart.register(
 const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
+const sendTaskReminderMutation = useSendTaskReminderMutation()
 
 const projectStore = useProjectStore()
 const {
@@ -849,13 +850,8 @@ async function setReminder(task: Task) {
   const thresholdMinutes = getReminderThreshold(task.id)
 
   try {
-    const response = await post<{
-      message: string
-      data?: {
-        sentCount?: number
-        skippedCount?: number
-      }
-    }>(`/reminders/tasks/${task.id}/send`, {
+    const response = await sendTaskReminderMutation.mutateAsync({
+      taskId: task.id,
       thresholdMinutes,
     })
 

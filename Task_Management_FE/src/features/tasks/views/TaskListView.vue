@@ -904,6 +904,7 @@ const router = useRouter()
 const routeProjectId = computed(() =>
   typeof route.params.projectId === 'string' ? route.params.projectId : null
 )
+const effectiveProjectId = computed(() => routeProjectId.value ?? currentProjectId.value)
 
 // ── Sidebar / panel ────────────────────────────────────────────────────────────────────
 const sidebarOpen = ref(false)
@@ -945,10 +946,10 @@ function cancelColEdit() {
 async function saveColEdit() {
   const id = editingColId.value
   const title = editingColTitle.value.trim()
-  if (!id || !title || !currentProjectId.value) { cancelColEdit(); return }
+  if (!id || !title || !effectiveProjectId.value) { cancelColEdit(); return }
   cancelColEdit()
   try {
-    await store.updateStatusInProject(currentProjectId.value, id, { title })
+    await store.updateStatusInProject(effectiveProjectId.value, id, { title })
     toast.success('Status updated')
   } catch {
     toast.error('Cannot update status')
@@ -977,7 +978,7 @@ function cancelColDelete() {
 
 async function confirmColDelete() {
   const col = deleteColTarget.value
-  if (!col || !currentProjectId.value) return
+  if (!col || !effectiveProjectId.value) return
   if (deleteColTaskCount.value > 0 && !deleteColMoveTarget.value) {
     toast.error('Please select a status to move tasks to')
     return
@@ -985,7 +986,7 @@ async function confirmColDelete() {
   deletingCol.value = true
   try {
     await store.deleteStatusInProject(
-      currentProjectId.value,
+      effectiveProjectId.value,
       col.id,
       deleteColMoveTarget.value || undefined
     )
@@ -1007,7 +1008,7 @@ const memberSearchInput = ref<HTMLInputElement | null>(null)
 const visibleAvatarCount = 4
 const addingMemberId = ref<string | null>(null)
 const assignableUsersQuery = useUsersQuery(memberSearch, {
-  enabled: computed(() => Boolean(memberPickerOpen.value && currentProjectId.value)),
+  enabled: computed(() => Boolean(memberPickerOpen.value && effectiveProjectId.value)),
 })
 
 const filteredPickerMembers = computed(() => {
@@ -1056,12 +1057,12 @@ async function openMemberPicker() {
 }
 
 async function addMemberFromPicker(user: User) {
-  if (!currentProjectId.value || addingMemberId.value) return
+  if (!effectiveProjectId.value || addingMemberId.value) return
 
   addingMemberId.value = user.id
 
   try {
-    await store.addMemberToProject(currentProjectId.value, user.id)
+    await store.addMemberToProject(effectiveProjectId.value, user.id)
     memberSearch.value = ''
     toast.success(`Added ${user.fullName || user.email} to this project`)
   } catch (_error) {
@@ -1131,21 +1132,21 @@ watch(modalOpen, (open) => {
 
 async function openTrash() {
   trashOpen.value = true
-  if (!currentProjectId.value) return
+  if (!effectiveProjectId.value) return
 
   try {
-    await store.loadProjectTrash(currentProjectId.value)
+    await store.loadProjectTrash(effectiveProjectId.value)
   } catch {
     toast.error('Cannot load trash')
   }
 }
 
 async function restoreTrashTask(taskId: string) {
-  if (!currentProjectId.value) return
+  if (!effectiveProjectId.value) return
   restoringTaskId.value = taskId
 
   try {
-    await store.restoreTaskRemote(taskId, currentProjectId.value)
+    await store.restoreTaskRemote(taskId, effectiveProjectId.value)
     toast.success('Task restored')
   } catch {
     toast.error('Cannot restore task')
@@ -1157,8 +1158,8 @@ async function restoreTrashTask(taskId: string) {
 async function onTaskDeleted() {
   selectedTaskId.value = null
   toast.success('Task moved to Trash')
-  if (currentProjectId.value) {
-    await store.loadProjectTrash(currentProjectId.value)
+  if (effectiveProjectId.value) {
+    await store.loadProjectTrash(effectiveProjectId.value)
   }
 }
 
@@ -1175,25 +1176,25 @@ function onTasksReorder(_colId: string, _newList: Task[]) {
 
 async function onColumnChange(evt: { moved?: { element: Column; newIndex: number } }) {
   const moved = evt.moved
-  if (!moved || !currentProjectId.value) return
+  if (!moved || !effectiveProjectId.value) return
 
   try {
-    await store.updateStatusPosition(currentProjectId.value, moved.element.id, moved.newIndex + 1)
+    await store.updateStatusPosition(effectiveProjectId.value, moved.element.id, moved.newIndex + 1)
   } catch (_error) {
     toast.error('Cannot update status order')
-    await syncProjectTasks(currentProjectId.value)
+    await syncProjectTasks(effectiveProjectId.value)
   }
 }
 
 async function onTaskChange(evt: { added?: { element: Task } }, toColId: string) {
   // Fires when a task is dropped into this column from another
-  if (!evt.added || !currentProjectId.value) return
+  if (!evt.added || !effectiveProjectId.value) return
 
   try {
-    await store.moveTaskToStatus(currentProjectId.value, evt.added.element.id, toColId)
+    await store.moveTaskToStatus(effectiveProjectId.value, evt.added.element.id, toColId)
   } catch (_error) {
     toast.error('Cannot update task status')
-    await syncProjectTasks(currentProjectId.value)
+    await syncProjectTasks(effectiveProjectId.value)
   }
 }
 
@@ -1278,9 +1279,9 @@ async function loadTaskGroups(projectId: string | null) {
   }
 }
 
-// Fetch groups when project changes
+// Fetch groups when project changes — dùng routeProjectId (URL) thay vì store
 watch(
-  currentProjectId,
+  routeProjectId,
   async (projectId) => {
     await loadTaskGroups(projectId)
   },
@@ -1376,7 +1377,7 @@ function toggleNewAssignee(id: string) {
 
 async function addTask() {
   if (!newTask.value.title.trim()) return
-  if (!currentProjectId.value) {
+  if (!effectiveProjectId.value) {
     toast.error('Please select a project first')
     return
   }
@@ -1390,7 +1391,7 @@ async function addTask() {
 
   try {
     await store.createTaskInProject({
-      projectId: currentProjectId.value,
+      projectId: effectiveProjectId.value!,
       title: newTask.value.title.trim(),
       description: newTask.value.description.trim(),
       statusId: newTask.value.status,
@@ -1530,7 +1531,7 @@ const newStatus = ref({ title: '', color: '#6366f1', iconId: 'list' })
 
 async function addStatus() {
   if (!newStatus.value.title.trim()) return
-  if (!currentProjectId.value) {
+  if (!effectiveProjectId.value) {
     toast.error('Please select a project first')
     return
   }
@@ -1539,7 +1540,7 @@ async function addStatus() {
 
   try {
     await store.createStatusInProject({
-      projectId: currentProjectId.value,
+      projectId: effectiveProjectId.value!,
       title: newStatus.value.title.trim(),
       color: newStatus.value.color,
       icon: newStatus.value.iconId,
@@ -1568,19 +1569,19 @@ const submittingGroup = ref(false)
 
 async function addGroup() {
   if (!newGroup.value.name.trim()) return
-  if (!currentProjectId.value) {
+  if (!effectiveProjectId.value) {
     toast.error('Please select a project first')
     return
   }
 
   submittingGroup.value = true
   try {
-    const created = await createProjectGroup(currentProjectId.value, {
+    const created = await createProjectGroup(effectiveProjectId.value!, {
       name: newGroup.value.name.trim(),
       color: newGroup.value.color,
     })
     taskGroups.value = created?.id ? [...taskGroups.value, created] : taskGroups.value
-    await loadTaskGroups(currentProjectId.value)
+    await loadTaskGroups(effectiveProjectId.value)
     newGroup.value = { name: '', color: '#6366f1' }
     activeTab.value = 'task'
     toast.success('Group created successfully')
@@ -1638,8 +1639,9 @@ async function syncProjectTasks(projectId: string | null) {
   }
 }
 
+// routeProjectId là nguồn chính: khi URL thay đổi (link mới, chọn project khác), load lại data
 watch(
-  currentProjectId,
+  routeProjectId,
   (projectId) => {
     void syncProjectTasks(projectId)
   },

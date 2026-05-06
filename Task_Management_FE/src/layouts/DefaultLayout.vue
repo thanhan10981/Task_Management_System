@@ -59,7 +59,7 @@
             style="border: 1.5px solid var(--search-border); background: var(--search-bg); color: var(--text-secondary);"
             type="text"
             placeholder="Search..."
-            :disabled="!routeProjectId"
+            :disabled="!effectiveProjectId"
             @focus="openSearchMenu"
             @keydown.escape="closeSearchMenu"
             @keyup.enter="handleSearch"
@@ -489,13 +489,15 @@ const searchWrapRef = ref<HTMLElement | null>(null)
 const routeProjectId = computed(() =>
   typeof route.params.projectId === 'string' ? route.params.projectId : null
 )
-const hasRouteProject = computed(() => Boolean(routeProjectId.value))
+// effectiveProjectId: URL ưu tiên, fallback store — dùng cho nav/search trên mọi trang
+const effectiveProjectId = computed(() => routeProjectId.value ?? currentProjectId.value)
+const hasRouteProject = computed(() => Boolean(effectiveProjectId.value))
 const searchParams = computed(() => {
   const query = debouncedSearchQuery.value.trim()
-  if (!query || !routeProjectId.value) return null
+  if (!query || !effectiveProjectId.value) return null
 
   return {
-    projectId: routeProjectId.value,
+    projectId: effectiveProjectId.value,
     search: query,
     limit: 10,
   }
@@ -519,12 +521,12 @@ const shouldShowSearchMenu = computed(() => {
 })
 
 function handleSearch() {
-  if (!routeProjectId.value || !searchQuery.value.trim()) return
+  if (!effectiveProjectId.value || !searchQuery.value.trim()) return
   searchMenuOpen.value = true
 }
 
 function openSearchMenu() {
-  if (!routeProjectId.value || !searchQuery.value.trim()) return
+  if (!effectiveProjectId.value || !searchQuery.value.trim()) return
   searchMenuOpen.value = true
 }
 
@@ -533,11 +535,11 @@ function closeSearchMenu() {
 }
 
 function handleSearchResultClick(task: TaskSearchResult) {
-  if (!routeProjectId.value) return
+  if (!effectiveProjectId.value) return
   searchMenuOpen.value = false
   void router.push({
     name: 'project-tasks',
-    params: { projectId: routeProjectId.value },
+    params: { projectId: effectiveProjectId.value },
     query: {
       ...route.query,
       taskId: task.taskId,
@@ -671,7 +673,7 @@ const selectedMembers   = ref<User[]>([])
 const createProjectForm = reactive({ name: '', description: '' })
 
 const selectedMemberIds = computed(() => new Set(selectedMembers.value.map((m) => m.id)))
-const shouldHydrateCurrentUser = computed(() => Boolean(authStore.accessToken) && !authStore.user)
+const shouldHydrateCurrentUser = computed(() => Boolean(authStore.accessToken))
 const authMeQuery = useAuthMeQuery(shouldHydrateCurrentUser)
 const assignableUsersQuery = useUsersQuery(memberSearchQuery, {
   enabled: computed(() => createProjectModalOpen.value),
@@ -693,7 +695,8 @@ const filteredAssignableUsers = computed(() => {
 })
 
 const currentProjectName = computed(() => {
-  const current = projects.value.find((p) => p.id === currentProjectId.value)
+  const id = routeProjectId.value ?? currentProjectId.value
+  const current = projects.value.find((p) => p.id === id)
   return current?.name ?? 'Select Project'
 })
 
@@ -723,7 +726,9 @@ function onClickOutside(e: MouseEvent) {
 
 watch(
   () => authMeQuery.data.value?.data,
-  (user) => { if (user) authStore.setAuth(authStore.accessToken, user) },
+  (user) => {
+    if (user) authStore.setAuth(authStore.accessToken, user)
+  },
   { immediate: true },
 )
 watch(
@@ -807,6 +812,7 @@ function handleLogout() {
 function selectProject(projectId: string) {
   projectMenuOpen.value = false
   projectStore.setCurrentProjectId(projectId, { persist: true })
+
   const routeName = typeof route.name === 'string' ? route.name : ''
   const projectRoutes = new Set([
     'project-tasks',
@@ -815,13 +821,15 @@ function selectProject(projectId: string) {
     'project-files',
     'project-task-detail',
   ])
-  const targetName = projectRoutes.has(routeName) ? routeName : 'project-tasks'
-  void router.push({
-    name: targetName,
-    params: { projectId },
-    query: route.query,
-    hash: route.hash,
-  })
+
+  if (projectRoutes.has(routeName)) {
+    void router.push({
+      name: routeName,
+      params: { projectId },
+      query: route.query,
+      hash: route.hash,
+    })
+  }
 }
 
 function goToCreateProject() {
@@ -868,7 +876,7 @@ async function submitCreateProject() {
     })
     if (created?.id) {
       closeCreateProjectModal()
-      if (route.name !== 'dashboard') await router.push({ name: 'dashboard' })
+      await router.push({ name: 'project-tasks', params: { projectId: created.id } })
     }
   } catch (error) {
     createProjectError.value = extractErrorMessage(error)
@@ -901,8 +909,8 @@ function isActive(item: { routeName: string }) {
 
 function navTarget(item: { routeName: string; requiresProject?: boolean }) {
   if (!item.requiresProject) return { name: item.routeName }
-  if (!routeProjectId.value) return { name: 'dashboard' }
-  return { name: item.routeName, params: { projectId: routeProjectId.value } }
+  if (!effectiveProjectId.value) return { name: 'dashboard' }
+  return { name: item.routeName, params: { projectId: effectiveProjectId.value } }
 }
 
 const navItems = [
@@ -945,7 +953,7 @@ const navItems = [
 </script>
 
 <style scoped>
-/* 1. Nav item: CSS-variable colors + hover + active gradient */
+
 .nav-item { color: var(--text-subtle); }
 .nav-item:hover {
   background: var(--nav-hover-bg);

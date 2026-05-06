@@ -791,6 +791,7 @@ import { useTaskStore } from '@/stores/task.store'
 import type { User } from '@/types/user.types'
 import { storeToRefs } from 'pinia'
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import draggable from 'vuedraggable'
 import TaskDetailModal from './TaskDetailModal.vue'
 
@@ -798,6 +799,11 @@ const store = useTaskStore()
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
 const toast = useToast()
+const route = useRoute()
+const routeProjectId = computed(() =>
+  typeof route.params.projectId === 'string' ? route.params.projectId : null
+)
+const effectiveProjectId = computed(() => routeProjectId.value ?? currentProjectId.value)
 
 /* ── Types ─────────────────────────────────────────────────────── */
 interface Member { initial: string; name: string; color: string }
@@ -859,8 +865,8 @@ function sprintSelectionKey(projectId: string) {
 }
 
 function saveSelectedSprint(id: string) {
-  if (!currentProjectId.value) return
-  localStorage.setItem(sprintSelectionKey(currentProjectId.value), id)
+  if (!effectiveProjectId.value) return
+  localStorage.setItem(sprintSelectionKey(effectiveProjectId.value), id)
 }
 
 function restoreSelectedSprint(projectId: string) {
@@ -875,7 +881,7 @@ const memberSearchInput = ref<HTMLInputElement | null>(null)
 const visibleAvatarCount = 4
 const addingMemberId = ref<string | null>(null)
 const assignableUsersQuery = useUsersQuery(memberSearch, {
-  enabled: computed(() => Boolean(memberPickerOpen.value && currentProjectId.value)),
+  enabled: computed(() => Boolean(memberPickerOpen.value && effectiveProjectId.value)),
 })
 
 const filteredPickerMembers = computed(() => {
@@ -917,11 +923,11 @@ async function openMemberPicker() {
 }
 
 async function addMemberFromPicker(user: User) {
-  if (!currentProjectId.value || addingMemberId.value) return
+  if (!effectiveProjectId.value || addingMemberId.value) return
 
   addingMemberId.value = user.id
   try {
-    await store.addMemberToProject(currentProjectId.value, user.id)
+    await store.addMemberToProject(effectiveProjectId.value, user.id)
     memberSearch.value = ''
     syncBoardFromStore()
     toast.success(`Added ${user.fullName || user.email} to this project`)
@@ -964,17 +970,17 @@ function formatSprintDates(start: string, end: string): string {
 }
 
 async function createSprint() {
-  if (!newSprint.value.name.trim() || !currentProjectId.value) return
+  if (!newSprint.value.name.trim() || !effectiveProjectId.value) return
 
   try {
     const created = await createProjectSprint({
-      projectId: currentProjectId.value,
+      projectId: effectiveProjectId.value,
       name: newSprint.value.name.trim(),
       startDate: newSprint.value.startDate ? new Date(newSprint.value.startDate).toISOString() : undefined,
       endDate: newSprint.value.endDate ? new Date(newSprint.value.endDate).toISOString() : undefined,
     })
 
-    await loadProjectSprints(currentProjectId.value)
+    await loadProjectSprints(effectiveProjectId.value)
     selectedSprintId.value = created.id
     saveSelectedSprint(created.id)
     tasksBySprintId.value[created.id] = []
@@ -1131,8 +1137,9 @@ async function syncProjectBoard(projectId: string | null) {
   syncBoardFromStore()
 }
 
+// routeProjectId là nguồn chính: khi URL thay đổi (link mới, chọn project khác), load lại data
 watch(
-  currentProjectId,
+  routeProjectId,
   async (projectId) => {
     try {
       await syncProjectBoard(projectId)
@@ -1148,13 +1155,6 @@ watch(
   () => syncBoardFromStore(),
   { deep: true }
 )
-
-/* ── Derived lists per column ───────────────────────────────────── */
-// vuedraggable mutates the array in place on drop,
-// so we use computed arrays that filter by status + search.
-// We hand these arrays directly to <draggable :list="...">
-// and let vuedraggable update them; we reconcile status
-// via the @change event.
 
 function columnList(colId: string): Task[] {
   const all = tasksBySprintId.value[selectedSprintId.value] ?? []
@@ -1386,14 +1386,14 @@ function onDragEnd()   { isDragging.value = false; draggingOverCol.value = null 
  * We update the task's status to match the target column.
  */
 async function onColChange(evt: any, colId: string) {
-  if (!evt.added || !currentProjectId.value) return
+  if (!evt.added || !effectiveProjectId.value) return
 
   try {
-    await store.moveTaskToStatus(currentProjectId.value, (evt.added.element as Task).id, colId)
+    await store.moveTaskToStatus(effectiveProjectId.value, (evt.added.element as Task).id, colId)
     syncBoardFromStore()
   } catch {
     toast.error('Cannot update task status')
-    await syncProjectBoard(currentProjectId.value)
+    await syncProjectBoard(effectiveProjectId.value)
   }
 }
 
@@ -1403,9 +1403,9 @@ function toggleCardMenu(id: string) {
   activeCardMenu.value = activeCardMenu.value === id ? null : id
 }
 async function moveTask(task: Task, status: string) {
-  if (!currentProjectId.value) return
+  if (!effectiveProjectId.value) return
   try {
-    await store.moveTaskToStatus(currentProjectId.value, task.id, status)
+    await store.moveTaskToStatus(effectiveProjectId.value, task.id, status)
     syncBoardFromStore()
   } catch {
     toast.error('Cannot update task status')
@@ -1414,8 +1414,8 @@ async function moveTask(task: Task, status: string) {
 }
 async function deleteTask(id: string) {
   try {
-    await store.deleteTaskRemote(id, currentProjectId.value)
-    if (currentProjectId.value) await syncProjectBoard(currentProjectId.value)
+    await store.deleteTaskRemote(id, effectiveProjectId.value)
+    if (effectiveProjectId.value) await syncProjectBoard(effectiveProjectId.value)
   } catch {
     toast.error('Cannot delete task')
   }
@@ -1429,7 +1429,7 @@ function openTask(task: Task) {
 async function onTaskDeleted() {
   selectedTaskId.value = null
   detailOpen.value = false
-  if (currentProjectId.value) await syncProjectBoard(currentProjectId.value)
+  if (effectiveProjectId.value) await syncProjectBoard(effectiveProjectId.value)
 }
 
 /* ── Add task modal ─────────────────────────────────────────────── */
@@ -1499,7 +1499,7 @@ function addTask(colId: string) {
 }
 
 async function submitNewTask() {
-  if (!newTask.value.name.trim() || !currentProjectId.value) return
+  if (!newTask.value.name.trim() || !effectiveProjectId.value) return
   if (!newTask.value.status) {
     toast.error('Please select a status for the task')
     return
@@ -1509,7 +1509,7 @@ async function submitNewTask() {
   try {
     const labelStyle = newTask.value.label ? store.labelPresets[newTask.value.label] : undefined
     await store.createTaskInProject({
-      projectId: currentProjectId.value,
+      projectId: effectiveProjectId.value,
       title: newTask.value.name.trim(),
       description: newTask.value.desc.trim(),
       statusId: newTask.value.status,
@@ -1523,7 +1523,7 @@ async function submitNewTask() {
       labelBg: labelStyle?.bg,
       labelColor: labelStyle?.color,
     })
-    await syncProjectBoard(currentProjectId.value)
+    await syncProjectBoard(effectiveProjectId.value)
     showAddModal.value = false
   } catch {
     toast.error('Cannot create task')
@@ -1585,11 +1585,11 @@ function cancelColEdit() {
 async function saveColEdit() {
   const id = editingColId.value
   const title = editingColTitle.value.trim()
-  if (!id || !title || !currentProjectId.value) { cancelColEdit(); return }
+  if (!id || !title || !effectiveProjectId.value) { cancelColEdit(); return }
   cancelColEdit()
   try {
-    await store.updateStatusInProject(currentProjectId.value, id, { title })
-    await syncProjectBoard(currentProjectId.value)
+    await store.updateStatusInProject(effectiveProjectId.value, id, { title })
+    await syncProjectBoard(effectiveProjectId.value)
     toast.success('Status updated')
   } catch {
     toast.error('Cannot update status')
@@ -1619,7 +1619,7 @@ function cancelColDelete() {
 
 async function confirmColDelete() {
   const col = deleteColTarget.value
-  if (!col || !currentProjectId.value) return
+  if (!col || !effectiveProjectId.value) return
   if (deleteColTaskCount.value > 0 && !deleteColMoveTarget.value) {
     toast.error('Please select a status to move tasks to')
     return
@@ -1627,11 +1627,11 @@ async function confirmColDelete() {
   deletingCol.value = true
   try {
     await store.deleteStatusInProject(
-      currentProjectId.value,
+      effectiveProjectId.value,
       col.id,
       deleteColMoveTarget.value || undefined
     )
-    await syncProjectBoard(currentProjectId.value)
+    await syncProjectBoard(effectiveProjectId.value)
     toast.success(`Status "${col.title}" deleted`)
     cancelColDelete()
   } catch {

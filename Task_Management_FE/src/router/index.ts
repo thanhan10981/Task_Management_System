@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
-import type { RouteRecordRaw } from 'vue-router'
+import type { LocationQueryRaw, RouteRecordRaw } from 'vue-router'
 import { createRouter, createWebHistory } from 'vue-router'
 
 const LAST_PROJECT_STORAGE_KEY = 'lastProjectId'
@@ -13,7 +13,7 @@ function getStoredProjectId() {
   )
 }
 
-function resolveLegacyProjectRoute(name: string, to: { query?: unknown; hash?: string } = {}) {
+function resolveLegacyProjectRoute(name: string, to: { query?: LocationQueryRaw; hash?: string } = {}) {
   const projectId = getStoredProjectId()
   if (!projectId) {
     return { name: 'dashboard' }
@@ -200,7 +200,17 @@ router.beforeEach(async (to) => {
     await projectStore.initializeAfterAuth()
 
     const projectId = typeof to.params.projectId === 'string' ? to.params.projectId : null
-    projectStore.setCurrentProjectId(projectId, { persist: Boolean(projectId) })
+
+    if (projectId) {
+      projectStore.setCurrentProjectId(projectId, { persist: true })
+    } else {
+      if (!projectStore.currentProjectId) {
+        const storedId = projectStore.getStoredLastProjectId()
+        if (storedId) {
+          projectStore.setCurrentProjectId(storedId)
+        }
+      }
+    }
 
     if (to.meta.requiresProject && !projectId) {
       return { name: 'dashboard', query: to.query, hash: to.hash }

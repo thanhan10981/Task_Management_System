@@ -386,7 +386,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import CloudinaryUploader from '../components/CloudinaryUploader.vue'
 import folderPlusIcon from '@/assets/icons/folder-plus.svg?url'
 import trashIcon from '@/assets/icons/trash.svg?url'
@@ -448,17 +448,22 @@ const pendingDeleteFileName = computed(() => {
 
 const toast = useToast()
 const router = useRouter()
+const route = useRoute()
 const queryClient = useQueryClient()
 const projectStore = useProjectStore()
 const { currentProjectId } = storeToRefs(projectStore)
+const routeProjectId = computed(() =>
+  typeof route.params.projectId === 'string' ? route.params.projectId : null
+)
+const effectiveProjectId = computed(() => routeProjectId.value ?? currentProjectId.value)
 
 function errorMessage(error: unknown, fallback: string) { return extractErrorMessage(error, fallback) }
 
 const { folders, folderRows, loadingFolders, loadFolders, expandAncestors, toggleFolderExpand, isExpanded, resetFoldersState } =
-  useFolders({ currentFolder, currentProjectId, toast, errorMessage })
+  useFolders({ currentFolder, currentProjectId: effectiveProjectId, toast, errorMessage })
 
 const { recentFiles, allFiles, loadingFiles, deletingFile, loadFiles, loadAllFiles, deleteFile, refreshAfterUpload, mergeOptimisticUploadedFiles, resetFilesState } =
-  useFiles({ currentFolder, currentProjectId, folders, loadFolders, toast, errorMessage })
+  useFiles({ currentFolder, currentProjectId: effectiveProjectId, folders, loadFolders, toast, errorMessage })
 
 const { usedStorage, storagePercent, totalStorage, storageItems, applyFolderCountsFromFiles } =
   useStorageRefined({ allFiles, folders })
@@ -481,7 +486,7 @@ async function loadAllData() {
 onMounted(async () => {
   window.addEventListener('storage', handleStorageEvent)
   window.addEventListener('click', handleGlobalClick)
-  if (!currentProjectId.value) return
+  if (!effectiveProjectId.value) return
   await loadAllData()
 })
 
@@ -490,11 +495,11 @@ onUnmounted(() => {
   window.removeEventListener('click', handleGlobalClick)
 })
 
-watch(currentProjectId, async () => {
+watch(routeProjectId, async () => {
   resetFoldersState(); resetFilesState()
   currentFolder.value = DEFAULT_FOLDER
   lastAppliedFilesRef.value = null
-  if (!currentProjectId.value) { applyFolderCountsFromFiles([]); return }
+  if (!effectiveProjectId.value) { applyFolderCountsFromFiles([]); return }
   await loadAllData()
 })
 
@@ -504,7 +509,7 @@ watch(() => allFiles.value, (nextFiles, prevFiles) => {
 }, { deep: false })
 
 async function refreshAll() {
-  if (currentProjectId.value) await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
+  if (effectiveProjectId.value) await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
   await loadAllData()
 }
 
@@ -519,8 +524,8 @@ async function createFolder() {
   if (!path) return
   creatingFolder.value = true
   try {
-    if (!currentProjectId.value) throw new Error('Missing current project. Please create a project first.')
-    await createCloudinaryFolder(currentProjectId.value, path)
+    if (!effectiveProjectId.value) throw new Error('Missing current project. Please create a project first.')
+    await createCloudinaryFolder(effectiveProjectId.value, path)
     await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all })
     showCreateFolder.value = false
     newFolderName.value = ''

@@ -20,7 +20,7 @@ export const taskReminderTemplate = ({
     'This is a friendly reminder that the following task is approaching its deadline:',
     `- Task: ${taskTitle}`,
     `- Project: ${projectName ?? 'N/A'}`,
-    `- Due date (Vietnam time): ${dueDateDisplay}`,
+    `- Due date: ${dueDateDisplay}`,
     `- Reminder threshold: ${thresholdMinutes} minutes`,
     '',
     'Please review and complete the task on time.',
@@ -34,7 +34,7 @@ export const taskReminderTemplate = ({
     <ul>
       <li><strong>Task:</strong> ${taskTitle}</li>
       <li><strong>Project:</strong> ${projectName ?? 'N/A'}</li>
-      <li><strong>Due date (Vietnam time):</strong> ${dueDateDisplay}</li>
+      <li><strong>Due date:</strong> ${dueDateDisplay}</li>
       <li><strong>Reminder threshold:</strong> ${thresholdMinutes} minutes</li>
     </ul>
     <p>Please review and complete the task on time.</p>

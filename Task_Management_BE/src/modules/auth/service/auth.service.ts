@@ -28,6 +28,8 @@ type JwtPayload = {
 
 const PASSWORD_RESET_TOKEN_PREFIX = 'auth:password-reset:token';
 const PASSWORD_RESET_USER_PREFIX = 'auth:password-reset:user';
+const PASSWORD_RESET_COOLDOWN_PREFIX = 'auth:password-reset:cooldown';
+const PASSWORD_RESET_EMAIL_COOLDOWN_SECONDS = 60;
 
 @Injectable()
 export class AuthService {
@@ -134,6 +136,11 @@ export class AuthService {
     });
 
     if (!user) {
+      return;
+    }
+
+    const canSendResetEmail = await this.reservePasswordResetEmailSlot(user.id);
+    if (!canSendResetEmail) {
       return;
     }
 
@@ -256,6 +263,22 @@ export class AuthService {
 
   private getPasswordResetUserKey(userId: string) {
     return `${PASSWORD_RESET_USER_PREFIX}:${userId}`;
+  }
+
+  private getPasswordResetCooldownKey(userId: string) {
+    return `${PASSWORD_RESET_COOLDOWN_PREFIX}:${userId}`;
+  }
+
+  private async reservePasswordResetEmailSlot(userId: string) {
+    const result = await this.redis.set(
+      this.getPasswordResetCooldownKey(userId),
+      '1',
+      'EX',
+      PASSWORD_RESET_EMAIL_COOLDOWN_SECONDS,
+      'NX',
+    );
+
+    return result === 'OK';
   }
 
   private async storePasswordResetToken(

@@ -54,6 +54,21 @@ export const useProjectStore = defineStore('project', () => {
         queryKey: QUERY_KEYS.projects.list(),
         queryFn: () => listUserProjects(),
       })
+
+      const storedProjectId = getStoredLastProjectId()
+      const currentIdExists = projects.value.some((project) => project.id === currentProjectId.value)
+      const storedIdExists = projects.value.some((project) => project.id === storedProjectId)
+
+      if (currentProjectId.value && currentIdExists) {
+        return
+      }
+
+      if (storedProjectId && storedIdExists) {
+        setCurrentProjectId(storedProjectId)
+        return
+      }
+
+      setCurrentProjectId(null, { clearStored: Boolean(storedProjectId || currentProjectId.value) })
     } finally {
       loadingProjects.value = false
       projectContextResolved.value = true

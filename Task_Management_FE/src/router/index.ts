@@ -18,7 +18,7 @@ function getStoredProjectId() {
 function resolveLegacyProjectRoute(name: string, to: { query?: LocationQueryRaw; hash?: string } = {}) {
   const projectId = getStoredProjectId()
   if (!projectId) {
-    return { name: 'dashboard' }
+    return { name: 'create-project' }
   }
 
   return {
@@ -110,7 +110,7 @@ const routes: RouteRecordRaw[] = [
         redirect: (to) => {
           const projectId = getStoredProjectId()
           if (!projectId) {
-            return { name: 'dashboard' }
+            return { name: 'create-project' }
           }
 
           return {
@@ -223,7 +223,13 @@ router.beforeEach(async (to) => {
     const projectId = typeof to.params.projectId === 'string' ? to.params.projectId : null
 
     if (projectId) {
-      projectStore.setCurrentProjectId(projectId, { persist: true })
+      projectStore.setCurrentProjectId(projectId)
+
+      if (projectStore.hasCurrentProject) {
+        projectStore.setCurrentProjectId(projectId, { persist: true })
+      } else {
+        projectStore.setCurrentProjectId(null, { clearStored: true })
+      }
     } else {
       if (!projectStore.currentProjectId) {
         const storedId = projectStore.getStoredLastProjectId()
@@ -233,7 +239,11 @@ router.beforeEach(async (to) => {
       }
     }
 
-    if (to.meta.requiresProject && !projectId) {
+    if (to.meta.requiresProject && (!projectId || !projectStore.hasCurrentProject)) {
+      if (!projectStore.hasProjects) {
+        return { name: 'create-project', query: to.query, hash: to.hash }
+      }
+
       return { name: 'dashboard', query: to.query, hash: to.hash }
     }
   }

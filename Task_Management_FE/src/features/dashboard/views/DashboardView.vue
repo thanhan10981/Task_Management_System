@@ -17,25 +17,89 @@
 
     <!-- ── No project at all ────────────────────────────────────────── -->
     <div v-else-if="!currentProjectId && !hasProjects" class="db-empty card">
-      <div class="relative z-10 w-[88px] h-[88px] flex items-center justify-center text-[2rem] rounded-[24px] border" style="background: linear-gradient(180deg, var(--bg-surface-2), var(--bg-surface-3)); border-color: var(--border-medium); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), var(--shadow-sm);">🚀</div>
-      <h3 class="relative z-10 text-2xl font-bold tracking-[-0.02em] m-0" style="color: var(--text-heading);">No Project Yet</h3>
-      <p class="relative z-10 text-[0.95rem] leading-[1.7] max-w-[460px] m-0" style="color: var(--text-subtle);">
-        You have not joined any project yet. Create your first project to start tracking tasks.
-      </p>
-      <button
-        class="gradient-btn relative z-10 mt-2 px-[18px] py-3 border border-indigo-400/30 hover:-translate-y-px hover:brightness-105"
-        style="box-shadow: 0 12px 28px rgba(99,102,241,0.18);"
-        @click="goToCreateProject"
-      >
-        Create Project
-      </button>
+      <!-- Left: content -->
+      <div class="db-empty-content">
+        <div class="db-empty-badge">Getting started</div>
+        <h3 class="db-empty-title">Your workspace<br>awaits a project</h3>
+        <p class="db-empty-desc">Bring your team's work into one place. Track tasks, monitor progress, and ship faster — all from a single dashboard.</p>
+        <ul class="db-empty-features">
+          <li>
+            <span class="db-feat-dot" style="background:#6366f1"></span>
+            <span>Kanban boards &amp; sprint planning</span>
+          </li>
+          <li>
+            <span class="db-feat-dot" style="background:#06b6d4"></span>
+            <span>Analytics &amp; completion tracking</span>
+          </li>
+          <li>
+            <span class="db-feat-dot" style="background:#a78bfa"></span>
+            <span>Team reminders &amp; due-date alerts</span>
+          </li>
+        </ul>
+        <button
+          class="gradient-btn db-empty-cta"
+          @click="goToCreateProject"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Project
+        </button>
+      </div>
+
+      <!-- Right: illustration -->
+      <div class="db-empty-illustration" aria-hidden="true">
+        <img
+          :src="noProjectIllustration"
+          alt=""
+          class="db-empty-svg"
+          draggable="false"
+        />
+      </div>
     </div>
 
     <!-- ── Project selected but none chosen ────────────────────────── -->
-    <div v-else-if="!currentProjectId" class="db-empty card">
-      <div class="relative z-10 w-[88px] h-[88px] flex items-center justify-center text-[2rem] rounded-[24px] border" style="background: linear-gradient(180deg, var(--bg-surface-2), var(--bg-surface-3)); border-color: var(--border-medium); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), var(--shadow-sm);">📋</div>
-      <h3 class="relative z-10 text-2xl font-bold tracking-[-0.02em] m-0" style="color: var(--text-heading);">No Project Selected</h3>
-      <p class="relative z-10 text-[0.95rem] leading-[1.7] max-w-[460px] m-0" style="color: var(--text-subtle);">Please select a project from the header dropdown to view dashboard analytics.</p>
+    <div v-else-if="!currentProjectId" class="db-empty db-no-select card">
+      <!-- Left: content -->
+      <div class="db-empty-content">
+        <div class="db-empty-badge db-nosel-badge">Select a Project</div>
+        <h3 class="db-empty-title">
+          Pick a project<br>to get started
+        </h3>
+        <p class="db-empty-desc">
+          Choose a project from the dropdown in the header to unlock your
+          dashboard — live analytics, task progress, and team insights all in one view.
+        </p>
+        <ul class="db-empty-features">
+          <li>
+            <span class="db-feat-dot" style="background:#6366f1"></span>
+            <span>Live task &amp; completion analytics</span>
+          </li>
+          <li>
+            <span class="db-feat-dot" style="background:#06b6d4"></span>
+            <span>Sprint progress &amp; Kanban overview</span>
+          </li>
+          <li>
+            <span class="db-feat-dot" style="background:#a78bfa"></span>
+            <span>Deadline reminders &amp; team alerts</span>
+          </li>
+        </ul>
+        <!-- Hint arrow pointing to header -->
+        <div class="db-nosel-hint">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="flex-shrink:0;">
+            <path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>
+          </svg>
+          <span>Use the <strong>Select Project</strong> dropdown above</span>
+        </div>
+      </div>
+
+      <!-- Right: illustration -->
+      <div class="db-empty-illustration" aria-hidden="true">
+        <img
+          :src="noProjectSelectedIllustration"
+          alt=""
+          class="db-nosel-svg"
+          draggable="false"
+        />
+      </div>
     </div>
 
     <!-- ── Main Dashboard Content ───────────────────────────────────── -->
@@ -336,6 +400,8 @@
 </template>
 
 <script setup lang="ts">
+import noProjectIllustration from '@/assets/icons/no-project-illustration.svg'
+import noProjectSelectedIllustration from '@/assets/icons/no-project-selected-illustration.svg'
 import { useToast } from '@/composables/useToast'
 import { useTaskAnalyticsChartQuery } from '@/features/dashboard/composables/useTaskAnalyticsChartQuery'
 import { useSendTaskReminderMutation } from '@/features/reminders/composables/useReminderMutations'
@@ -896,47 +962,204 @@ async function goToCreateProject() {
 </script>
 
 <style scoped>
-/* 1. Empty state card — ::before & ::after pseudo-elements + CSS-variable gradients */
+/* 1. Empty state card */
 .db-empty {
   position: relative;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
+  gap: 0;
   min-height: 340px;
-  padding: 56px 24px;
-  text-align: center;
+  padding: 52px 48px 52px 52px;
   background:
-    radial-gradient(circle at top, rgba(99,102,241,0.08), transparent 34%),
-    linear-gradient(180deg, var(--bg-surface), var(--bg-surface-2));
+    radial-gradient(ellipse 60% 80% at 110% 50%, rgba(99,102,241,0.09), transparent),
+    radial-gradient(ellipse 50% 60% at -10% 80%, rgba(6,182,212,0.05), transparent),
+    var(--bg-surface);
   border: 1px solid var(--border-base);
   box-shadow: var(--shadow-sm);
 }
 .db-empty::before {
   content: '';
   position: absolute;
-  right: -48px; bottom: -64px;
-  width: 240px; height: 240px;
-  border-radius: 50%;
-  background: rgba(99,102,241,0.08);
-  filter: blur(24px);
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 39px,
+    rgba(255,255,255,0.018) 39px,
+    rgba(255,255,255,0.018) 40px
+  ),
+  repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 39px,
+    rgba(255,255,255,0.018) 39px,
+    rgba(255,255,255,0.018) 40px
+  );
   pointer-events: none;
 }
-.db-empty::after {
+.db-empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  position: relative;
+  z-index: 1;
+}
+.db-empty-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #818cf8;
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.22);
+}
+.db-empty-badge::before {
   content: '';
-  position: absolute;
-  top: 24px; left: 24px;
-  width: 96px; height: 96px;
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent);
-  border: 1px solid rgba(255,255,255,0.04);
-  opacity: 0.75;
-  pointer-events: none;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #6366f1;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+.db-empty-title {
+  margin: 0;
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: var(--text-heading);
+}
+.db-empty-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text-subtle);
+  max-width: 340px;
+}
+.db-empty-features {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.db-empty-features li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+.db-feat-dot {
+  flex-shrink: 0;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  opacity: 0.85;
+}
+.db-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 10px 20px;
+  font-size: 0.875rem;
+}
+.db-empty-illustration {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.db-empty-svg {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  filter: drop-shadow(0 16px 40px rgba(99,102,241,0.14));
+  animation: float-svg 5s ease-in-out infinite;
+}
+@keyframes float-svg {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@media (max-width: 900px) {
+  .db-empty {
+    grid-template-columns: 1fr;
+    padding: 44px 32px;
+    text-align: left;
+  }
+  .db-empty-illustration { display: none; }
 }
 @media (max-width: 640px) {
-  .db-empty { min-height: 300px; padding: 40px 18px; }
+  .db-empty { padding: 36px 20px; }
+  .db-empty-title { font-size: 1.5rem; }
+}
+
+/* ── No-project-selected variant ─────────────────────────────── */
+.db-no-select {
+  background:
+    radial-gradient(ellipse 55% 75% at 110% 50%, rgba(6,182,212,0.09), transparent),
+    radial-gradient(ellipse 45% 60% at -10% 70%, rgba(99,102,241,0.07), transparent),
+    var(--bg-surface);
+}
+.db-nosel-badge {
+  color: #38bdf8 !important;
+  background: rgba(6,182,212,0.12) !important;
+  border-color: rgba(6,182,212,0.25) !important;
+}
+.db-nosel-badge::before {
+  background: #06b6d4 !important;
+  animation: pulse-dot 2.4s ease-in-out infinite !important;
+}
+.db-nosel-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  color: var(--text-subtle);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-medium);
+  margin-top: 4px;
+}
+.db-nosel-hint strong {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.db-nosel-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.db-nosel-svg {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  filter: drop-shadow(0 16px 40px rgba(6,182,212,0.14));
+  animation: float-svg 5s ease-in-out infinite;
+}
+.db-nosel-cursor {
+  animation: nosel-click 2.5s ease-in-out infinite;
+  transform-origin: 196px 73px;
+}
+@keyframes nosel-click {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(0.85); opacity: 0.7; }
+  60% { transform: scale(1.1); opacity: 1; }
 }
 
 /* 2. Stat card hover with CSS-variable shadow */

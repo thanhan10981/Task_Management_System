@@ -1,0 +1,67 @@
+<svg viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background glow -->
+  <ellipse cx="160" cy="130" rx="120" ry="90" fill="rgba(99,102,241,0.07)"/>
+
+  <!-- Board frame -->
+  <rect x="40" y="30" width="240" height="168" rx="14" fill="#1e2130" stroke="rgba(99,102,241,0.22)" stroke-width="1.5"/>
+
+  <!-- Board header -->
+  <rect x="40" y="30" width="240" height="36" rx="14" fill="rgba(99,102,241,0.10)"/>
+  <rect x="40" y="52" width="240" height="14" fill="rgba(99,102,241,0.10)"/>
+  <circle cx="60" cy="48" r="5" fill="rgba(99,102,241,0.55)"/>
+  <circle cx="77" cy="48" r="5" fill="rgba(6,182,212,0.50)"/>
+  <circle cx="94" cy="48" r="5" fill="rgba(167,139,250,0.50)"/>
+  <!-- Board title bar text lines -->
+  <rect x="112" y="44" width="60" height="7" rx="3.5" fill="rgba(255,255,255,0.12)"/>
+
+  <!-- Column 1: Todo -->
+  <rect x="56" y="74" width="62" height="10" rx="5" fill="rgba(251,191,36,0.25)"/>
+  <rect x="56" y="74" width="28" height="10" rx="5" fill="rgba(251,191,36,0.55)"/>
+  <rect x="56" y="92" width="62" height="34" rx="8" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <rect x="64" y="100" width="38" height="6" rx="3" fill="rgba(255,255,255,0.20)"/>
+  <rect x="64" y="110" width="28" height="4" rx="2" fill="rgba(255,255,255,0.10)"/>
+  <rect x="56" y="134" width="62" height="34" rx="8" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <rect x="64" y="142" width="44" height="6" rx="3" fill="rgba(255,255,255,0.18)"/>
+  <rect x="64" y="152" width="22" height="4" rx="2" fill="rgba(255,255,255,0.08)"/>
+
+  <!-- Column 2: In Progress -->
+  <rect x="129" y="74" width="62" height="10" rx="5" fill="rgba(6,182,212,0.20)"/>
+  <rect x="129" y="74" width="40" height="10" rx="5" fill="rgba(6,182,212,0.50)"/>
+  <rect x="129" y="92" width="62" height="34" rx="8" fill="rgba(99,102,241,0.08)" stroke="rgba(99,102,241,0.18)" stroke-width="1"/>
+  <rect x="137" y="100" width="32" height="6" rx="3" fill="rgba(99,102,241,0.55)"/>
+  <rect x="137" y="110" width="24" height="4" rx="2" fill="rgba(255,255,255,0.10)"/>
+  <!-- In-progress pulse dot -->
+  <circle cx="181" cy="103" r="4" fill="rgba(6,182,212,0.8)"/>
+  <circle cx="181" cy="103" r="7" fill="rgba(6,182,212,0.15)"/>
+
+  <!-- Column 3: Done -->
+  <rect x="202" y="74" width="62" height="10" rx="5" fill="rgba(167,139,250,0.20)"/>
+  <rect x="202" y="74" width="24" height="10" rx="5" fill="rgba(167,139,250,0.55)"/>
+  <rect x="202" y="92" width="62" height="34" rx="8" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <!-- Checkmark -->
+  <rect x="210" y="100" width="20" height="20" rx="4" fill="rgba(99,102,241,0.18)"/>
+  <path d="M214 110l3 3 5-5" stroke="#a78bfa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="234" y="100" width="22" height="6" rx="3" fill="rgba(255,255,255,0.15)"/>
+  <rect x="234" y="110" width="16" height="4" rx="2" fill="rgba(255,255,255,0.08)"/>
+
+  <!-- Bottom progress bar -->
+  <rect x="56" y="182" width="208" height="6" rx="3" fill="rgba(255,255,255,0.05)"/>
+  <rect x="56" y="182" width="130" height="6" rx="3" fill="url(#progGrad)"/>
+  <defs>
+    <linearGradient id="progGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Floating badge -->
+  <rect x="196" y="200" width="92" height="28" rx="14" fill="#111827" stroke="rgba(99,102,241,0.35)" stroke-width="1.2"/>
+  <circle cx="213" cy="214" r="5" fill="rgba(99,102,241,0.8)"/>
+  <rect x="222" y="210" width="40" height="5" rx="2.5" fill="rgba(255,255,255,0.20)"/>
+  <rect x="222" y="218" width="26" height="4" rx="2" fill="rgba(255,255,255,0.10)"/>
+
+  <!-- Small accent dots -->
+  <circle cx="42" cy="22" r="2" fill="rgba(99,102,241,0.4)"/>
+  <circle cx="278" cy="208" r="1.5" fill="rgba(6,182,212,0.5)"/>
+  <circle cx="292" cy="36" r="2.5" fill="rgba(167,139,250,0.35)"/>
+</svg>

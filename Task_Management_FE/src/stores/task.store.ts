@@ -174,6 +174,10 @@ type CreateProjectTaskPayload = {
   dueDate?: string
   assigneeIds?: string[]
   groupId?: string
+  suggestedSubtasks?: Array<{
+    title: string
+    description?: string
+  }>
 }
 
 type CreateProjectStatusPayload = {
@@ -834,10 +838,9 @@ export const useTaskStore = defineStore('tasks', () => {
       ? new Date(payload.dueDate).toISOString()
       : undefined
 
-    await taskService.createTask({
+    await taskService.createProjectTask(payload.projectId, {
       title: payload.title,
       description: payload.description || undefined,
-      projectId: payload.projectId,
       statusId: payload.statusId,
       sprintId: payload.sprintId || undefined,
       priority,
@@ -846,6 +849,9 @@ export const useTaskStore = defineStore('tasks', () => {
       dueDate,
       assigneeIds: payload.assigneeIds?.length ? payload.assigneeIds : undefined,
       groupId: payload.groupId || undefined,
+      suggestedSubtasks: payload.suggestedSubtasks?.length
+        ? payload.suggestedSubtasks
+        : undefined,
     })
 
     await loadProjectBoard(payload.projectId)

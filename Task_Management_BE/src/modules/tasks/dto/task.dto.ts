@@ -10,10 +10,26 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { OmitType } from '@nestjs/swagger';
 import { TaskPriority } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
+
+export class SuggestedSubtaskDto {
+  @ApiProperty({ description: 'Subtask title', example: 'Create backend endpoint' })
+  @IsString()
+  @IsNotEmpty({ message: 'Subtask title is required' })
+  @MaxLength(255, { message: 'Subtask title must be at most 255 characters' })
+  title: string;
+
+  @ApiPropertyOptional({ description: 'Subtask description', example: 'Implement DTOs and service method' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
 
 export class CreateTaskDto {
   @ApiProperty({ description: 'Task title', example: 'Implement auth middleware' })
@@ -85,6 +101,16 @@ export class CreateTaskDto {
   @ArrayUnique()
   @IsUUID('all', { each: true })
   assigneeIds?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Suggested subtasks to create and link to this task',
+    type: [SuggestedSubtaskDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SuggestedSubtaskDto)
+  suggestedSubtasks?: SuggestedSubtaskDto[];
 }
 
 export class UpdateTaskDto {
@@ -152,6 +178,10 @@ export class UpdateTaskDto {
   @IsUUID(4, { each: true, message: 'Each assignee id must be a valid UUID' })
   assigneeIds?: string[];
 }
+
+export class CreateProjectTaskDto extends OmitType(CreateTaskDto, [
+  'projectId',
+] as const) {}
 
 export class TaskQueryDto extends PaginationDto {
   @ApiPropertyOptional({ description: 'Filter by status name', example: 'IN_PROGRESS' })

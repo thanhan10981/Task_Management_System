@@ -65,6 +65,19 @@
 
       <!-- Header right -->
       <div class="flex items-center gap-1.5 md:gap-2.5 shrink-0">
+        <button
+          class="hidden sm:inline-flex items-center gap-1.5 h-[34px] px-3.5 rounded-[10px] border-none text-[12.5px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
+          style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
+          title="AI Create Task"
+          @click="openAiCreateTask"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+            <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+          </svg>
+         
+        </button>
+
         <!-- Group - desktop only -->
         <button
           class="hidden md:flex items-center gap-1.5 h-[34px] px-3 rounded-[10px] border-[1.5px] text-[12.5px] font-semibold cursor-pointer transition-all"
@@ -778,6 +791,13 @@
     <!-- Global overlay (close menus) -->
     <div v-if="sprintMenuOpen || activeCardMenu" class="fixed inset-0 z-[80]" @click="closeAllMenus"></div>
     <TaskDetailModal v-model="detailOpen" :task-id="selectedTaskId" @deleted="onTaskDeleted"/>
+    <AICreateTaskModal
+      v-model="aiCreateOpen"
+      :project-id="effectiveProjectId"
+      :status-id="aiDefaultStatusId"
+      :sprint-id="selectedModalSprintId"
+      @created="onAiTaskCreated"
+    />
   </div>
 </template>
 
@@ -793,6 +813,7 @@ import { storeToRefs } from 'pinia'
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import draggable from 'vuedraggable'
+import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 import TaskDetailModal from './TaskDetailModal.vue'
 
 const store = useTaskStore()
@@ -1436,6 +1457,7 @@ async function onTaskDeleted() {
 const showAddModal  = ref(false)
 const detailOpen = ref(false)
 const selectedTaskId = ref<string | null>(null)
+const aiCreateOpen = ref(false)
 const submittingTask = ref(false)
 
 const newTaskDefault = () => ({
@@ -1450,6 +1472,27 @@ const selectedModalSprintId = computed(() => {
     ? selectedSprintId.value
     : ''
 })
+const aiDefaultStatusId = computed(() => store.columns[0]?.id ?? columns[0]?.id ?? null)
+
+function openAiCreateTask() {
+  if (!effectiveProjectId.value) {
+    toast.error('Please select a project first')
+    return
+  }
+
+  if (!aiDefaultStatusId.value) {
+    toast.error('Please create a status before creating tasks')
+    return
+  }
+
+  aiCreateOpen.value = true
+}
+
+async function onAiTaskCreated() {
+  if (effectiveProjectId.value) {
+    await syncProjectBoard(effectiveProjectId.value)
+  }
+}
 
 /* label picker for modal */
 const modalLabelPickerOpen = ref(false)

@@ -14,6 +14,12 @@
               <span class="td-breadcrumb-item font-semibold" style="color:var(--text-primary)">{{ task?.title?.slice(0,28) }}…</span>
             </div>
             <div class="flex items-center gap-1">
+              <button class="td-topbar-btn" title="AI Create Task" @click="openAiCreateTask">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                  <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+                  <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+                </svg>
+              </button>
               <button class="td-topbar-btn td-topbar-btn--danger" title="Move to trash" @click="showDeleteConfirm = true">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
@@ -72,6 +78,22 @@
                   <!-- Ordered list -->
                   <button class="td-toolbar-btn" @mousedown.prevent @click="toggleList('ol')" title="Ordered list">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke-width="2"/><path d="M4 10h2" stroke-width="2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke-width="2"/></svg>
+                  </button>
+                  <span class="td-toolbar-divider"/>
+                  <button
+                    class="td-toolbar-btn td-toolbar-btn--ai"
+                    :disabled="generatingDescription"
+                    title="Generate with AI"
+                    @mousedown.prevent
+                    @click="generateInlineDescription"
+                  >
+                    <svg v-if="!generatingDescription" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                      <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+                      <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+                    </svg>
+                    <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="td-spin">
+                      <path d="M21 12a9 9 0 1 1-3-6.7"/>
+                    </svg>
                   </button>
                 </div>
                 <div
@@ -641,6 +663,14 @@
             </div>
           </Transition>
         </div><!-- /td-panel -->
+        <AICreateTaskModal
+          v-model="aiCreateOpen"
+          :project-id="detailProjectId"
+          :status-id="task?.status ?? null"
+          :sprint-id="task?.sprint ?? null"
+          :group-id="task?.groupId ?? null"
+          @created="onAiTaskCreated"
+        />
       </div><!-- /td-overlay -->
     </Transition>
   </Teleport>
@@ -650,6 +680,8 @@
 import {
   getFilePreviewUrl,
 } from '@/api/cloudinary'
+import { useToast } from '@/composables/useToast'
+import { generateAiTaskDescription } from '@/features/tasks/services/ai-task.service'
 import {
   useDeleteFileMutation,
   useSignedFileUploadMutation,
@@ -661,6 +693,7 @@ import { useTaskStore } from '@/stores/task.store'
 import type { Attachment, Comment as TaskComment, Member, Subtask } from '@/stores/task.store'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
+import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 
 // ── Props / Emits ─────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -683,6 +716,7 @@ type MergedActivityEntry = {
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 const store = useTaskStore()
+const toast = useToast()
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
 const { currentProject, currentProjectId } = storeToRefs(projectStore)
@@ -691,10 +725,12 @@ const deleteFileMutation = useDeleteFileMutation()
 
 // ── Task ref ──────────────────────────────────────────────────────────────────
 const task = computed(() => (props.taskId ? store.getTask(props.taskId) : null))
+const detailProjectId = computed(() => currentProjectId.value ?? store.loadedProjectId)
 const shortTaskCode = computed(() => `T-${task.value?.id?.slice(-5) ?? ''}`)
 const showDeleteConfirm = ref(false)
 const deletingTask = ref(false)
 const deleteTaskError = ref('')
+const aiCreateOpen = ref(false)
 const progress = computed(() =>
   props.taskId ? store.subtaskProgress(props.taskId) : { done: 0, total: 0 }
 )
@@ -778,6 +814,21 @@ async function confirmDeleteTask() {
   }
 }
 
+function openAiCreateTask() {
+  if (!detailProjectId.value || !task.value?.status) return
+  aiCreateOpen.value = true
+}
+
+async function onAiTaskCreated() {
+  if (detailProjectId.value) {
+    await store.loadProjectBoard(detailProjectId.value)
+  }
+
+  if (task.value) {
+    await store.loadTaskDetail(task.value.id)
+  }
+}
+
 // ── Title editing ─────────────────────────────────────────────────────────────
 const titleRef = ref<HTMLElement | null>(null)
 watch(
@@ -801,6 +852,7 @@ const descRef = ref<HTMLElement | null>(null)
 const descHtml = ref('')
 const descriptionDirty = ref(false)
 const savingDescription = ref(false)
+const generatingDescription = ref(false)
 
 function syncDescriptionFromTask() {
   if (!props.modelValue || !descRef.value) return
@@ -808,8 +860,9 @@ function syncDescriptionFromTask() {
 
   const serverDesc = task.value?.description ?? ''
   descHtml.value = serverDesc
-  if (descRef.value.innerHTML !== serverDesc) {
-    descRef.value.innerHTML = serverDesc
+  const renderedDesc = renderDescriptionForEditor(serverDesc)
+  if (descRef.value.innerHTML !== renderedDesc) {
+    descRef.value.innerHTML = renderedDesc
   }
 }
 
@@ -821,7 +874,7 @@ watch(
     const t = store.getTask(id)
     descHtml.value = t?.description ?? ''
     descriptionDirty.value = false
-    if (descRef.value) descRef.value.innerHTML = t?.description ?? ''
+    if (descRef.value) descRef.value.innerHTML = renderDescriptionForEditor(t?.description ?? '')
   },
   { immediate: true }
 )
@@ -860,12 +913,39 @@ async function saveDescription() {
     const serverDesc = refreshed?.description ?? ''
     descHtml.value = serverDesc
     await nextTick()
-    if (descRef.value) descRef.value.innerHTML = serverDesc
+    if (descRef.value) descRef.value.innerHTML = renderDescriptionForEditor(serverDesc)
     descriptionDirty.value = false
   } finally {
     savingDescription.value = false
   }
 }
+
+async function generateInlineDescription() {
+  if (!task.value || !descRef.value) return
+
+  generatingDescription.value = true
+  try {
+    const currentDescription = normalizeEditorText(descRef.value.innerText || '')
+    const generatedMarkdown = await generateAiTaskDescription(
+      task.value.title,
+      currentDescription
+    )
+    const mergedMarkdown = mergeInlineAiMarkdown(currentDescription, generatedMarkdown)
+    descRef.value.innerHTML = renderDescriptionForEditor(mergedMarkdown)
+    descHtml.value = descRef.value.innerHTML
+    descriptionDirty.value = true
+    const createdSubtasks = await createSuggestedSubtasksFromMarkdown(generatedMarkdown)
+    toast.success('AI description inserted')
+    if (createdSubtasks > 0) {
+      toast.success(`${createdSubtasks} suggested subtask${createdSubtasks > 1 ? 's' : ''} added`)
+    }
+  } catch (error) {
+    toast.error(extractInlineAiError(error))
+  } finally {
+    generatingDescription.value = false
+  }
+}
+
 function toggleList(type: 'ul' | 'ol') {
   if (!descRef.value) return
   ensureDescriptionSelection()
@@ -919,6 +999,157 @@ function escapeHtml(value: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+function renderDescriptionForEditor(value: string) {
+  const normalized = value.replace(/\r\n/g, '\n').trim()
+  if (!normalized) return ''
+  if (/<[a-z][\s\S]*>/i.test(normalized)) return normalized
+
+  const lines = normalized.split('\n')
+  const output: string[] = []
+  let paragraph: string[] = []
+  let listOpen = false
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return
+    output.push(`<p>${paragraph.join('<br>')}</p>`)
+    paragraph = []
+  }
+
+  const closeList = () => {
+    if (!listOpen) return
+    output.push('</ul>')
+    listOpen = false
+  }
+
+  lines.forEach((line) => {
+    const trimmed = line.trim()
+
+    if (!trimmed) {
+      flushParagraph()
+      closeList()
+      return
+    }
+
+    const heading = trimmed.match(/^(#{2,3})\s+(.+)$/)
+    if (heading) {
+      flushParagraph()
+      closeList()
+      output.push(`<h3>${escapeHtml(heading[2])}</h3>`)
+      return
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/)
+    if (bullet) {
+      flushParagraph()
+      if (!listOpen) {
+        output.push('<ul>')
+        listOpen = true
+      }
+      output.push(`<li>${escapeHtml(bullet[1])}</li>`)
+      return
+    }
+
+    closeList()
+    paragraph.push(escapeHtml(trimmed))
+  })
+
+  flushParagraph()
+  closeList()
+
+  return output.join('')
+}
+
+function normalizeEditorText(value: string) {
+  return value
+    .replace(/\u00a0/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function mergeInlineAiMarkdown(currentDescription: string, generatedMarkdown: string) {
+  const current = normalizeEditorText(currentDescription)
+  const generated = normalizeEditorText(generatedMarkdown)
+  if (!current) return generated
+
+  const aiSections = extractAiSections(generated)
+  const base = removeExistingAiSections(current)
+  return [base, aiSections].filter(Boolean).join('\n\n')
+}
+
+function extractAiSections(markdown: string) {
+  const sectionStart = findFirstAiSectionIndex(markdown)
+  if (sectionStart < 0) return markdown
+  return markdown.slice(sectionStart).trim()
+}
+
+async function createSuggestedSubtasksFromMarkdown(markdown: string) {
+  if (!task.value) return 0
+
+  const titles = extractSuggestedSubtaskTitles(markdown)
+  if (!titles.length) return 0
+
+  const existingTitles = new Set(
+    store
+      .subtasksByTask(task.value.id)
+      .map((subtask) => subtask.title.trim().toLowerCase())
+      .filter(Boolean)
+  )
+  const uniqueTitles = titles.filter((title) => !existingTitles.has(title.toLowerCase()))
+
+  for (const title of uniqueTitles) {
+    await store.createSubtaskRemote(task.value.id, title)
+    existingTitles.add(title.toLowerCase())
+  }
+
+  return uniqueTitles.length
+}
+
+function extractSuggestedSubtaskTitles(markdown: string) {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const headingIndex = lines.findIndex((line) =>
+    /^##\s+Suggested Subtasks\s*$/i.test(line.trim())
+  )
+
+  if (headingIndex < 0) return []
+
+  const sectionLines: string[] = []
+  for (const line of lines.slice(headingIndex + 1)) {
+    if (/^##\s+/.test(line.trim())) break
+    sectionLines.push(line)
+  }
+
+  return sectionLines
+    .map((line) => line.trim().match(/^[-*]\s+(.+)$/)?.[1]?.trim() ?? '')
+    .map((title) => title.replace(/\s+/g, ' ').slice(0, 255))
+    .filter(Boolean)
+}
+
+function removeExistingAiSections(markdown: string) {
+  const sectionStart = findFirstAiSectionIndex(markdown)
+  if (sectionStart < 0) return markdown.trim()
+  return markdown.slice(0, sectionStart).trim()
+}
+
+function findFirstAiSectionIndex(markdown: string) {
+  const matches = [
+    markdown.search(/^##\s+Behavior\b/im),
+    markdown.search(/^##\s+Acceptance Criteria\b/im),
+    markdown.search(/^##\s+Suggested Subtasks\b/im),
+    markdown.search(/^Behavior\s*$/im),
+    markdown.search(/^Acceptance Criteria\s*$/im),
+    markdown.search(/^Suggested Subtasks\s*$/im),
+  ].filter((index) => index >= 0)
+
+  return matches.length ? Math.min(...matches) : -1
+}
+
+function extractInlineAiError(error: unknown) {
+  const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
+  if (Array.isArray(message)) return message.join(', ')
+  return message || (error instanceof Error ? error.message : 'Cannot generate description')
 }
 
 // ── Subtasks ──────────────────────────────────────────────────────────────────
@@ -1380,6 +1611,40 @@ function timeAgo(iso: string) {
 .td-topbar-btn--danger:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #dc2626;
+}
+.td-toolbar-btn--ai {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+}
+.td-toolbar-btn--ai:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.14);
+  color: #6d28d9;
+}
+.td-toolbar-btn--ai:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.td-spin {
+  animation: tdSpin 0.8s linear infinite;
+}
+@keyframes tdSpin {
+  to { transform: rotate(360deg); }
+}
+.td-editor :deep(h3) {
+  margin: 18px 0 8px;
+  color: var(--text-heading);
+  font-size: 15px;
+  font-weight: 800;
+}
+.td-editor :deep(p) {
+  margin: 0 0 12px;
+}
+.td-editor :deep(ul) {
+  margin: 0 0 12px 18px;
+  padding: 0;
+}
+.td-editor :deep(li) {
+  margin: 5px 0;
 }
 .td-confirm-enter-active,
 .td-confirm-leave-active {

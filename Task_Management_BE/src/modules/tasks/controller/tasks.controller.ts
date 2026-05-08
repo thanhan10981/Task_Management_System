@@ -27,10 +27,12 @@ import {
   TaskQueryDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
+import { GenerateTaskDescriptionDto } from '../dto/ai-task.dto';
 import {
   CreateTaskStatusDto,
   UpdateTaskStatusDto,
 } from '../dto/task-status.dto';
+import { AiTaskService } from '../service/ai-task.service';
 import { TaskService } from '../service/task.service';
 import { TaskAssigneeService } from '../service/task-assignee.service';
 import { TaskStatusService } from '../service/task-status.service';
@@ -44,7 +46,18 @@ export class TasksController {
     private readonly taskService: TaskService,
     private readonly taskAssigneeService: TaskAssigneeService,
     private readonly taskStatusService: TaskStatusService,
+    private readonly aiTaskService: AiTaskService,
   ) {}
+
+  @Post('ai/generate-description')
+  @ApiOperation({ summary: 'Generate markdown for a task description editor' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Description generated successfully' })
+  generateDescription(@Body() dto: GenerateTaskDescriptionDto) {
+    return this.aiTaskService.generateTaskDescription(
+      dto.title,
+      dto.description ?? '',
+    );
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create a new task' })

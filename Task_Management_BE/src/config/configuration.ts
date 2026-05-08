@@ -37,4 +37,9 @@ export default () => ({
   mailQueue: {
     name: process?.env?.MAIL_QUEUE_NAME,
   },
+
+  gemini: {
+    apiKey: process?.env?.GEMINI_API_KEY,
+    fallbackModel: process?.env?.GEMINI_FALLBACK_MODEL,
+  },
 });

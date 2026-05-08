@@ -139,6 +139,19 @@
           </Transition>
         </div><!-- /member picker -->
 
+        <button
+          class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-[10px] border-none text-[12px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
+          style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
+          title="AI Create Task"
+          @click="openAiCreateTask"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+            <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+          </svg>
+          
+        </button>
+
         <!-- Trash -->
         <button
           class="relative w-8 h-8 inline-flex items-center justify-center border-[1.5px] border-[var(--btn-border)] rounded-[10px] bg-[var(--btn-bg)] text-[var(--text-muted)] cursor-pointer transition-all duration-150 flex-shrink-0 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-2)] hover:-translate-y-px"
@@ -752,6 +765,11 @@
 
     <!-- ══ TASK DETAIL MODAL ══════════════════════════════════════════════ -->
     <TaskDetailModal v-model="modalOpen" :task-id="selectedTaskId" @deleted="onTaskDeleted"/>
+    <AICreateTaskModal
+      v-model="aiCreateOpen"
+      :project-id="effectiveProjectId"
+      :status-id="defaultStatusId"
+    />
 
     <!-- ══ DELETE STATUS MODAL ══════════════════════════════════════════════ -->
     <Transition name="fade">
@@ -893,6 +911,7 @@ import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
+import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 import TaskDetailModal from './TaskDetailModal.vue'
 
 const store = useTaskStore()
@@ -1093,6 +1112,7 @@ onUnmounted(() => {
 // ── Modal ──────────────────────────────────────────────────────────────────────
 const modalOpen = ref(false)
 const selectedTaskId = ref<string | null>(null)
+const aiCreateOpen = ref(false)
 const trashOpen = ref(false)
 const restoringTaskId = ref<string | null>(null)
 const trashCount = computed(() => store.trashTasks.length)
@@ -1129,6 +1149,20 @@ watch(modalOpen, (open) => {
     query: nextQuery,
   })
 })
+
+function openAiCreateTask() {
+  if (!effectiveProjectId.value) {
+    toast.error('Please select a project first')
+    return
+  }
+
+  if (!defaultStatusId.value) {
+    toast.error('Please create a status before creating tasks')
+    return
+  }
+
+  aiCreateOpen.value = true
+}
 
 async function openTrash() {
   trashOpen.value = true

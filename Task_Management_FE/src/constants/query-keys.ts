@@ -5,10 +5,23 @@ export const QUERY_KEYS = {
     list: (params: Record<string, unknown>) => [...QUERY_KEYS.tasks.lists(), params] as const,
     search: (params: Record<string, unknown>) => [...QUERY_KEYS.tasks.all, 'search', params] as const,
     detail: (id: string) => [...QUERY_KEYS.tasks.all, 'detail', id] as const,
+    statuses: (projectId: string) => [...QUERY_KEYS.tasks.all, 'statuses', projectId] as const,
+    members: (projectId: string) => [...QUERY_KEYS.tasks.all, 'members', projectId] as const,
+    trash: (projectId: string) => [...QUERY_KEYS.tasks.all, 'trash', projectId] as const,
+    groups: (projectId: string) => [...QUERY_KEYS.tasks.all, 'groups', projectId] as const,
+    subtasks: (taskId: string) => [...QUERY_KEYS.tasks.all, 'subtasks', taskId] as const,
+    comments: (taskId: string) => [...QUERY_KEYS.tasks.all, 'comments', taskId] as const,
+    history: (taskId: string) => [...QUERY_KEYS.tasks.all, 'history', taskId] as const,
+    files: (taskId: string) => [...QUERY_KEYS.tasks.all, 'files', taskId] as const,
   },
   projects: {
     all: ['projects'] as const,
     list: () => [...QUERY_KEYS.projects.all, 'list'] as const,
+    members: (projectId: string) => [...QUERY_KEYS.projects.all, 'members', projectId] as const,
+  },
+  sprints: {
+    all: ['sprints'] as const,
+    list: (projectId: string) => [...QUERY_KEYS.sprints.all, 'list', projectId] as const,
   },
   taskAnalytics: {
     all: ['task-analytics'] as const,

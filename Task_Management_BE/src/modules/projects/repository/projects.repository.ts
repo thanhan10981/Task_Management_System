@@ -32,7 +32,7 @@ export class ProjectsRepository {
         members: {
           create: {
             userId,
-            role: 'OWNER',
+            role: ProjectMemberRole.OWNER,
             addedBy: userId,
           },
         },

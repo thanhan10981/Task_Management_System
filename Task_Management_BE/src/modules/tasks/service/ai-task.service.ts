@@ -19,7 +19,7 @@ import {
 
 const PRIMARY_MODEL_ID = 'gemini-2.5-flash';
 const DEFAULT_FALLBACK_MODEL_ID = 'gemini-2.5-flash-lite';
-const ALLOWED_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH']);
+const ALLOWED_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT']);
 
 @Injectable()
 export class AiTaskService {
@@ -150,7 +150,7 @@ export class AiTaskService {
               },
               priority: {
                 type: Type.STRING,
-                enum: ['LOW', 'MEDIUM', 'HIGH'],
+                enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'],
               },
               suggestedSubtasks: {
                 type: Type.ARRAY,

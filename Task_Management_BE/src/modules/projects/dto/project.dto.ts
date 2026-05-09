@@ -132,7 +132,7 @@ export class AddProjectMemberDto {
   @IsUUID()
   userId: string;
 
-  @ApiPropertyOptional({ description: 'Role for member', enum: ProjectMemberRole, example: 'MEMBER' })
+  @ApiPropertyOptional({ description: 'Role for member', enum: ProjectMemberRole, example: 'DEVELOPER' })
   @IsOptional()
   @IsEnum(ProjectMemberRole)
   role?: ProjectMemberRole;

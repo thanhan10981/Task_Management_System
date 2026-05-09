@@ -5,66 +5,76 @@
   >
     <!-- PAGE HEADER -->
     <div
-      class="flex items-center justify-between shrink-0 gap-2 md:gap-3 px-4 md:px-6 h-14 md:h-[60px]"
-      style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);"
+      class="flex items-center justify-between shrink-0 gap-2 md:gap-3 px-3 md:px-6 h-12 md:h-[60px]"
+      style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);overflow:hidden;"
     >
-      <div class="flex items-center gap-2 md:gap-3.5 min-w-0 relative z-[210]">
-        <h1 class="text-base md:text-lg font-extrabold tracking-tight m-0" style="color:var(--text-heading);">Board</h1>
+      <div class="flex items-center gap-1.5 md:gap-3.5 min-w-0 relative z-[210]">
+        <h1 class="text-sm md:text-lg font-extrabold tracking-tight m-0 shrink-0" style="color:var(--text-heading);">Board</h1>
 
         <!-- Sprint Selector -->
         <div class="relative">
           <button
-            class="flex items-center gap-1 md:gap-1.5 max-w-[120px] md:max-w-none h-[30px] md:h-[34px] px-2 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[12px] md:text-[13px] font-semibold cursor-pointer transition-all overflow-hidden"
+            ref="sprintBtnRef"
+            class="flex items-center gap-1 md:gap-1.5 max-w-[100px] md:max-w-none h-[28px] md:h-[34px] px-1.5 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[13px] font-semibold cursor-pointer transition-all overflow-hidden"
             :class="sprintMenuOpen ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-[var(--border-medium)] bg-[var(--bg-surface)] text-[var(--text-secondary)]'"
-            @click="sprintMenuOpen = !sprintMenuOpen"
+            @click="toggleSprintMenu"
           >
             <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: currentSprint.color }"></span>
             <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ currentSprint.name }}</span>
             <svg class="w-3 h-3 shrink-0 transition-transform duration-200" :class="sprintMenuOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
 
-          <div v-if="sprintMenuOpen" class="sprint-drop absolute top-[calc(100%+6px)] left-0 min-w-[230px] rounded-[14px] border p-1.5 z-[220]" style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 16px 48px rgba(0,0,0,0.14);">
-            <div class="text-[10px] font-bold tracking-widest uppercase px-2.5 pt-1.5 pb-1" style="color:var(--text-subtle);">Sprint</div>
-            <button
-              v-for="s in sprints" :key="s.id"
-              class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[13px] font-semibold cursor-pointer text-left transition-colors"
-              :class="s.id === selectedSprintId ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'"
-              @click="selectSprint(s.id)"
+          <!-- Sprint dropdown teleported to body to escape overflow:hidden -->
+          <Teleport to="body">
+            <div
+              v-if="sprintMenuOpen"
+              class="sprint-drop fixed min-w-[230px] rounded-[14px] border p-1.5 z-[9999]"
+              :style="sprintDropStyle"
+              style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 16px 48px rgba(0,0,0,0.14);"
+              @click.stop
             >
-              <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }"></span>
-              <span class="flex-1">{{ s.name }}</span>
-              <span class="text-[11px] text-[var(--text-muted)]">{{ s.dates }}</span>
-              <svg v-if="s.id === selectedSprintId" class="w-3.5 h-3.5 text-indigo-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>
-            <div class="h-px my-1" style="background:var(--border-base);"></div>
-            <div v-if="!showNewSprintForm" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-[12.5px] font-semibold text-indigo-500 cursor-pointer hover:bg-indigo-50 transition-colors" @click.stop="showNewSprintForm = true">
-              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              New Sprint
+              <div class="text-[10px] font-bold tracking-widest uppercase px-2.5 pt-1.5 pb-1" style="color:var(--text-subtle);">Sprint</div>
+              <button
+                v-for="s in sprints" :key="s.id"
+                class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[13px] font-semibold cursor-pointer text-left transition-colors"
+                :class="s.id === selectedSprintId ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'"
+                @click="selectSprint(s.id)"
+              >
+                <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }"></span>
+                <span class="flex-1">{{ s.name }}</span>
+                <span class="text-[11px] text-[var(--text-muted)]">{{ s.dates }}</span>
+                <svg v-if="s.id === selectedSprintId" class="w-3.5 h-3.5 text-indigo-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <div class="h-px my-1" style="background:var(--border-base);"></div>
+              <div v-if="!showNewSprintForm" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-[12.5px] font-semibold text-indigo-500 cursor-pointer hover:bg-indigo-50 transition-colors" @click.stop="showNewSprintForm = true">
+                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Sprint
+              </div>
+              <div v-else class="flex flex-col gap-2 p-2 pb-1" @click.stop>
+                <input v-model="newSprint.name" class="sprint-inp h-[30px] px-2.5 rounded-lg border-[1.5px] text-[12.5px] outline-none font-[inherit] transition-all" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" placeholder="Sprint name" @keydown.enter="createSprint" @keydown.esc="showNewSprintForm = false" ref="sprintNameInput" maxlength="30"/>
+                <div class="flex items-center gap-1.5">
+                  <input v-model="newSprint.startDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="Start date"/>
+                  <span class="text-[11px] text-[var(--text-muted)]">→</span>
+                  <input v-model="newSprint.endDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="End date"/>
+                </div>
+                <div class="flex gap-[5px] flex-wrap">
+                  <button v-for="c in sprintColorOptions" :key="c" class="w-5 h-5 rounded-full border-2 cursor-pointer transition-transform hover:scale-110" :class="newSprint.color === c ? 'scale-110 border-white shadow-[0_0_0_2px_#6366f1]' : 'border-transparent'" :style="{ background: c }" @click.stop="newSprint.color = c"></button>
+                </div>
+                <div class="flex gap-1.5 justify-end">
+                  <button class="h-7 px-2.5 rounded-[7px] border-[1.5px] bg-transparent text-[12px] font-semibold cursor-pointer hover:bg-[var(--bg-surface-2)] transition-colors" style="border-color:var(--border-medium);color:var(--text-secondary);" @click.stop="showNewSprintForm = false">Cancel</button>
+                  <button class="flex items-center gap-1 h-7 px-3 rounded-[7px] border-none text-white text-[12px] font-bold cursor-pointer bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="!newSprint.name.trim()" @click.stop="createSprint">
+                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Create
+                  </button>
+                </div>
+              </div>
             </div>
-            <div v-else class="flex flex-col gap-2 p-2 pb-1" @click.stop>
-              <input v-model="newSprint.name" class="sprint-inp h-[30px] px-2.5 rounded-lg border-[1.5px] text-[12.5px] outline-none font-[inherit] transition-all" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" placeholder="Sprint name" @keydown.enter="createSprint" @keydown.esc="showNewSprintForm = false" ref="sprintNameInput" maxlength="30"/>
-              <div class="flex items-center gap-1.5">
-                <input v-model="newSprint.startDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="Start date"/>
-                <span class="text-[11px] text-[var(--text-muted)]">→</span>
-                <input v-model="newSprint.endDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="End date"/>
-              </div>
-              <div class="flex gap-[5px] flex-wrap">
-                <button v-for="c in sprintColorOptions" :key="c" class="w-5 h-5 rounded-full border-2 cursor-pointer transition-transform hover:scale-110" :class="newSprint.color === c ? 'scale-110 border-white shadow-[0_0_0_2px_#6366f1]' : 'border-transparent'" :style="{ background: c }" @click.stop="newSprint.color = c"></button>
-              </div>
-              <div class="flex gap-1.5 justify-end">
-                <button class="h-7 px-2.5 rounded-[7px] border-[1.5px] bg-transparent text-[12px] font-semibold cursor-pointer hover:bg-[var(--bg-surface-2)] transition-colors" style="border-color:var(--border-medium);color:var(--text-secondary);" @click.stop="showNewSprintForm = false">Cancel</button>
-                <button class="flex items-center gap-1 h-7 px-3 rounded-[7px] border-none text-white text-[12px] font-bold cursor-pointer bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="!newSprint.name.trim()" @click.stop="createSprint">
-                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Create
-                </button>
-              </div>
-            </div>
-          </div>
+          </Teleport>
         </div>
       </div>
 
       <!-- Header right -->
-      <div class="flex items-center gap-1.5 md:gap-2.5 shrink-0">
+      <div class="flex items-center gap-1 md:gap-2.5 shrink-0">
         <button
           class="hidden sm:inline-flex items-center gap-1.5 h-[34px] px-3.5 rounded-[10px] border-none text-[12.5px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
           style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
@@ -78,18 +88,20 @@
          
         </button>
 
-        <!-- Group - desktop only -->
+        <!-- Group button -->
         <button
-          class="hidden md:flex items-center gap-1.5 h-[34px] px-3 rounded-[10px] border-[1.5px] text-[12.5px] font-semibold cursor-pointer transition-all"
+          class="flex items-center gap-1 md:gap-1.5 h-[28px] md:h-[34px] px-1.5 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[12.5px] font-semibold cursor-pointer transition-all"
           :class="groupByGroup ? 'border-indigo-400 text-indigo-600 bg-indigo-50' : ''"
           :style="!groupByGroup ? 'border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);' : ''"
           @click="groupByGroup = !groupByGroup"
           title="Group tasks"
         >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
-          Group
+          <svg class="w-3 md:w-3.5 h-3 md:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+          <span class="hidden md:inline">Group</span>
         </button>
         <div class="hidden md:block w-px h-7" style="background:var(--border-medium);"></div>
+        <!-- Divider before group on mobile -->
+        <div class="block md:hidden w-px h-5" style="background:var(--border-medium);"></div>
         <!-- Invite / members - desktop only -->
         <div class="hidden md:flex items-center gap-2 relative" ref="memberPickerRef">
           <div class="flex items-center">
@@ -109,6 +121,7 @@
             >+{{ store.members.length - visibleAvatarCount }}</button>
           </div>
           <button
+            ref="memberPickerBtnRef"
             class="flex items-center gap-1.5 h-[34px] px-3.5 rounded-[10px] border-none text-[12.5px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
             :class="{ 'opacity-90 -translate-y-px': memberPickerOpen }"
             style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
@@ -119,8 +132,15 @@
             Invite
           </button>
 
-          <Transition name="mp-drop">
-            <div v-if="memberPickerOpen" class="mp-dropdown board-mp-dropdown" @click.stop>
+          <Teleport to="body">
+            <Transition name="mp-drop">
+              <div
+                v-if="memberPickerOpen"
+                ref="memberPickerDropRef"
+                class="mp-dropdown board-mp-dropdown"
+                :style="memberPickerStyle"
+                @click.stop
+              >
               <div class="mp-dropdown-head">
                 <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Project Members</span>
                 <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
@@ -136,11 +156,64 @@
                 />
               </div>
 
+              <div class="px-2 pt-1 pb-2">
+                <button
+                  type="button"
+                  class="w-full h-[32px] px-2.5 rounded-[8px] border text-[12px] font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-secondary);"
+                  @click="copyInviteLink"
+                >
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l2.92-2.92a5 5 0 0 0-7.07-7.07L11.8 5"/><path d="M14 11a5 5 0 0 0-7.54-.54L3.54 13.38a5 5 0 0 0 7.07 7.07L12.2 19"/></svg>
+                  Copy invite link
+                </button>
+              </div>
+
               <div class="mp-list">
-                <div v-for="m in filteredPickerMembers" :key="m.id" class="mp-item">
+                <div class="mp-dropdown-head">
+                  <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Current Members</span>
+                  <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
+                </div>
+
+                <div
+                  v-for="m in store.members"
+                  :key="m.id"
+                  class="mp-item w-full text-left"
+                >
                   <div class="mp-item-avatar" :style="{ background: m.color }">{{ m.initials }}</div>
                   <div class="mp-item-info">
                     <span class="mp-item-name">{{ m.name }}</span>
+                    <span class="text-[10px] font-semibold uppercase" style="color:var(--text-subtle)">
+                      {{ (m.role || 'DEVELOPER').toUpperCase() }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <select
+                      v-if="canUpdateMemberRole(m)"
+                      class="h-[24px] px-1.5 rounded-md border text-[10px] font-semibold"
+                      style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-secondary);"
+                      :disabled="updatingRoleMemberId === m.id"
+                      :value="(m.role || 'DEVELOPER').toUpperCase()"
+                      @change="updateMemberRoleFromPicker(m, ($event.target as HTMLSelectElement).value)"
+                    >
+                      <option v-for="role in memberRoleOptions" :key="role" :value="role">{{ role }}</option>
+                    </select>
+                    <button
+                      v-if="canManageProjectMembers && !isProjectOwner(m) && m.id !== authStore.user?.id"
+                      type="button"
+                      class="mp-item-check"
+                      style="color:#ef4444;font-size:11px"
+                      :disabled="removingMemberId === m.id"
+                      @click="removeMemberFromPicker(m)"
+                    >
+                      {{ removingMemberId === m.id ? 'Removing...' : 'Remove' }}
+                    </button>
+                    <span
+                      v-else
+                      class="mp-item-check"
+                      style="color:var(--text-subtle);font-size:10px"
+                    >
+                      {{ isProjectOwner(m) ? 'Owner' : m.id === authStore.user?.id ? 'You' : '' }}
+                    </span>
                   </div>
                 </div>
 
@@ -176,8 +249,8 @@
                   No users available to add
                 </div>
 
-                <div v-else-if="filteredPickerMembers.length === 0" class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
-                  No members found
+                <div v-else class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
+                  Type a name or email to search users
                 </div>
               </div>
 
@@ -185,29 +258,30 @@
                 <button class="mp-footer-btn mp-footer-btn--ghost" @click="memberSearch = ''">Clear search</button>
                 <button class="mp-footer-btn mp-footer-btn--primary" @click="memberPickerOpen = false">Done</button>
               </div>
-            </div>
-          </Transition>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
         <div class="hidden md:block w-px h-7" style="background:var(--border-medium);"></div>
         <!-- New Status -->
         <button
-          class="flex items-center gap-1.5 h-[30px] md:h-[34px] px-2 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[12.5px] font-semibold cursor-pointer transition-all whitespace-nowrap"
+          class="flex items-center gap-1 md:gap-1.5 h-[28px] md:h-[34px] px-1.5 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[12.5px] font-semibold cursor-pointer transition-all whitespace-nowrap"
           :class="statusPanelOpen ? 'border-violet-400 text-violet-600 bg-violet-50' : ''"
           :style="!statusPanelOpen ? 'border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);' : ''"
           @click="statusPanelOpen = !statusPanelOpen" title="New Status"
         >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          <svg class="w-3 md:w-3.5 h-3 md:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           <span class="hidden md:inline">New Status</span>
         </button>
-        <div class="w-px h-7 hidden md:block" style="background:var(--border-medium);"></div>
+        <div class="w-px h-5 md:h-7 hidden md:block" style="background:var(--border-medium);"></div>
         <!-- Toggle sidebar -->
         <button
-          class="flex items-center justify-center w-[30px] md:w-[34px] h-[30px] md:h-[34px] rounded-lg md:rounded-[10px] border-[1.5px] cursor-pointer transition-all"
+          class="flex items-center justify-center w-[28px] md:w-[34px] h-[28px] md:h-[34px] rounded-lg md:rounded-[10px] border-[1.5px] cursor-pointer transition-all"
           :class="sidebarOpen ? 'border-indigo-400 text-indigo-500 bg-indigo-50' : ''"
           :style="!sidebarOpen ? 'border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);' : ''"
           @click="sidebarOpen = !sidebarOpen" title="Task Groups"
         >
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+          <svg class="w-3.5 md:w-4 h-3.5 md:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
         </button>
       </div>
     </div>
@@ -229,16 +303,19 @@
 
     <!-- BOARD + SIDEBAR WRAPPER -->
     <div class="flex flex-1 overflow-hidden relative">
+    <!-- LEFT SIDEBAR BACKDROP (mobile) -->
+    <Transition name="sidebar-backdrop">
+      <div v-if="sidebarOpen && isMobile" class="fixed inset-0 z-[199] bg-[rgba(15,23,42,0.5)] backdrop-blur-sm" @click="sidebarOpen = false"></div>
+    </Transition>
 
     <!-- LEFT SIDEBAR -->
     <Transition name="sidebar">
       <aside
         v-if="sidebarOpen"
         class="flex flex-col shrink-0 overflow-hidden"
-        :class="isMobile ? 'fixed z-[200] top-[48px] bottom-[56px] left-0 w-[min(280px,85%)] shadow-[4px_0_32px_rgba(0,0,0,0.22)]' : 'w-[260px] relative z-0'"
+        :class="isMobile ? 'fixed z-[200] left-0 top-0 bottom-0 w-[min(280px,80vw)] shadow-[4px_0_32px_rgba(0,0,0,0.22)]' : 'w-[260px] relative z-0'"
         style="background:var(--bg-surface);border-right:1px solid var(--border-base);"
       >
-        <div v-if="isMobile" class="fixed inset-0 -z-10 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" @click="sidebarOpen = false"></div>
         <div class="flex items-center justify-between px-4 py-3.5 pb-3 shrink-0" style="border-bottom:1px solid var(--border-base);">
           <span class="text-[13px] font-bold" style="color:var(--text-primary);">Task Groups</span>
           <button class="w-[26px] h-[26px] rounded-[7px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-colors hover:bg-red-50 hover:text-red-500" style="color:var(--text-subtle);" @click="sidebarOpen = false">
@@ -802,12 +879,19 @@
 </template>
 
 <script setup lang="ts">
-import { createProjectSprint, listProjectSprints, type SprintSummary } from '@/api/sprints'
-import { listProjectGroups, type TaskGroup } from '@/api/tasks'
+import type { SprintSummary } from '@/api/sprints'
+import type { TaskGroup } from '@/api/tasks'
 import { useToast } from '@/composables/useToast'
+import { useUserSettingsQuery } from '@/features/settings/composables/useUserSettings'
+import { fetchProjectGroupsQuery } from '@/features/tasks/composables/useTaskGroupsQuery'
+import {
+  fetchProjectSprintsQuery,
+  useCreateProjectSprintMutation,
+} from '@/features/tasks/composables/useSprintsQuery'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
+import { useAuthStore } from '@/stores/auth.store'
 import type { User } from '@/types/user.types'
 import { storeToRefs } from 'pinia'
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
@@ -818,7 +902,10 @@ import TaskDetailModal from './TaskDetailModal.vue'
 
 const store = useTaskStore()
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
+const userSettingsQuery = useUserSettingsQuery()
 const { currentProjectId } = storeToRefs(projectStore)
+const createSprintMutation = useCreateProjectSprintMutation()
 const toast = useToast()
 const route = useRoute()
 const routeProjectId = computed(() =>
@@ -828,6 +915,14 @@ const effectiveProjectId = computed(() => routeProjectId.value ?? currentProject
 
 /* ── Types ─────────────────────────────────────────────────────── */
 interface Member { initial: string; name: string; color: string }
+type ProjectMember = {
+  id: string
+  name: string
+  initials: string
+  color: string
+  role?: string
+}
+type RolePermissionMatrix = Record<string, { canCreateTask: boolean }>
 interface Subtasks { done: number; total: number }
 interface Task {
   id: string
@@ -851,34 +946,41 @@ interface Sprint {
   members: Member[]
 }
 
-/* ── Columns (hardcoded 3) ─────────────────────────────────────── */
+/* ── Columns ─────────────────────────────────────────────────────── */
 const columns = [
   { id: 'todo',       title: 'To Do',       color: '#6366f1', emptyIcon: '📋', emptyText: 'No tasks here yet. Add one!' },
   { id: 'inprogress', title: 'In Progress',  color: '#f59e0b', emptyIcon: '🚧', emptyText: 'Nothing in progress. Start a task!' },
   { id: 'done',       title: 'Done',         color: '#10b981', emptyIcon: '🎉', emptyText: 'No completed tasks yet.' },
 ]
 
-/* ── Members ───────────────────────────────────────────────────── */
-const allMembers: Member[] = [
-  { initial: 'A', name: 'Alice', color: '#6366f1' },
-  { initial: 'B', name: 'Bob',   color: '#ec4899' },
-  { initial: 'C', name: 'Carol', color: '#f59e0b' },
-  { initial: 'D', name: 'David', color: '#10b981' },
-  { initial: 'E', name: 'Eva',   color: '#0ea5e9' },
-]
-
-/* ── Sprints ────────────────────────────────────────────────────── */
-const sprints = ref<Sprint[]>([
-  { id: 's1', name: 'Sprint 1', color: '#10b981', dates: 'Apr 1 – Apr 14',  members: allMembers.slice(0, 3) },
-  { id: 's2', name: 'Sprint 2', color: '#6366f1', dates: 'Apr 15 – Apr 28', members: allMembers.slice(0, 4) },
-  { id: 's3', name: 'Sprint 3', color: '#f59e0b', dates: 'Apr 29 – May 12', members: allMembers },
-  { id: 's4', name: 'Sprint 4', color: '#ec4899', dates: 'May 13 – May 26', members: allMembers.slice(1) },
-  { id: 's5', name: 'Sprint 5', color: '#0ea5e9', dates: 'May 27 – Jun 9',  members: allMembers.slice(0, 5) },
-])
-
+const sprints = ref<Sprint[]>([])
 const selectedSprintId = ref('')
 const sprintMenuOpen = ref(false)
-const currentSprint = computed(() => sprints.value.find(s => s.id === selectedSprintId.value) ?? sprints.value[0])
+const sprintBtnRef = ref<HTMLElement | null>(null)
+const sprintDropStyle = ref<Record<string, string>>({})
+
+function updateSprintDropPos() {
+  const btn = sprintBtnRef.value
+  if (!btn) return
+  const rect = btn.getBoundingClientRect()
+  const dropWidth = 230
+  const viewportW = window.innerWidth
+  const left = Math.min(rect.left, viewportW - dropWidth - 8)
+  sprintDropStyle.value = {
+    top: `${rect.bottom + 6}px`,
+    left: `${left}px`,
+  }
+}
+
+function toggleSprintMenu() {
+  if (!sprintMenuOpen.value) updateSprintDropPos()
+  sprintMenuOpen.value = !sprintMenuOpen.value
+}
+
+const emptySprint: Sprint = { id: '', name: 'Backlog', color: '#64748b', dates: '', members: [] }
+const currentSprint = computed(() =>
+  sprints.value.find((s) => s.id === selectedSprintId.value) ?? sprints.value[0] ?? emptySprint
+)
 const SPRINT_SELECTION_KEY_PREFIX = 'board_selected_sprint'
 
 function sprintSelectionKey(projectId: string) {
@@ -898,25 +1000,72 @@ function restoreSelectedSprint(projectId: string) {
 const memberPickerOpen = ref(false)
 const memberSearch = ref('')
 const memberPickerRef = ref<HTMLElement | null>(null)
+const memberPickerBtnRef = ref<HTMLElement | null>(null)
+const memberPickerDropRef = ref<HTMLElement | null>(null)
 const memberSearchInput = ref<HTMLInputElement | null>(null)
+const memberPickerStyle = ref<Record<string, string>>({})
 const visibleAvatarCount = 4
 const addingMemberId = ref<string | null>(null)
+const removingMemberId = ref<string | null>(null)
+const updatingRoleMemberId = ref<string | null>(null)
+const memberRoleOptions = ['ADMIN', 'DEVELOPER', 'VIEWER'] as const
 const assignableUsersQuery = useUsersQuery(memberSearch, {
-  enabled: computed(() => Boolean(memberPickerOpen.value && effectiveProjectId.value)),
-})
-
-const filteredPickerMembers = computed(() => {
-  const q = memberSearch.value.trim().toLowerCase()
-  if (!q) return store.members
-  return store.members.filter((m) => m.name.toLowerCase().includes(q))
+  enabled: computed(() =>
+    Boolean(memberPickerOpen.value && effectiveProjectId.value && memberSearch.value.trim())
+  ),
 })
 
 const selectedProjectMemberIds = computed(() => new Set(store.members.map((member) => member.id)))
-const searchedUsers = computed(() =>
-  (assignableUsersQuery.data.value ?? [])
+const searchedUsers = computed(() => {
+  if (!memberSearch.value.trim()) return []
+  return (assignableUsersQuery.data.value ?? [])
     .filter((user) => !selectedProjectMemberIds.value.has(user.id))
     .slice(0, 8)
+})
+const inviteLink = computed(() => {
+  if (!effectiveProjectId.value) return ''
+  if (typeof window === 'undefined') return `/projects/${effectiveProjectId.value}`
+  return `${window.location.origin}/projects/${effectiveProjectId.value}`
+})
+const currentUserProjectMember = computed<ProjectMember | null>(() =>
+  (store.members.find((member) => member.id === authStore.user?.id) as ProjectMember | undefined) ?? null
 )
+const canManageProjectMembers = computed(() => {
+  const role = (currentUserProjectMember.value?.role || '').toUpperCase()
+  return role === 'OWNER' || role === 'ADMIN'
+})
+
+const defaultRolePermissions: RolePermissionMatrix = {
+  OWNER: { canCreateTask: true },
+  ADMIN: { canCreateTask: true },
+  DEVELOPER: { canCreateTask: true },
+  VIEWER: { canCreateTask: false },
+}
+
+const rolePermissions = computed<RolePermissionMatrix>(() => {
+  const payload = userSettingsQuery.data.value?.data?.preferences
+  const maybeMatrix =
+    payload && typeof payload === 'object'
+      ? (payload as Record<string, unknown>)['projectRolePermissions']
+      : null
+  if (!maybeMatrix || typeof maybeMatrix !== 'object') return defaultRolePermissions
+
+  const safe: RolePermissionMatrix = { ...defaultRolePermissions }
+  for (const role of Object.keys(defaultRolePermissions)) {
+    const value = (maybeMatrix as Record<string, unknown>)[role]
+    if (value && typeof value === 'object') {
+      const canCreateTask = (value as Record<string, unknown>).canCreateTask
+      if (typeof canCreateTask === 'boolean') safe[role] = { canCreateTask }
+    }
+  }
+  return safe
+})
+
+const canCurrentUserCreateTask = computed(() => {
+  const role = (currentUserProjectMember.value?.role || 'DEVELOPER').toUpperCase()
+  if (role === 'OWNER' || role === 'ADMIN') return true
+  return rolePermissions.value[role]?.canCreateTask ?? false
+})
 
 function userInitials(user: User) {
   const raw = (user.fullName || user.email).trim()
@@ -935,11 +1084,41 @@ function userAvatarColor(user: User) {
   return palette[hash % palette.length]
 }
 
+function isProjectOwner(member: { role?: string | null }) {
+  return (member.role || '').toUpperCase() === 'OWNER'
+}
+
+function canUpdateMemberRole(member: { id: string; role?: string | null }) {
+  if (!canManageProjectMembers.value) return false
+  if (isProjectOwner(member)) return false
+  if (member.id === authStore.user?.id) return false
+  return true
+}
+
+function updateMemberPickerPos() {
+  const btn = memberPickerBtnRef.value
+  if (!btn || typeof window === 'undefined') return
+
+  const rect = btn.getBoundingClientRect()
+  const dropWidth = 260
+  const viewportW = window.innerWidth
+  const left = Math.max(12, Math.min(rect.right - dropWidth, viewportW - dropWidth - 12))
+
+  memberPickerStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 10}px`,
+    left: `${left}px`,
+    width: `${dropWidth}px`,
+    zIndex: '9999',
+  }
+}
+
 async function openMemberPicker() {
   memberPickerOpen.value = true
   sprintMenuOpen.value = false
   activeCardMenu.value = null
   await nextTick()
+  updateMemberPickerPos()
   memberSearchInput.value?.focus()
 }
 
@@ -959,9 +1138,74 @@ async function addMemberFromPicker(user: User) {
   }
 }
 
+async function removeMemberFromPicker(member: { id: string; name: string; role?: string | null }) {
+  if (!effectiveProjectId.value || removingMemberId.value) return
+  if (!canManageProjectMembers.value) return
+  if (isProjectOwner(member)) return
+
+  removingMemberId.value = member.id
+  try {
+    await store.removeMemberFromProject(effectiveProjectId.value, member.id)
+    syncBoardFromStore()
+    toast.success(`Removed ${member.name} from this project`)
+  } catch {
+    toast.error('Cannot remove member from this project')
+  } finally {
+    removingMemberId.value = null
+  }
+}
+
+async function updateMemberRoleFromPicker(member: ProjectMember, role: string) {
+  const nextRole = role.trim().toUpperCase()
+  const currentRole = (member.role || 'DEVELOPER').toUpperCase()
+  const allowedRoles = new Set(memberRoleOptions)
+  if (!effectiveProjectId.value || updatingRoleMemberId.value) return
+  if (!allowedRoles.has(nextRole as (typeof memberRoleOptions)[number])) return
+  if (!canUpdateMemberRole(member) || nextRole === currentRole) return
+
+  updatingRoleMemberId.value = member.id
+  try {
+    await store.updateMemberRoleInProject(effectiveProjectId.value, member.id, nextRole)
+    syncBoardFromStore()
+    toast.success(`Updated ${member.name} role to ${nextRole}`)
+  } catch {
+    toast.error('Cannot update member role')
+  } finally {
+    updatingRoleMemberId.value = null
+  }
+}
+
 function onMemberPickerDocClick(e: MouseEvent) {
-  if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node)) {
+  const target = e.target as Node
+  if (
+    memberPickerRef.value &&
+    !memberPickerRef.value.contains(target) &&
+    !memberPickerDropRef.value?.contains(target)
+  ) {
     memberPickerOpen.value = false
+  }
+}
+
+async function copyInviteLink() {
+  if (!inviteLink.value) {
+    toast.error('Cannot create invite link for this project')
+    return
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(inviteLink.value)
+    } else {
+      const input = document.createElement('input')
+      input.value = inviteLink.value
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+    }
+    toast.success('Invite link copied')
+  } catch {
+    toast.error('Cannot copy invite link')
   }
 }
 
@@ -994,7 +1238,7 @@ async function createSprint() {
   if (!newSprint.value.name.trim() || !effectiveProjectId.value) return
 
   try {
-    const created = await createProjectSprint({
+    const created = await createSprintMutation.mutateAsync({
       projectId: effectiveProjectId.value,
       name: newSprint.value.name.trim(),
       startDate: newSprint.value.startDate ? new Date(newSprint.value.startDate).toISOString() : undefined,
@@ -1014,46 +1258,7 @@ async function createSprint() {
 }
 
 /* ── Tasks per sprint ───────────────────────────────────────────── */
-function ds(n: number): string {
-  const d = new Date(); d.setDate(d.getDate() + n)
-  return d.toISOString().split('T')[0]
-}
-
-const tasksBySprintId = ref<Record<string, Task[]>>({
-  s1: [
-    { id: 's1-1', name: 'Market Research',     status: 'done',       priority: 'high',   due: ds(-5),  assignees: [allMembers[0]], tags: ['research'], subtasks: { done: 3, total: 3 } },
-    { id: 's1-2', name: 'Competitor Analysis', status: 'done',       priority: 'medium', due: ds(-3),  assignees: [allMembers[1]], tags: ['analysis'] },
-    { id: 's1-3', name: 'User Surveys',        status: 'inprogress', priority: 'high',   due: ds(2),   assignees: [allMembers[0], allMembers[2]], progress: 72, subtasks: { done: 4, total: 6 } },
-    { id: 's1-4', name: 'Persona Creation',    status: 'todo',       priority: 'low',    due: ds(5),   assignees: [allMembers[2]] },
-  ],
-  s2: [
-    { id: 's2-1',  name: 'Profile Design',        status: 'todo',       priority: 'medium', due: ds(3),  assignees: [allMembers[0]], tags: ['design', 'ux'], subtasks: { done: 1, total: 4 } },
-    { id: 's2-2',  name: 'Navigation Menu',        status: 'todo',       priority: 'low',    due: ds(5),  assignees: [allMembers[1]], tags: ['ui'] },
-    { id: 's2-3',  name: 'Login Flow',             status: 'todo',       priority: 'urgent', due: ds(1),  assignees: [allMembers[0], allMembers[2]], subtasks: { done: 0, total: 3 } },
-    { id: 's2-4',  name: 'Draw Sketches',          status: 'todo',       priority: 'high',   due: ds(4),  assignees: [allMembers[1]], tags: ['design'] },
-    { id: 's2-5',  name: 'Settings Page',          status: 'inprogress', priority: 'high',   due: ds(2),  assignees: [allMembers[2], allMembers[0]], tags: ['ui', 'ux'], progress: 65, subtasks: { done: 3, total: 5 } },
-    { id: 's2-6',  name: 'Build Wireframe',        status: 'inprogress', priority: 'urgent', due: ds(0),  assignees: [allMembers[1]], desc: 'Complete all screens for wireframing phase', progress: 40, subtasks: { done: 2, total: 5 } },
-    { id: 's2-7',  name: 'User Interface Design',  status: 'inprogress', priority: 'medium', due: ds(6),  assignees: [allMembers[2], allMembers[1]], tags: ['ui'], progress: 15 },
-    { id: 's2-8',  name: 'Homepage Redesign',      status: 'done',       priority: 'high',   due: ds(-2), assignees: [allMembers[0], allMembers[2]], subtasks: { done: 4, total: 4 } },
-    { id: 's2-9',  name: 'Integrate API Flows',    status: 'done',       priority: 'medium', due: ds(-1), assignees: [allMembers[1]], tags: ['dev'] },
-    { id: 's2-10', name: 'Services Module',        status: 'done',       priority: 'low',    due: ds(-3), assignees: [allMembers[2]], desc: 'Backend service layer complete' },
-  ],
-  s3: [
-    { id: 's3-1', name: 'Backend Architecture', status: 'todo',       priority: 'urgent', due: ds(7),  assignees: [allMembers[0], allMembers[3]], tags: ['dev'] },
-    { id: 's3-2', name: 'API Design',           status: 'inprogress', priority: 'high',   due: ds(4),  assignees: [allMembers[3]], progress: 30, subtasks: { done: 1, total: 5 } },
-    { id: 's3-3', name: 'Database Schema',      status: 'done',       priority: 'high',   due: ds(-1), assignees: [allMembers[0]] },
-  ],
-  s4: [
-    { id: 's4-1', name: 'QA Testing Phase',  status: 'todo',       priority: 'high',   due: ds(10), assignees: [allMembers[1], allMembers[4]] },
-    { id: 's4-2', name: 'Bug Fixing Sprint', status: 'inprogress', priority: 'urgent', due: ds(5),  assignees: [allMembers[0]], progress: 55, subtasks: { done: 3, total: 7 } },
-    { id: 's4-3', name: 'Code Review',       status: 'done',       priority: 'medium', due: ds(-2), assignees: [allMembers[2]] },
-  ],
-  s5: [
-    { id: 's5-1', name: 'Deploy to Production', status: 'todo',       priority: 'urgent', due: ds(14), assignees: allMembers },
-    { id: 's5-2', name: 'Performance Audit',    status: 'inprogress', priority: 'high',   due: ds(8),  assignees: [allMembers[0], allMembers[1]], progress: 20 },
-    { id: 's5-3', name: 'Documentation',        status: 'done',       priority: 'low',    due: ds(-1), assignees: [allMembers[4]] },
-  ],
-})
+const tasksBySprintId = ref<Record<string, Task[]>>({})
 
 const projectGroups = ref<TaskGroup[]>([])
 const groupByGroup = ref(false)
@@ -1106,8 +1311,6 @@ function syncBoardFromStore() {
     }))
   )
 
-  allMembers.splice(0, allMembers.length, ...store.members.map(toBoardMember))
-
   const nextTasksBySprint: Record<string, Task[]> = {
     '': tasksForSprint('').map(toBoardTask),
   }
@@ -1126,7 +1329,7 @@ function syncBoardFromStore() {
 const remoteSprintCache = ref<SprintSummary[]>([])
 
 async function loadProjectSprints(projectId: string) {
-  remoteSprintCache.value = await listProjectSprints(projectId)
+  remoteSprintCache.value = await fetchProjectSprintsQuery(projectId)
   sprints.value = [
     { id: '', name: 'Backlog', color: '#64748b', dates: 'No sprint', members: [] },
     ...remoteSprintCache.value.map((sprint, index) => ({
@@ -1153,12 +1356,11 @@ async function syncProjectBoard(projectId: string | null) {
     store.loadProjectBoard(projectId),
     store.loadProjectTrash(projectId),
     loadProjectSprints(projectId),
-    listProjectGroups(projectId).then((groups) => { projectGroups.value = groups }),
+    fetchProjectGroupsQuery(projectId).then((groups) => { projectGroups.value = groups }),
   ])
   syncBoardFromStore()
 }
 
-// routeProjectId là nguồn chính: khi URL thay đổi (link mới, chọn project khác), load lại data
 watch(
   routeProjectId,
   async (projectId) => {
@@ -1332,20 +1534,25 @@ async function createStatus() {
 /* ── Left Sidebar ──────────────────────────────────────────────── */
 const isMobile = ref(false)
 const sidebarOpen = ref(false)
+function handleBoardWindowResize() {
+  isMobile.value = window.innerWidth < 768
+  if (memberPickerOpen.value) updateMemberPickerPos()
+}
 
 onMounted(() => {
   isMobile.value = window.innerWidth < 768
   sidebarOpen.value = !isMobile.value // open by default on desktop only
   document.addEventListener('click', onMemberPickerDocClick)
   document.addEventListener('click', onDocColMenuClick)
-  window.addEventListener('resize', () => {
-    isMobile.value = window.innerWidth < 768
-  })
+  window.addEventListener('resize', handleBoardWindowResize)
+  window.addEventListener('scroll', updateMemberPickerPos, true)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onMemberPickerDocClick)
   document.removeEventListener('click', onDocColMenuClick)
+  window.removeEventListener('resize', handleBoardWindowResize)
+  window.removeEventListener('scroll', updateMemberPickerPos, true)
 })
 
 // Group definition for sidebar (static per sprint)
@@ -1479,6 +1686,10 @@ function openAiCreateTask() {
     toast.error('Please select a project first')
     return
   }
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
 
   if (!aiDefaultStatusId.value) {
     toast.error('Please create a status before creating tasks')
@@ -1534,6 +1745,10 @@ function modalToggleAssignee(id: string) {
 const modalGroupPickerOpen = ref(false)
 
 function addTask(colId: string) {
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
   newTask.value = { ...newTaskDefault(), status: colId,
     sprintId: selectedModalSprintId.value }
   modalLabelPickerOpen.value = false
@@ -1543,6 +1758,10 @@ function addTask(colId: string) {
 
 async function submitNewTask() {
   if (!newTask.value.name.trim() || !effectiveProjectId.value) return
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
   if (!newTask.value.status) {
     toast.error('Please select a status for the task')
     return
@@ -1710,15 +1929,24 @@ onMounted(() => {
     boardWrapObserver.observe(boardWrapRef.value)
     boardWrapWidth.value = boardWrapRef.value.getBoundingClientRect().width
   }
-  document.addEventListener('click', onMemberPickerDocClick)
 })
 onUnmounted(() => {
   boardWrapObserver?.disconnect()
-  document.removeEventListener('click', onMemberPickerDocClick)
 })
 </script>
 
 <style scoped>
+/* ── Sidebar transition ── */
+.sidebar-enter-active { animation: sbIn 0.22s cubic-bezier(0.22,1,0.36,1); }
+.sidebar-leave-active { animation: sbOut 0.18s ease forwards; }
+@keyframes sbIn  { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes sbOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-20px); } }
+
+/* ── Sidebar backdrop transition ── */
+.sidebar-backdrop-enter-active { transition: opacity 0.22s ease; }
+.sidebar-backdrop-leave-active { transition: opacity 0.18s ease; }
+.sidebar-backdrop-enter-from, .sidebar-backdrop-leave-to { opacity: 0; }
+
 * { box-sizing: border-box; }
 
 /* ── Sprint/card dropdown animation ── */
@@ -1848,9 +2076,9 @@ onUnmounted(() => {
 @media (max-width: 767px) {
   .board-col {
     /* On mobile override with viewport-based width */
-    width: calc(100vw - 48px) !important;
-    min-width: 260px;
-    max-width: 100%;
+    width: calc(100vw - 32px) !important;
+    min-width: 240px;
+    max-width: calc(100vw - 32px);
   }
 }
 /* ── Column 3-dot dropdown menu ────────────────────────────────── */

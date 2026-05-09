@@ -237,6 +237,39 @@
                 </label>
               </div>
             </div>
+
+            <div class="mt-5">
+              <h4 class="text-[0.95rem] font-bold m-0" style="color: var(--text-heading);">Role permissions</h4>
+              <p class="text-[0.8rem] mt-1 mb-2" style="color: var(--text-subtle);">
+                Owner/Admin can decide who can create tasks in this project.
+              </p>
+              <div class="flex flex-col gap-0 rounded-xl overflow-hidden border-[1.5px]" style="border-color: var(--border-base);">
+                <div
+                  v-for="perm in rolePermissions"
+                  :key="perm.role"
+                  class="notif-row flex items-center justify-between gap-4 px-[18px] py-3.5 border-b border-b-[var(--border-base)] last:border-b-0 transition-colors duration-150"
+                >
+                  <div class="flex flex-col gap-0.5">
+                    <span class="text-sm font-semibold" style="color: var(--text-primary);">{{ perm.role }}</span>
+                    <span class="text-[0.8rem]" style="color: var(--text-subtle);">Allow this role to create tasks.</span>
+                  </div>
+                  <label class="relative inline-flex cursor-pointer flex-shrink-0" :class="{ 'opacity-50 cursor-not-allowed': !canManageRolePermissions }">
+                    <input
+                      v-model="perm.canCreateTask"
+                      type="checkbox"
+                      class="toggle-input absolute opacity-0 w-0 h-0"
+                      :disabled="!canManageRolePermissions"
+                    >
+                    <span class="toggle-track block w-11 h-6 rounded-full relative transition-colors duration-[220ms]">
+                      <span class="toggle-thumb absolute top-[3px] left-[3px] w-[18px] h-[18px] rounded-full bg-white transition-transform duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]" style="box-shadow: 0 1px 4px rgba(0,0,0,0.20);" />
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <p v-if="!canManageRolePermissions" class="text-[0.78rem] mt-2 mb-0" style="color: var(--text-subtle);">
+                You need OWNER or ADMIN role in this project to change permission rules.
+              </p>
+            </div>
           </section>
         </template>
       </div>
@@ -293,8 +326,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
+import { useProjectStore } from '@/stores/project.store'
+import { useTaskStore } from '@/stores/task.store'
 import { useTheme } from '@/composables/useTheme'
 import uploadCloudIcon from '@/assets/icons/upload-cloud.svg?url'
 import pencilEditIcon from '@/assets/icons/pencil-edit.svg?url'
@@ -317,12 +352,16 @@ interface PasswordForm { current: string; newPw: string; confirm: string }
 interface ProfilePreview extends ProfileForm { fullName: string }
 interface Notification { id: string; title: string; desc: string; enabled: boolean }
 interface ThemeOption { value: UserSettings['theme']; label: string; icon: string }
+interface RolePermission { role: 'DEVELOPER' | 'VIEWER'; canCreateTask: boolean }
 interface SettingsSnapshot {
   form: ProfileForm; settings: UserSettings; pwForm: PasswordForm
   notifications: Array<{ id: string; enabled: boolean }>
+  rolePermissions: RolePermission[]
 }
 
 const authStore = useAuthStore()
+const projectStore = useProjectStore()
+const taskStore = useTaskStore()
 const { themeMode, setTheme } = useTheme()
 const userSettingsQuery = useUserSettingsQuery()
 const saveUserSettingsMutation = useSaveUserSettingsMutation()
@@ -366,9 +405,26 @@ const notifications = reactive<Notification[]>([
   { id: 'project', title: 'Project milestones', desc: 'When a project milestone is reached.', enabled: true },
   { id: 'mentions', title: 'Mentions', desc: 'When someone mentions you in a comment.', enabled: true },
 ])
+const rolePermissions = reactive<RolePermission[]>([
+  { role: 'DEVELOPER', canCreateTask: true },
+  { role: 'VIEWER', canCreateTask: false },
+])
+const currentProjectRole = computed(() => {
+  const me = taskStore.members.find((member) => member.id === authStore.user?.id)
+  return (me?.role || '').toUpperCase()
+})
+const canManageRolePermissions = computed(() =>
+  currentProjectRole.value === 'OWNER' || currentProjectRole.value === 'ADMIN'
+)
 
 function buildSnapshot(): SettingsSnapshot {
-  return { form: { ...form }, settings: { ...settings }, pwForm: { ...pwForm }, notifications: notifications.map((n) => ({ id: n.id, enabled: n.enabled })) }
+  return {
+    form: { ...form },
+    settings: { ...settings },
+    pwForm: { ...pwForm },
+    notifications: notifications.map((n) => ({ id: n.id, enabled: n.enabled })),
+    rolePermissions: rolePermissions.map((item) => ({ ...item })),
+  }
 }
 
 const originalSnapshot = ref<SettingsSnapshot>(buildSnapshot())
@@ -439,6 +495,10 @@ function applyLoadedUserSettings(payload?: UserSettingsApiData) {
     }
   }
   const profile = isRecord(payload.preferences) && isRecord(payload.preferences['profile']) ? payload.preferences['profile'] : null
+  const rolePermPayload =
+    isRecord(payload.preferences) && isRecord(payload.preferences['projectRolePermissions'])
+      ? payload.preferences['projectRolePermissions']
+      : null
   if (profile) {
     if (typeof profile.firstName === 'string') form.firstName = profile.firstName
     if (typeof profile.lastName === 'string') form.lastName = profile.lastName
@@ -448,18 +508,50 @@ function applyLoadedUserSettings(payload?: UserSettingsApiData) {
     if (typeof profile.avatarUrl === 'string') form.avatarUrl = profile.avatarUrl
     if (typeof profile.coverUrl === 'string') form.coverUrl = profile.coverUrl
   }
+  if (rolePermPayload) {
+    for (const item of rolePermissions) {
+      const maybeRole = rolePermPayload[item.role]
+      if (isRecord(maybeRole) && typeof maybeRole.canCreateTask === 'boolean') {
+        item.canCreateTask = maybeRole.canCreateTask
+      }
+    }
+  }
   originalSnapshot.value = buildSnapshot()
 }
 
 watch(() => userSettingsQuery.data.value?.data, (payload) => { applyLoadedUserSettings(payload) }, { immediate: true })
 watch(() => userSettingsQuery.error.value, (error) => { if (error) console.error('[SettingsView] Cannot load user settings', error) })
 
+onMounted(async () => {
+  if (!projectStore.currentProjectId || taskStore.members.length) return
+  try {
+    await taskStore.loadProjectBoard(projectStore.currentProjectId)
+  } catch (error) {
+    console.error('[SettingsView] Cannot load project members', error)
+  }
+})
+
 async function handleSave() {
   if (!isDirty.value || saving.value || loadingSettings.value || pwMismatch.value) return
   const userId = authStore.user?.id
   const notificationSettings = Object.fromEntries(notifications.map((item) => [item.id, item.enabled]))
   const fullName = `${form.firstName} ${form.lastName}`.trim()
-  const preferences = { profile: { firstName: form.firstName, lastName: form.lastName, jobTitle: form.jobTitle, phone: form.phone, bio: form.bio, avatarUrl: form.avatarUrl, coverUrl: form.coverUrl } }
+  const projectRolePermissions = Object.fromEntries(
+    rolePermissions.map((item) => [item.role, { canCreateTask: item.canCreateTask }])
+  )
+  const preferences = {
+    profile: {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      jobTitle: form.jobTitle,
+      phone: form.phone,
+      bio: form.bio,
+      avatarUrl: form.avatarUrl,
+      coverUrl: form.coverUrl,
+    },
+    projectRolePermissions,
+    currentProjectId: projectStore.currentProjectId ?? null,
+  }
   try {
     await saveUserSettingsMutation.mutateAsync({ userId, userProfile: { fullName, avatarUrl: form.avatarUrl, coverUrl: form.coverUrl, jobTitle: form.jobTitle, phone: form.phone, bio: form.bio, password: pwForm.newPw || undefined }, settings: { theme: toApiTheme(settings.theme), notificationSettings, preferences } })
     setTheme(settings.theme)
@@ -476,6 +568,10 @@ function handleCancel() {
   Object.assign(pwForm, { ...originalSnapshot.value.pwForm })
   setTheme(originalSnapshot.value.settings.theme)
   for (const n of notifications) { const saved = originalSnapshot.value.notifications.find((s) => s.id === n.id); if (saved) n.enabled = saved.enabled }
+  for (const p of rolePermissions) {
+    const saved = originalSnapshot.value.rolePermissions.find((s) => s.role === p.role)
+    if (saved) p.canCreateTask = saved.canCreateTask
+  }
 }
 
 function applyTheme(theme: UserSettings['theme']) { settings.theme = theme; setTheme(theme) }

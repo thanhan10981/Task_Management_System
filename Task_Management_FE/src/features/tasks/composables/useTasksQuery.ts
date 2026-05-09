@@ -127,6 +127,8 @@ export const useTasksQuery = (
   return useQuery({
     queryKey: computed(() => QUERY_KEYS.tasks.list(unref(params))),
     enabled,
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const response = await get('/tasks', { params: unref(params) })
       const parsed = taskListResponseSchema.parse(response)
@@ -142,6 +144,8 @@ export const useTasksQuery = (
 export const useTaskDetailQuery = (id: string) => {
   return useQuery({
     queryKey: QUERY_KEYS.tasks.detail(id),
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const response = await get(`/tasks/${id}`)
       const parsed = taskDetailResponseSchema.parse(response)

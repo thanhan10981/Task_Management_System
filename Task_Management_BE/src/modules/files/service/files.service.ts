@@ -134,6 +134,7 @@ export class FilesService {
         sizeBytes: typeof cloudinaryAsset.bytes === 'number' ? BigInt(cloudinaryAsset.bytes) : BigInt(pendingUpload.sizeBytes),
         projectId: pendingUpload.projectId,
         taskId: pendingUpload.taskId,
+        commentId: dto.commentId,
         uploadedBy: userId,
       });
 
@@ -436,6 +437,7 @@ export class FilesService {
         createdAt: true,
         uploadedBy: true,
         taskId: true,
+        commentId: true,
         folderPath: true,
         uploader: {
           select: {
@@ -465,6 +467,7 @@ export class FilesService {
         uploadedBy: file.uploadedBy,
         uploader: this.serializeUploaderProfile(file.uploader),
         taskId: file.taskId,
+        commentId: file.commentId,
         folderPath: file.folderPath,
         isSaved: true,
         canSaveToProject: true,
@@ -600,6 +603,7 @@ export class FilesService {
         fileType: true,
         fileCategory: true,
         sizeBytes: true,
+        commentId: true,
         fileUrl: true,
         uploader: {
           select: {
@@ -636,6 +640,7 @@ export class FilesService {
         isSaved: true,
         canSaveToProject: true,
         projectId: savedFile.projectId,
+        commentId: savedFile.commentId,
         folderPath: this.cloudinaryFileManagerService.normalizePath(savedFile.folderPath) ?? '',
       })),
       requestedBy: userId,

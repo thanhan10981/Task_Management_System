@@ -25,8 +25,8 @@ enum ProjectStatus {
 enum ProjectMemberRole {
   OWNER
   ADMIN
-  MEMBER
-  GUEST
+  DEVELOPER
+  VIEWER
 
   @@map("project_member_role")
 }
@@ -168,7 +168,7 @@ model ProjectMember {
   id        String            @id @default(uuid())
   projectId String
   userId    String
-  role      ProjectMemberRole @default(MEMBER)
+  role      ProjectMemberRole @default(DEVELOPER)
   joinedAt  DateTime          @default(now()) @db.Timestamptz(6)
   addedBy   String?
 

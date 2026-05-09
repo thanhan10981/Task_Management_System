@@ -455,7 +455,7 @@ const showProjectResolvingState = computed(
 )
 
 const taskQueryParams = computed(() =>
-  currentProjectId.value ? { projectId: currentProjectId.value } : {}
+  currentProjectId.value ? { projectId: currentProjectId.value, page: 1, limit: 100 } : {}
 )
 
 const {
@@ -488,7 +488,7 @@ const activeTabLabel = computed(
 const stats = computed(() => {
   const tasks = taskList.value
   return {
-    completed: tasks.filter((t) => t.status === 'done').length,
+    completed: chartSummary.value?.completedTasks ?? tasks.filter((t) => t.status === 'done').length,
     newTask: tasks.filter((t) => t.status === 'todo').length,
     projectDone: Math.round(chartSummary.value?.completionRate ?? 0),
   }

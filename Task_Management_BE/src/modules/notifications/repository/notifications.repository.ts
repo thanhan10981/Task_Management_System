@@ -10,6 +10,10 @@ export class NotificationsRepository {
     return this.prisma.notification.findUnique({ where: { id } });
   }
 
+  create(data: Prisma.NotificationUncheckedCreateInput) {
+    return this.prisma.notification.create({ data });
+  }
+
   listByUserId(userId: string, where: Prisma.NotificationWhereInput, skip: number, take: number) {
     return this.prisma.notification.findMany({
       where: {

@@ -1,7 +1,14 @@
 import { del, get, patch, post } from '@/api/client'
 import { getTaskFileMetadata, type CloudinaryFileMetadata } from '@/api/cloudinary'
-import { addProjectMember, listProjectMembers } from '@/api/projects'
+import {
+  addProjectMember,
+  listProjectMembers,
+  removeProjectMember,
+  updateProjectMemberRole,
+} from '@/api/projects'
+import { QUERY_KEYS } from '@/constants/query-keys'
 import { taskService } from '@/features/tasks/services/task.service'
+import { queryClient } from '@/lib/query-client'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -10,6 +17,7 @@ export interface Member {
   name: string
   initials: string
   color: string
+  role?: string
 }
 
 export interface Column {
@@ -47,6 +55,7 @@ export interface Attachment {
   format?: string
   resourceType?: string
   size: string
+  commentId?: string | null
 }
 
 export interface ActivityLog {
@@ -158,6 +167,7 @@ type RawProjectStatus = {
 type RawProjectMember = {
   userId?: string
   user?: RawUser | null
+  role?: string | null
 }
 
 type CreateProjectTaskPayload = {
@@ -388,6 +398,130 @@ export const useTaskStore = defineStore('tasks', () => {
   function unwrapList<T>(response: T[] | { data?: T[] }): T[] {
     if (Array.isArray(response)) return response
     return Array.isArray(response?.data) ? response.data : []
+  }
+
+  const PROJECT_TASKS_PARAMS = { page: 1, limit: 100 } as const
+  const LIVE_TASK_QUERY_OPTIONS = { staleTime: 0 } as const
+
+  function projectTasksParams(projectId: string) {
+    return { projectId, ...PROJECT_TASKS_PARAMS }
+  }
+
+  function projectTrashParams(projectId: string) {
+    return { projectId, deleted: 'true', ...PROJECT_TASKS_PARAMS }
+  }
+
+  function taskDetailParams() {
+    return { ...PROJECT_TASKS_PARAMS }
+  }
+
+  async function fetchProjectTasks(projectId: string) {
+    const response = await queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.list(projectTasksParams(projectId)),
+      queryFn: () => taskService.listTasks(projectTasksParams(projectId)),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+
+    return Array.isArray((response as { data?: unknown[] })?.data)
+      ? (response as { data: RawTask[] }).data
+      : []
+  }
+
+  function fetchProjectStatuses(projectId: string) {
+    return queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.statuses(projectId),
+      queryFn: () => taskService.listProjectStatuses(projectId),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+  }
+
+  function fetchProjectMembers(projectId: string) {
+    return queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.members(projectId),
+      queryFn: () => listProjectMembers(projectId),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+  }
+
+  async function fetchTrashTasks(projectId: string) {
+    const response = await queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.trash(projectId),
+      queryFn: () => taskService.listTasks(projectTrashParams(projectId)),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+
+    return Array.isArray((response as { data?: unknown[] })?.data)
+      ? (response as { data: RawTask[] }).data
+      : []
+  }
+
+  function fetchTaskDetail(taskId: string) {
+    return queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.detail(taskId),
+      queryFn: () => get<RawTask | { data?: RawTask }>(`/tasks/${taskId}`),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+  }
+
+  function fetchTaskSubtasks(taskId: string) {
+    return queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.subtasks(taskId),
+      queryFn: () =>
+        get<RawTask[] | { data?: RawTask[] }>(`/tasks/parent/${taskId}`, {
+          params: taskDetailParams(),
+        }),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+  }
+
+  function fetchTaskComments(taskId: string) {
+    return queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.comments(taskId),
+      queryFn: () =>
+        get<RawComment[] | { data?: RawComment[] }>(`/tasks/${taskId}/comments`, {
+          params: taskDetailParams(),
+        }),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+  }
+
+  function fetchTaskHistory(taskId: string) {
+    return queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.history(taskId),
+      queryFn: () =>
+        get<RawTaskHistory[] | { data?: RawTaskHistory[] }>(`/tasks/${taskId}/history`, {
+          params: taskDetailParams(),
+        }),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+  }
+
+  function fetchTaskFiles(projectId: string, taskId: string) {
+    return queryClient.fetchQuery({
+      queryKey: QUERY_KEYS.tasks.files(taskId),
+      queryFn: () => getTaskFileMetadata(projectId, taskId),
+      ...LIVE_TASK_QUERY_OPTIONS,
+    })
+  }
+
+  async function invalidateProjectTaskQueries(projectId?: string | null) {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.all }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.taskAnalytics.all }),
+      ...(projectId
+        ? [queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.allInProject(projectId) })]
+        : []),
+    ])
+  }
+
+  async function invalidateTaskDetailQueries(taskId: string) {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.detail(taskId) }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.subtasks(taskId) }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.comments(taskId) }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.history(taskId) }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.files(taskId) }),
+    ])
   }
 
   function upsertTask(rawTask: RawTask) {
@@ -675,6 +809,7 @@ export const useTaskStore = defineStore('tasks', () => {
         format: file.format,
         resourceType: file.resourceType,
         size: formatBytes(Number(file.bytes) || 0),
+        commentId: file.commentId,
       }))
     )
     updateTask(taskId, { files: attachmentsByTask(taskId).length })
@@ -703,11 +838,13 @@ export const useTaskStore = defineStore('tasks', () => {
     if (!id) return null
 
     const name = getDisplayName(rawMember.user)
+    const role = rawMember.role?.trim().toUpperCase() || undefined
     return {
       id,
       name,
       initials: initialsFromName(name),
       color: colorFromSeed(id || name),
+      role,
     }
   }
 
@@ -717,12 +854,12 @@ export const useTaskStore = defineStore('tasks', () => {
     members.value = nextMembers
       ? nextMembers
       : Array.from(
-          new Map(
-            nextTasks
-              .flatMap((task) => task.assignees)
-              .map((member) => [member.id, member] as const)
-          ).values()
-        )
+        new Map(
+          nextTasks
+            .flatMap((task) => task.assignees)
+            .map((member) => [member.id, member] as const)
+        ).values()
+      )
   }
 
   function tasksByCol(colId: string) {
@@ -751,6 +888,11 @@ export const useTaskStore = defineStore('tasks', () => {
     return attachments.value.filter((attachment) => attachment.taskId === taskId)
   }
 
+  // Only non-comment attachments (for the main Attachments section)
+  function attachmentsByTaskOnly(taskId: string) {
+    return attachments.value.filter((attachment) => attachment.taskId === taskId && !attachment.commentId)
+  }
+
   function getMember(id: string) {
     return members.value.find((member) => member.id === id)
   }
@@ -763,10 +905,10 @@ export const useTaskStore = defineStore('tasks', () => {
     loading.value = true
 
     try {
-      const [taskResponse, statusResponse, membersResponse] = await Promise.all([
-        taskService.listTasks({ projectId, page: 1, limit: 100 }),
-        taskService.listProjectStatuses(projectId),
-        listProjectMembers(projectId),
+      const [rawTasks, statusResponse, membersResponse] = await Promise.all([
+        fetchProjectTasks(projectId),
+        fetchProjectStatuses(projectId),
+        fetchProjectMembers(projectId),
       ])
 
       const rawStatuses = Array.isArray(statusResponse)
@@ -775,20 +917,18 @@ export const useTaskStore = defineStore('tasks', () => {
 
       const nextColumns = rawStatuses.length
         ? rawStatuses.map((status) => ({
-            id: status.id ?? '',
-            title: status.name ?? 'Untitled',
-            icon: getStatusIcon(status.id ?? '', inferColumnIcon(status.name ?? '', Boolean(status.isDone))),
-            color: status.color?.trim() || '#94a3b8',
-          }))
+          id: status.id ?? '',
+          title: status.name ?? 'Untitled',
+          icon: getStatusIcon(status.id ?? '', inferColumnIcon(status.name ?? '', Boolean(status.isDone))),
+          color: status.color?.trim() || '#94a3b8',
+        }))
         : []
 
-      const nextTasks = Array.isArray((taskResponse as { data?: unknown[] })?.data)
-        ? (taskResponse as { data: RawTask[] }).data.map(mapTask)
-        : []
+      const nextTasks = rawTasks.map(mapTask)
       const nextMembers = Array.isArray(membersResponse)
         ? membersResponse
-            .map((member) => mapProjectMember(member as RawProjectMember))
-            .filter((member): member is Member => Boolean(member))
+          .map((member) => mapProjectMember(member as RawProjectMember))
+          .filter((member): member is Member => Boolean(member))
         : []
 
       replaceBoardData(nextColumns, nextTasks, nextMembers)
@@ -802,16 +942,7 @@ export const useTaskStore = defineStore('tasks', () => {
     loadingTrash.value = true
 
     try {
-      const response = await taskService.listTasks({
-        projectId,
-        deleted: 'true',
-        page: 1,
-        limit: 100,
-      })
-      const rawTasks = Array.isArray((response as { data?: unknown[] })?.data)
-        ? (response as { data: RawTask[] }).data
-        : []
-
+      const rawTasks = await fetchTrashTasks(projectId)
       trashTasks.value = rawTasks.map(mapTask)
     } finally {
       loadingTrash.value = false
@@ -820,6 +951,19 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function addMemberToProject(projectId: string, userId: string) {
     await addProjectMember(projectId, userId)
+    await invalidateProjectTaskQueries(projectId)
+    await loadProjectBoard(projectId)
+  }
+
+  async function removeMemberFromProject(projectId: string, userId: string) {
+    await removeProjectMember(projectId, userId)
+    await invalidateProjectTaskQueries(projectId)
+    await loadProjectBoard(projectId)
+  }
+
+  async function updateMemberRoleInProject(projectId: string, userId: string, role: string) {
+    await updateProjectMemberRole(projectId, userId, role)
+    await invalidateProjectTaskQueries(projectId)
     await loadProjectBoard(projectId)
   }
 
@@ -854,6 +998,7 @@ export const useTaskStore = defineStore('tasks', () => {
         : undefined,
     })
 
+    await invalidateProjectTaskQueries(payload.projectId)
     await loadProjectBoard(payload.projectId)
   }
 
@@ -868,6 +1013,7 @@ export const useTaskStore = defineStore('tasks', () => {
       isDefault: columns.value.length === 0,
     })
 
+    await invalidateProjectTaskQueries(payload.projectId)
     await loadProjectBoard(payload.projectId)
 
     // Persist the chosen icon for the newly created column
@@ -883,6 +1029,7 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function updateStatusPosition(projectId: string, statusId: string, position: number) {
     await taskService.updateProjectStatus(projectId, statusId, { position })
+    await invalidateProjectTaskQueries(projectId)
     await loadProjectBoard(projectId)
   }
 
@@ -895,6 +1042,7 @@ export const useTaskStore = defineStore('tasks', () => {
       ...(data.title !== undefined && { name: data.title }),
       ...(data.color !== undefined && { color: data.color }),
     })
+    await invalidateProjectTaskQueries(projectId)
     await loadProjectBoard(projectId)
   }
 
@@ -915,6 +1063,7 @@ export const useTaskStore = defineStore('tasks', () => {
       )
     }
     await taskService.deleteProjectStatus(projectId, statusId)
+    await invalidateProjectTaskQueries(projectId)
     await loadProjectBoard(projectId)
   }
 
@@ -932,13 +1081,15 @@ export const useTaskStore = defineStore('tasks', () => {
       throw error
     }
 
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(projectId)
     if (loadedProjectId.value === projectId) {
       await loadProjectBoard(projectId)
     }
   }
 
   async function loadTaskDetail(taskId: string) {
-    const taskResponse = await get<RawTask | { data?: RawTask }>(`/tasks/${taskId}`)
+    const taskResponse = await fetchTaskDetail(taskId)
     const rawTask = unwrapPayload(taskResponse)
     upsertTask(rawTask)
 
@@ -948,16 +1099,10 @@ export const useTaskStore = defineStore('tasks', () => {
     }
 
     const [subtaskResponse, commentResponse, historyResponse, fileResponse] = await Promise.all([
-      get<RawTask[] | { data?: RawTask[] }>(`/tasks/parent/${taskId}`, {
-        params: { page: 1, limit: 100 },
-      }),
-      get<RawComment[] | { data?: RawComment[] }>(`/tasks/${taskId}/comments`, {
-        params: { page: 1, limit: 100 },
-      }),
-      get<RawTaskHistory[] | { data?: RawTaskHistory[] }>(`/tasks/${taskId}/history`, {
-        params: { page: 1, limit: 100 },
-      }),
-      rawTask.projectId ? getTaskFileMetadata(rawTask.projectId, taskId) : Promise.resolve([]),
+      fetchTaskSubtasks(taskId),
+      fetchTaskComments(taskId),
+      fetchTaskHistory(taskId),
+      rawTask.projectId ? fetchTaskFiles(rawTask.projectId, taskId) : Promise.resolve([]),
     ])
 
     replaceSubtasks(taskId, unwrapList(subtaskResponse))
@@ -968,7 +1113,11 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function updateTaskRemote(taskId: string, data: Record<string, unknown>) {
     const response = await patch<RawTask | { data?: RawTask }>(`/tasks/${taskId}`, data)
-    upsertTask(unwrapPayload(response))
+    const rawTask = unwrapPayload(response)
+    upsertTask(rawTask)
+    const projectId = rawTask.projectId ?? loadedProjectId.value
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(projectId)
     await loadTaskDetail(taskId)
   }
 
@@ -996,6 +1145,8 @@ export const useTaskStore = defineStore('tasks', () => {
       priority: parentTask.priority.toUpperCase(),
     })
 
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(loadedProjectId.value)
     await loadTaskDetail(taskId)
   }
 
@@ -1005,6 +1156,8 @@ export const useTaskStore = defineStore('tasks', () => {
     data: Record<string, unknown>
   ) {
     await patch(`/tasks/${subtaskId}`, data)
+    await invalidateTaskDetailQueries(parentTaskId)
+    await invalidateProjectTaskQueries(loadedProjectId.value)
     await loadTaskDetail(parentTaskId)
   }
 
@@ -1018,29 +1171,42 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function deleteSubtaskRemote(parentTaskId: string, subtaskId: string) {
     await del(`/tasks/${subtaskId}`)
+    await invalidateTaskDetailQueries(parentTaskId)
+    await invalidateProjectTaskQueries(loadedProjectId.value)
     await loadTaskDetail(parentTaskId)
   }
 
-  async function addCommentRemote(taskId: string, text: string, parentCommentId?: string) {
-    await post(`/tasks/${taskId}/comments`, {
+  async function addCommentRemote(taskId: string, text: string, parentCommentId?: string, mentionIds?: string[]) {
+    const response = await post<RawComment | { data?: RawComment }>(`/tasks/${taskId}/comments`, {
       content: text,
       parentCommentId,
+      mentionIds,
     })
+    const created = unwrapPayload(response)
+    // Invalidate and reload after returning so callers (e.g. submitComment with file upload)
+    // can use the created comment ID immediately
+    await invalidateTaskDetailQueries(taskId)
     await loadTaskDetail(taskId)
+    return created
   }
 
   async function deleteCommentRemote(taskId: string, commentId: string) {
     await del(`/tasks/${taskId}/comments/${commentId}`)
+    await invalidateTaskDetailQueries(taskId)
     await loadTaskDetail(taskId)
   }
 
   async function assignTaskMemberRemote(taskId: string, memberId: string) {
     await post(`/tasks/${taskId}/assignees`, { userId: memberId })
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(loadedProjectId.value)
     await loadTaskDetail(taskId)
   }
 
   async function unassignTaskMemberRemote(taskId: string, memberId: string) {
     await del(`/tasks/${taskId}/assignees/${memberId}`)
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(loadedProjectId.value)
     await loadTaskDetail(taskId)
   }
 
@@ -1053,6 +1219,8 @@ export const useTaskStore = defineStore('tasks', () => {
     attachments.value = attachments.value.filter((attachment) => attachment.taskId !== taskId)
 
     const nextProjectId = projectId ?? loadedProjectId.value
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(nextProjectId)
     if (nextProjectId) {
       await loadProjectTrash(nextProjectId)
     }
@@ -1065,6 +1233,8 @@ export const useTaskStore = defineStore('tasks', () => {
     upsertTask(restoredTask)
 
     const nextProjectId = projectId ?? restoredTask.projectId ?? loadedProjectId.value
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(nextProjectId)
     if (nextProjectId) {
       await loadProjectBoard(nextProjectId)
       await loadProjectTrash(nextProjectId)
@@ -1209,6 +1379,7 @@ export const useTaskStore = defineStore('tasks', () => {
     commentsByTask,
     activityByTask,
     attachmentsByTask,
+    attachmentsByTaskOnly,
     getMember,
     getTask,
     labelStyle,
@@ -1217,6 +1388,8 @@ export const useTaskStore = defineStore('tasks', () => {
     loadProjectTrash,
     resetProjectBoard,
     addMemberToProject,
+    removeMemberFromProject,
+    updateMemberRoleInProject,
     createTaskInProject,
     createStatusInProject,
     updateStatusInProject,

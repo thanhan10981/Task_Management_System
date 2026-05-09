@@ -51,4 +51,9 @@ export class FinalizeUploadDto {
   @IsInt()
   @Min(0)
   bytes?: number;
+
+  @ApiPropertyOptional({ description: 'Comment ID to associate this file with', example: '33333333-3333-3333-3333-333333333333' })
+  @IsOptional()
+  @IsUUID()
+  commentId?: string;
 }

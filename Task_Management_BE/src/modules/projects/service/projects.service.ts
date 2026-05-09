@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType, Prisma } from '@prisma/client';
+import { NotificationType, Prisma, ProjectMemberRole } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import {
@@ -65,12 +65,12 @@ export class ProjectsService {
             create: [
               {
                 userId,
-                role: 'OWNER',
+                role: ProjectMemberRole.OWNER,
                 addedBy: userId,
               },
               ...requestedMemberIds.map((memberId) => ({
                 userId: memberId,
-                role: 'MEMBER' as const,
+                role: ProjectMemberRole.DEVELOPER,
                 addedBy: userId,
               })),
             ],
@@ -92,11 +92,11 @@ export class ProjectsService {
             projectId: createdProject.id,
             type: NotificationType.SYSTEM,
             title: 'You were added to a project',
-            content: `You have been added to project "${createdProject.name}" as MEMBER.`,
+            content: `You have been added to project "${createdProject.name}" as DEVELOPER.`,
             data: {
               action: 'PROJECT_MEMBER_ADDED',
               projectId: createdProject.id,
-              role: 'MEMBER',
+              role: 'DEVELOPER',
               addedBy: userId,
             },
           })),
@@ -239,7 +239,7 @@ export class ProjectsService {
           data: newMemberIds.map((memberId) => ({
             projectId: id,
             userId: memberId,
-            role: 'MEMBER',
+            role: ProjectMemberRole.DEVELOPER,
             addedBy: userId,
           })),
           skipDuplicates: true,
@@ -251,11 +251,11 @@ export class ProjectsService {
             projectId: id,
             type: NotificationType.SYSTEM,
             title: 'You were added to a project',
-            content: `You have been added to project "${existingProject.name}" as MEMBER.`,
+            content: `You have been added to project "${existingProject.name}" as DEVELOPER.`,
             data: {
               action: 'PROJECT_MEMBER_ADDED',
               projectId: id,
-              role: 'MEMBER',
+              role: 'DEVELOPER',
               addedBy: userId,
             },
           })),
@@ -309,7 +309,7 @@ export class ProjectsService {
       const member = await this.projectsRepository.addProjectMember(
         projectId,
         dto.userId,
-        dto.role || 'MEMBER',
+        dto.role || ProjectMemberRole.DEVELOPER,
         userId,
         tx,
       );
@@ -321,11 +321,11 @@ export class ProjectsService {
             project: { connect: { id: projectId } },
             type: NotificationType.SYSTEM,
             title: 'You were added to a project',
-            content: `You have been added to project "${project.name}" as ${dto.role || 'MEMBER'}.`,
+            content: `You have been added to project "${project.name}" as ${dto.role || ProjectMemberRole.DEVELOPER}.`,
             data: {
               action: 'PROJECT_MEMBER_ADDED',
               projectId,
-              role: dto.role || 'MEMBER',
+              role: dto.role || ProjectMemberRole.DEVELOPER,
               addedBy: userId,
             },
           },
@@ -337,7 +337,7 @@ export class ProjectsService {
     });
 
     this.logger.log(
-      `User ${dto.userId} added to project ${projectId} by ${userId} as ${dto.role || 'MEMBER'}`,
+      `User ${dto.userId} added to project ${projectId} by ${userId} as ${dto.role || ProjectMemberRole.DEVELOPER}`,
     );
 
     return createdMember;
@@ -364,7 +364,7 @@ export class ProjectsService {
       throw new NotFoundException('Project member not found');
     }
 
-    if (project.createdBy === memberUserId && dto.role !== 'OWNER') {
+    if (project.createdBy === memberUserId && dto.role !== ProjectMemberRole.OWNER) {
       throw new ForbiddenException('Project owner role cannot be downgraded');
     }
 

@@ -21,6 +21,8 @@ export interface EnvVariables {
   MAIL_PUBLIC_FROM_ADDRESS?: string;
   REMINDER_THRESHOLDS_MINUTES?: string;
   RESET_PASSWORD_CODE_EXPIRES_MINUTES?: number;
+  GEMINI_API_KEY?: string;
+  GEMINI_FALLBACK_MODEL?: string;
   REDIS_HOST: string;
   REDIS_PORT: number;
   REDIS_PASSWORD?: string;
@@ -170,6 +172,8 @@ export function validate(config: RawConfig): EnvVariables {
     RESET_PASSWORD_CODE_EXPIRES_MINUTES: config.RESET_PASSWORD_CODE_EXPIRES_MINUTES
       ? readNumber(config, 'RESET_PASSWORD_CODE_EXPIRES_MINUTES', 15)
       : undefined,
+    GEMINI_API_KEY: readString(config, 'GEMINI_API_KEY') || undefined,
+    GEMINI_FALLBACK_MODEL: readString(config, 'GEMINI_FALLBACK_MODEL') || undefined,
     REDIS_HOST: redisHost,
     REDIS_PORT: readRequiredNumber(config, 'REDIS_PORT'),
     REDIS_PASSWORD: readString(config, 'REDIS_PASSWORD') || undefined,

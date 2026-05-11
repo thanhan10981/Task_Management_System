@@ -38,7 +38,7 @@ export class ProjectAccessService {
     }
 
     const memberRole = project.members[0]?.role ?? null;
-    const isOwner = project.createdBy === userId || memberRole === 'OWNER';
+    const isOwner = project.createdBy === userId || memberRole === ProjectMemberRole.OWNER;
 
     if (!isOwner && !memberRole) {
       throw new ForbiddenException('You do not have access to this project');
@@ -57,7 +57,7 @@ export class ProjectAccessService {
   ): Promise<ProjectAccessContext> {
     const access = await this.ensureProjectMember(userId, projectId);
 
-    if (!access.isOwner && access.role !== 'ADMIN') {
+    if (!access.isOwner && access.role !== ProjectMemberRole.ADMIN) {
       throw new ForbiddenException(
         'Only project owner or admin can perform this action',
       );

@@ -60,6 +60,7 @@ export interface CloudinaryFileMetadata {
   uploadedBy?: string | null
   uploader?: SharedMember | null
   taskId?: string | null
+  commentId?: string | null
   isSaved?: boolean
   canSaveToProject?: boolean
   projectId?: string | null

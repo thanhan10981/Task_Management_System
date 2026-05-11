@@ -10,6 +10,34 @@
 
       <div class="flex items-center gap-2 sm:gap-3 shrink-0">
 
+        <!-- ── VIEW MODE TOGGLE ─────────────────────────────── -->
+        <div class="view-toggle-group">
+          <button
+            class="view-toggle-btn"
+            :class="{ 'view-toggle-btn--active': viewMode === 'board' }"
+            title="Board view"
+            @click="setViewMode('board')"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="8" rx="1.5"/><rect x="14" y="3" width="7" height="8" rx="1.5"/>
+              <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+            </svg>
+            <span class="hidden sm:inline">Board</span>
+          </button>
+          <button
+            class="view-toggle-btn"
+            :class="{ 'view-toggle-btn--active': viewMode === 'list' }"
+            title="List view"
+            @click="setViewMode('list')"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+              <circle cx="3" cy="6" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="3" cy="18" r="1"/>
+            </svg>
+            <span class="hidden sm:inline">List</span>
+          </button>
+        </div>
+
         <!-- ── MEMBER PICKER ─────────────────────────────────── -->
         <div class="relative" ref="memberPickerRef">
           <div class="flex items-center gap-1.5">
@@ -35,109 +63,162 @@
 
             <!-- Assign / manage button -->
             <button
-              class="mp-add-btn"
-              :class="{ 'mp-add-btn--open': memberPickerOpen }"
+              ref="memberPickerBtnRef"
+              class="flex items-center gap-1.5 h-[34px] px-3.5 rounded-[10px] border-none text-[12.5px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
+              :class="{ 'opacity-90 -translate-y-px': memberPickerOpen }"
+              style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
               title="Manage members"
               @click.stop="memberPickerOpen ? (memberPickerOpen = false) : openMemberPicker()"
             >
-              <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-                <line x1="10" y1="4" x2="10" y2="16"/>
-                <line x1="4" y1="10" x2="16" y2="10"/>
-              </svg>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Invite
             </button>
           </div>
 
-          <!-- Dropdown -->
-          <Transition name="mp-drop">
-            <div v-if="memberPickerOpen" class="mp-dropdown" @click.stop>
-              <!-- Header -->
-              <div class="mp-dropdown-head">
-                <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Project Members</span>
-                <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
-              </div>
+          <!-- Dropdown — Teleport to body to escape overflow:hidden -->
+          <Teleport to="body">
+            <Transition name="mp-drop">
+              <div
+                v-if="memberPickerOpen"
+                ref="memberPickerDropRef"
+                class="mp-dropdown board-mp-dropdown"
+                :style="memberPickerStyle"
+                @click.stop
+              >
+                <div class="mp-dropdown-head">
+                  <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Project Members</span>
+                  <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
+                </div>
 
-              <!-- Search -->
-              <div class="mp-search-wrap">
-                <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-subtle)"><circle cx="8.5" cy="8.5" r="5"/><line x1="13" y1="13" x2="17" y2="17"/></svg>
-                <input
-                  v-model="memberSearch"
-                  class="mp-search"
-                  placeholder="Search user to add…"
-                  ref="memberSearchInput"
-                />
-              </div>
+                <div class="mp-search-wrap">
+                  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-subtle)"><circle cx="8.5" cy="8.5" r="5"/><line x1="13" y1="13" x2="17" y2="17"/></svg>
+                  <input
+                    v-model="memberSearch"
+                    class="mp-search"
+                    placeholder="Search user to add..."
+                    ref="memberSearchInput"
+                  />
+                </div>
 
-              <!-- Member list -->
-              <div class="mp-list">
-                <div
-                  v-for="m in filteredPickerMembers" :key="m.id"
-                  class="mp-item"
-                >
-                  <div class="mp-item-avatar" :style="{ background: m.color }">{{ m.initials }}</div>
-                  <div class="mp-item-info">
-                    <span class="mp-item-name">{{ m.name }}</span>
+                <div class="px-2 pt-1 pb-2">
+                  <button
+                    type="button"
+                    class="w-full h-[32px] px-2.5 rounded-[8px] border text-[12px] font-semibold transition-colors flex items-center justify-center gap-1.5"
+                    style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-secondary);"
+                    @click="copyInviteLink"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l2.92-2.92a5 5 0 0 0-7.07-7.07L11.8 5"/><path d="M14 11a5 5 0 0 0-7.54-.54L3.54 13.38a5 5 0 0 0 7.07 7.07L12.2 19"/></svg>
+                    Copy invite link
+                  </button>
+                </div>
+
+                <div class="mp-list">
+                  <div class="mp-dropdown-head">
+                    <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Current Members</span>
+                    <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
+                  </div>
+
+                  <div
+                    v-for="m in store.members"
+                    :key="m.id"
+                    class="mp-item w-full text-left"
+                  >
+                    <div class="mp-item-avatar" :style="{ background: m.color }">{{ m.initials }}</div>
+                    <div class="mp-item-info">
+                      <span class="mp-item-name">{{ m.name }}</span>
+                      <span class="text-[10px] font-semibold uppercase" style="color:var(--text-subtle)">
+                        {{ (m.role || 'DEVELOPER').toUpperCase() }}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <select
+                        v-if="canUpdateMemberRole(m)"
+                        class="h-[24px] px-1.5 rounded-md border text-[10px] font-semibold"
+                        style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-secondary);"
+                        :disabled="updatingRoleMemberId === m.id"
+                        :value="(m.role || 'DEVELOPER').toUpperCase()"
+                        @change="updateMemberRoleFromPicker(m, ($event.target as HTMLSelectElement).value)"
+                      >
+                        <option v-for="role in memberRoleOptions" :key="role" :value="role">{{ role }}</option>
+                      </select>
+                      <button
+                        v-if="canManageProjectMembers && !isProjectOwner(m) && m.id !== authStore.user?.id"
+                        type="button"
+                        class="mp-item-check"
+                        style="color:#ef4444;font-size:11px"
+                        :disabled="removingMemberId === m.id"
+                        @click="removeMemberFromPicker(m)"
+                      >
+                        {{ removingMemberId === m.id ? 'Removing...' : 'Remove' }}
+                      </button>
+                      <span
+                        v-else
+                        class="mp-item-check"
+                        style="color:var(--text-subtle);font-size:10px"
+                      >
+                        {{ isProjectOwner(m) ? 'Owner' : m.id === authStore.user?.id ? 'You' : '' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div v-if="memberSearch.trim()" class="mp-dropdown-head">
+                    <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Search Results</span>
+                    <span class="text-[10px]" style="color:var(--text-subtle)">{{ searchedUsers.length }} available</span>
+                  </div>
+
+                  <button
+                    v-for="user in searchedUsers"
+                    :key="user.id"
+                    type="button"
+                    class="mp-item w-full text-left"
+                    :disabled="addingMemberId === user.id"
+                    @click="addMemberFromPicker(user)"
+                  >
+                    <div class="mp-item-avatar" :style="{ background: userAvatarColor(user) }">
+                      {{ userInitials(user) }}
+                    </div>
+                    <div class="mp-item-info">
+                      <span class="mp-item-name">{{ user.fullName || user.email }}</span>
+                    </div>
+                    <span class="mp-item-check" style="color:#6366f1;font-size:11px">
+                      {{ addingMemberId === user.id ? 'Adding...' : 'Add' }}
+                    </span>
+                  </button>
+
+                  <div v-if="assignableUsersQuery.isPending.value && memberSearch.trim()" class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
+                    Searching users...
+                  </div>
+
+                  <div v-else-if="memberSearch.trim() && searchedUsers.length === 0" class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
+                    No users available to add
+                  </div>
+
+                  <div v-else class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
+                    Type a name or email to search users
                   </div>
                 </div>
 
-                <div v-if="memberSearch.trim()" class="mp-dropdown-head">
-                  <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Search Results</span>
-                  <span class="text-[10px]" style="color:var(--text-subtle)">{{ searchedUsers.length }} available</span>
-                </div>
-
-                <button
-                  v-for="user in searchedUsers"
-                  :key="user.id"
-                  type="button"
-                  class="mp-item w-full text-left"
-                  :disabled="addingMemberId === user.id"
-                  @click="addMemberFromPicker(user)"
-                >
-                  <div class="mp-item-avatar" :style="{ background: userAvatarColor(user) }">
-                    {{ userInitials(user) }}
-                  </div>
-                  <div class="mp-item-info">
-                    <span class="mp-item-name">{{ user.fullName || user.email }}</span>
-                  </div>
-                  <span class="mp-item-check" style="color:#6366f1;font-size:11px">
-                    {{ addingMemberId === user.id ? 'Adding...' : 'Add' }}
-                  </span>
-                </button>
-
-                <div
-                  v-if="assignableUsersQuery.isPending.value && memberSearch.trim()"
-                  class="py-4 text-center text-[12px]"
-                  style="color:var(--text-subtle)"
-                >
-                  Searching users...
-                </div>
-
-                <div
-                  v-else-if="memberSearch.trim() && searchedUsers.length === 0"
-                  class="py-4 text-center text-[12px]"
-                  style="color:var(--text-subtle)"
-                >
-                  No users available to add
-                </div>
-
-                <div v-else-if="filteredPickerMembers.length === 0" class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
-                  No members found
+                <div class="mp-footer">
+                  <button class="mp-footer-btn mp-footer-btn--ghost" @click="memberSearch = ''">Clear search</button>
+                  <button class="mp-footer-btn mp-footer-btn--primary" @click="memberPickerOpen = false">Done</button>
                 </div>
               </div>
-
-              <!-- Footer actions -->
-              <div class="mp-footer">
-                <button
-                  class="mp-footer-btn mp-footer-btn--ghost"
-                  @click="memberSearch = ''"
-                >Clear search</button>
-                <button
-                  class="mp-footer-btn mp-footer-btn--primary"
-                  @click="memberPickerOpen = false"
-                >Done</button>
-              </div>
-            </div>
-          </Transition>
+            </Transition>
+          </Teleport>
         </div><!-- /member picker -->
+
+        <button
+          class="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-[10px] border-none text-[12px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
+          style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
+          title="AI Create Task"
+          @click="openAiCreateTask"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+            <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+          </svg>
+          
+        </button>
 
         <!-- Trash -->
         <button
@@ -150,16 +231,23 @@
           <span v-if="trashCount" class="absolute -top-[5px] -right-[5px] min-w-[15px] h-[15px] inline-flex items-center justify-center px-1 rounded-full bg-indigo-500 text-white text-[9px] font-bold leading-none border-[1.5px] border-[var(--bg-app)] pointer-events-none">{{ trashCount }}</span>
         </button>
 
-        <!-- Toggle panel button -->
+        <!-- Toggle panel button — Create new -->
         <button
-          class="w-8 h-8 rounded-xl border-none flex items-center justify-center cursor-pointer transition-all duration-150"
-          :style="sidebarOpen
-            ? 'background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,0.3);'
-            : 'background:var(--btn-bg);color:var(--text-muted);border:1.5px solid var(--btn-border);'"
-          :title="sidebarOpen ? 'Close panel' : 'Open panel'"
+          class="sidebar-create-btn"
+          :class="sidebarOpen ? 'sidebar-create-btn--open' : ''"
+          :title="sidebarOpen ? 'Close panel' : 'New Task / Status / Group'"
           @click="sidebarOpen = !sidebarOpen"
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+          <template v-if="!sidebarOpen">
+            <!-- Closed: + New -->
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>New</span>
+          </template>
+          <template v-else>
+            <!-- Open: × close -->
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+            <span class="hidden sm:inline">Close</span>
+          </template>
         </button>
 
       </div>
@@ -169,7 +257,7 @@
     <div class="flex-1 min-h-0 overflow-hidden relative">
 
       <!-- ── KANBAN COLUMNS ──────────────────────────────────────────────── -->
-      <div class="w-full h-full overflow-x-auto overflow-y-hidden">
+      <div v-if="viewMode === 'board'" class="w-full h-full overflow-x-auto overflow-y-hidden">
         <draggable
           v-model="columnsModel"
           item-key="id"
@@ -370,6 +458,201 @@
 
         </draggable>
       </div><!-- /kanban scroll area -->
+
+      <!-- ══ LIST VIEW ════════════════════════════════════════════════════════ -->
+      <div v-if="viewMode === 'list'" class="lv-container">
+
+        <!-- Empty state: no columns -->
+        <div v-if="store.columns.length === 0" class="lv-empty-state">
+          <div class="lv-empty-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+          </div>
+          <p class="lv-empty-title">No statuses yet</p>
+          <p class="lv-empty-sub">Create a status column to start adding tasks</p>
+        </div>
+
+        <!-- Status groups -->
+        <div v-for="col in store.columns" :key="col.id" class="lv-group">
+
+          <!-- Group header row -->
+          <div
+            class="lv-group-header"
+            @click="editingColId !== col.id && toggleGroup(col.id)"
+          >
+            <span class="lv-group-chevron" :class="{ 'lv-group-chevron--collapsed': collapsedGroups.has(col.id) }">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+            <span class="lv-group-dot" :style="{ background: col.color }"/>
+
+            <!-- Inline edit title (reuses board logic) -->
+            <template v-if="editingColId === col.id">
+              <input
+                :ref="el => { if (el) colEditInputs[col.id] = el as HTMLInputElement }"
+                v-model="editingColTitle"
+                class="lv-group-edit-input"
+                @keydown.enter.prevent="saveColEdit"
+                @keydown.escape.prevent="cancelColEdit"
+                @click.stop
+              />
+              <button class="lv-group-edit-btn lv-group-edit-btn--save" title="Save" @click.stop="saveColEdit">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <button class="lv-group-edit-btn" title="Cancel" @click.stop="cancelColEdit">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+              </button>
+            </template>
+
+            <!-- Normal title -->
+            <template v-else>
+              <span class="lv-group-name">{{ col.title }}</span>
+              <span class="lv-group-count" :style="{ background: col.color + '20', color: col.color }">
+                {{ store.tasksByCol(col.id).length }}
+              </span>
+              <span class="lv-group-add" @click.stop="sidebarOpen=true; activeTab='task'; newTask.status=col.id" title="Add task">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add task
+            </span>
+
+            <!-- Kebab menu -->
+            <div class="relative lv-group-menu-wrap" :ref="el => { if (el) colMenuRefs[col.id] = el as HTMLElement }" @click.stop>
+              <button
+                class="lv-group-kebab"
+                title="More options"
+                @click.stop="toggleColMenu(col.id)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/></svg>
+              </button>
+              <Transition name="cm-drop">
+                <div v-if="openColMenuId === col.id" class="col-menu-dropdown" @click.stop>
+                  <button class="col-menu-item" @click.stop="startColEdit(col)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    Edit
+                  </button>
+                  <button class="col-menu-item col-menu-item--danger" @click.stop="startColDelete(col)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    Delete
+                  </button>
+                </div>
+              </Transition>
+            </div>
+            </template>
+          </div>
+
+          <!-- Task table -->
+          <div v-if="!collapsedGroups.has(col.id)" class="lv-table-wrap">
+            <table class="lv-table">
+              <colgroup>
+                <col class="lv-col-title"/>
+                <col class="lv-col-priority"/>
+                <col class="lv-col-label"/>
+                <col class="lv-col-assignees"/>
+                <col class="lv-col-due"/>
+                <col class="lv-col-meta"/>
+              </colgroup>
+              <thead>
+                <tr class="lv-thead-row">
+                  <th class="lv-th">Title</th>
+                  <th class="lv-th lv-th--center">Priority</th>
+                  <th class="lv-th">Label</th>
+                  <th class="lv-th">Assignees</th>
+                  <th class="lv-th">Due Date</th>
+                  <th class="lv-th lv-th--center"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(task, idx) in store.tasksByCol(col.id)"
+                  :key="task.id"
+                  class="lv-row"
+                  :style="{ animationDelay: `${idx * 30}ms` }"
+                  @click="openTaskModal(task.id)"
+                >
+                  <!-- Title -->
+                  <td class="lv-td lv-td-title">
+                    <div class="lv-task-title-wrap">
+                      <span class="lv-task-dot" :style="{ background: col.color }"/>
+                      <span class="lv-task-title">{{ task.title }}</span>
+                      <span v-if="store.subtaskProgress(task.id).total > 0" class="lv-subtask-badge">
+                        {{ store.subtaskProgress(task.id).done }}/{{ store.subtaskProgress(task.id).total }}
+                      </span>
+                    </div>
+                    <p v-if="task.description && !task.description.startsWith('<')" class="lv-task-desc">{{ task.description }}</p>
+                  </td>
+
+                  <!-- Priority -->
+                  <td class="lv-td lv-td--center">
+                    <span class="kb-prio-badge" :class="`kb-prio-${task.priority}`">
+                      {{ priorityBadge[task.priority]?.label }}
+                    </span>
+                  </td>
+
+                  <!-- Label -->
+                  <td class="lv-td">
+                    <span
+                      v-if="task.label"
+                      class="kb-card-label"
+                      :style="{ background: task.labelBg, color: task.labelColor }"
+                    >{{ task.label }}</span>
+                    <span v-else class="lv-no-val">—</span>
+                  </td>
+
+                  <!-- Assignees -->
+                  <td class="lv-td">
+                    <div class="lv-assignees">
+                      <div
+                        v-for="m in task.assignees.slice(0, 4)" :key="m.id"
+                        class="kb-avatar-sm"
+                        :style="{ background: m.color }"
+                        :title="m.name"
+                      >{{ m.initials }}</div>
+                      <span
+                        v-if="task.assignees.length > 4"
+                        class="kb-avatar-sm text-[8px]"
+                        style="background:var(--bg-surface-3);color:var(--text-muted)"
+                      >+{{ task.assignees.length - 4 }}</span>
+                      <span v-if="task.assignees.length === 0" class="lv-no-val">—</span>
+                    </div>
+                  </td>
+
+                  <!-- Due Date -->
+                  <td class="lv-td">
+                    <span
+                      v-if="task.due"
+                      class="lv-due-chip"
+                      :class="{ 'lv-due-chip--overdue': isOverdue(task.due) }"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      {{ formatDate(task.due) }}
+                    </span>
+                    <span v-else class="lv-no-val">—</span>
+                  </td>
+
+                  <!-- Meta (comments / files) -->
+                  <td class="lv-td lv-td--center">
+                    <div class="lv-meta-icons">
+                      <span v-if="taskCommentCount(task.id)" class="lv-meta-chip">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        {{ taskCommentCount(task.id) }}
+                      </span>
+                      <span v-if="taskFileCount(task.id)" class="lv-meta-chip">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                        {{ taskFileCount(task.id) }}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Empty row -->
+                <tr v-if="store.tasksByCol(col.id).length === 0" class="lv-empty-row">
+                  <td colspan="6" class="lv-empty-cell">
+                    <span>No tasks in <strong>{{ col.title }}</strong></span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /list view -->
 
       <!-- ══ INLINE SIDE PANEL (pushes columns left) ══════════════════════ -->
       <Transition name="sp-slide">
@@ -752,6 +1035,11 @@
 
     <!-- ══ TASK DETAIL MODAL ══════════════════════════════════════════════ -->
     <TaskDetailModal v-model="modalOpen" :task-id="selectedTaskId" @deleted="onTaskDeleted"/>
+    <AICreateTaskModal
+      v-model="aiCreateOpen"
+      :project-id="effectiveProjectId"
+      :status-id="defaultStatusId"
+    />
 
     <!-- ══ DELETE STATUS MODAL ══════════════════════════════════════════════ -->
     <Transition name="fade">
@@ -882,6 +1170,7 @@
 
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth.store'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
 import { listProjectSprints, type SprintSummary } from '@/api/sprints'
 import { listProjectGroups, createProjectGroup, type TaskGroup } from '@/api/tasks'
@@ -893,10 +1182,12 @@ import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
+import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 import TaskDetailModal from './TaskDetailModal.vue'
 
 const store = useTaskStore()
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
 const { currentProjectId } = storeToRefs(projectStore)
 const toast = useToast()
 const route = useRoute()
@@ -905,6 +1196,33 @@ const routeProjectId = computed(() =>
   typeof route.params.projectId === 'string' ? route.params.projectId : null
 )
 const effectiveProjectId = computed(() => routeProjectId.value ?? currentProjectId.value)
+
+// ── View mode (persisted to localStorage) ────────────────────────────────────────────
+const VIEW_MODE_KEY = 'task-view-mode'
+const savedViewMode = (typeof localStorage !== 'undefined' ? localStorage.getItem(VIEW_MODE_KEY) : null) as 'board' | 'list' | null
+const viewMode = ref<'board' | 'list'>(savedViewMode === 'list' ? 'list' : 'board')
+
+function setViewMode(mode: 'board' | 'list') {
+  viewMode.value = mode
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(VIEW_MODE_KEY, mode)
+  }
+}
+
+// ── List view: collapsible groups ──────────────────────────────────────────────────────
+const collapsedGroups = ref<Set<string>>(new Set())
+
+function toggleGroup(colId: string) {
+  const next = new Set(collapsedGroups.value)
+  if (next.has(colId)) next.delete(colId)
+  else next.add(colId)
+  collapsedGroups.value = next
+}
+
+function isOverdue(due: string) {
+  if (!due) return false
+  return new Date(due) < new Date()
+}
 
 // ── Sidebar / panel ────────────────────────────────────────────────────────────────────
 const sidebarOpen = ref(false)
@@ -1001,14 +1319,25 @@ async function confirmColDelete() {
 
 
 // ── Member picker ────────────────────────────────────────────────────────────────────
+type ProjectMember = { id: string; name: string; initials: string; color: string; role?: string | null }
+
 const memberPickerOpen = ref(false)
 const memberSearch = ref('')
 const memberPickerRef = ref<HTMLElement | null>(null)
+const memberPickerBtnRef = ref<HTMLElement | null>(null)
+const memberPickerDropRef = ref<HTMLElement | null>(null)
+const memberPickerStyle = ref<Record<string, string>>({})
 const memberSearchInput = ref<HTMLInputElement | null>(null)
 const visibleAvatarCount = 4
 const addingMemberId = ref<string | null>(null)
+const removingMemberId = ref<string | null>(null)
+const updatingRoleMemberId = ref<string | null>(null)
+const memberRoleOptions = ['ADMIN', 'DEVELOPER', 'VIEWER'] as const
+
 const assignableUsersQuery = useUsersQuery(memberSearch, {
-  enabled: computed(() => Boolean(memberPickerOpen.value && effectiveProjectId.value)),
+  enabled: computed(() =>
+    Boolean(memberPickerOpen.value && effectiveProjectId.value && memberSearch.value.trim())
+  ),
 })
 
 const filteredPickerMembers = computed(() => {
@@ -1018,11 +1347,54 @@ const filteredPickerMembers = computed(() => {
 })
 
 const selectedProjectMemberIds = computed(() => new Set(store.members.map((member) => member.id)))
-const searchedUsers = computed(() =>
-  (assignableUsersQuery.data.value ?? [])
+const searchedUsers = computed(() => {
+  if (!memberSearch.value.trim()) return []
+  return (assignableUsersQuery.data.value ?? [])
     .filter((user) => !selectedProjectMemberIds.value.has(user.id))
     .slice(0, 8)
+})
+
+const inviteLink = computed(() => {
+  if (!effectiveProjectId.value) return ''
+  if (typeof window === 'undefined') return `/projects/${effectiveProjectId.value}`
+  return `${window.location.origin}/projects/${effectiveProjectId.value}`
+})
+
+const currentUserProjectMember = computed<ProjectMember | null>(() =>
+  (store.members.find((m) => m.id === authStore.user?.id) as ProjectMember | undefined) ?? null
 )
+
+const canManageProjectMembers = computed(() => {
+  const role = (currentUserProjectMember.value?.role || '').toUpperCase()
+  return role === 'OWNER' || role === 'ADMIN'
+})
+
+function isProjectOwner(member: { role?: string | null }) {
+  return (member.role || '').toUpperCase() === 'OWNER'
+}
+
+function canUpdateMemberRole(member: { id: string; role?: string | null }) {
+  if (!canManageProjectMembers.value) return false
+  if (isProjectOwner(member)) return false
+  if (member.id === authStore.user?.id) return false
+  return true
+}
+
+function updateMemberPickerPos() {
+  const btn = memberPickerBtnRef.value
+  if (!btn || typeof window === 'undefined') return
+  const rect = btn.getBoundingClientRect()
+  const dropWidth = 260
+  const viewportW = window.innerWidth
+  const left = Math.max(12, Math.min(rect.right - dropWidth, viewportW - dropWidth - 12))
+  memberPickerStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 10}px`,
+    left: `${left}px`,
+    width: `${dropWidth}px`,
+    zIndex: '9999',
+  }
+}
 
 function userInitials(user: User) {
   const raw = (user.fullName || user.email).trim()
@@ -1036,16 +1408,7 @@ function userInitials(user: User) {
 
 function userAvatarColor(user: User) {
   const seed = user.id || user.email
-  const palette = [
-    '#6366f1',
-    '#ec4899',
-    '#f59e0b',
-    '#10b981',
-    '#06b6d4',
-    '#8b5cf6',
-    '#ef4444',
-    '#f97316',
-  ]
+  const palette = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#ef4444', '#f97316']
   const hash = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return palette[hash % palette.length]
 }
@@ -1053,46 +1416,110 @@ function userAvatarColor(user: User) {
 async function openMemberPicker() {
   memberPickerOpen.value = true
   await nextTick()
-  memberSearchInput.value?.focus()
+  updateMemberPickerPos()
+  memberSearchInput.value?.focus({ preventScroll: true })
 }
 
 async function addMemberFromPicker(user: User) {
   if (!effectiveProjectId.value || addingMemberId.value) return
-
   addingMemberId.value = user.id
-
   try {
     await store.addMemberToProject(effectiveProjectId.value, user.id)
     memberSearch.value = ''
     toast.success(`Added ${user.fullName || user.email} to this project`)
-  } catch (_error) {
+  } catch {
     toast.error('Cannot add member to this project')
   } finally {
     addingMemberId.value = null
   }
 }
 
+async function removeMemberFromPicker(member: ProjectMember) {
+  if (!effectiveProjectId.value || removingMemberId.value) return
+  if (!canManageProjectMembers.value || isProjectOwner(member)) return
+  removingMemberId.value = member.id
+  try {
+    await store.removeMemberFromProject(effectiveProjectId.value, member.id)
+    toast.success(`Removed ${member.name} from this project`)
+  } catch {
+    toast.error('Cannot remove member from this project')
+  } finally {
+    removingMemberId.value = null
+  }
+}
+
+async function updateMemberRoleFromPicker(member: ProjectMember, role: string) {
+  const nextRole = role.trim().toUpperCase()
+  const currentRole = (member.role || 'DEVELOPER').toUpperCase()
+  const allowedRoles = new Set(memberRoleOptions)
+  if (!effectiveProjectId.value || updatingRoleMemberId.value) return
+  if (!allowedRoles.has(nextRole as (typeof memberRoleOptions)[number])) return
+  if (!canUpdateMemberRole(member) || nextRole === currentRole) return
+  updatingRoleMemberId.value = member.id
+  try {
+    await store.updateMemberRoleInProject(effectiveProjectId.value, member.id, nextRole)
+    toast.success(`Updated ${member.name} role to ${nextRole}`)
+  } catch {
+    toast.error('Cannot update member role')
+  } finally {
+    updatingRoleMemberId.value = null
+  }
+}
+
+async function copyInviteLink() {
+  if (!inviteLink.value) {
+    toast.error('Cannot create invite link for this project')
+    return
+  }
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(inviteLink.value)
+    } else {
+      const input = document.createElement('input')
+      input.value = inviteLink.value
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+    }
+    toast.success('Invite link copied')
+  } catch {
+    toast.error('Cannot copy invite link')
+  }
+}
+
 function onDocClick(e: MouseEvent) {
-  if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node))
+  const target = e.target as Node
+  if (
+    memberPickerRef.value &&
+    !memberPickerRef.value.contains(target) &&
+    !memberPickerDropRef.value?.contains(target)
+  ) {
     memberPickerOpen.value = false
+  }
 }
 onMounted(() => {
   document.addEventListener('click', onDocClick)
   document.addEventListener('click', onFpLabelDocClick)
   document.addEventListener('click', onDocColMenuClick)
   document.addEventListener('click', onGroupPickerDocClick)
+  window.addEventListener('resize', updateMemberPickerPos)
+  window.addEventListener('scroll', updateMemberPickerPos, true)
 })
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('click', onFpLabelDocClick)
   document.removeEventListener('click', onDocColMenuClick)
   document.removeEventListener('click', onGroupPickerDocClick)
+  window.removeEventListener('resize', updateMemberPickerPos)
+  window.removeEventListener('scroll', updateMemberPickerPos, true)
 })
 
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
 const modalOpen = ref(false)
 const selectedTaskId = ref<string | null>(null)
+const aiCreateOpen = ref(false)
 const trashOpen = ref(false)
 const restoringTaskId = ref<string | null>(null)
 const trashCount = computed(() => store.trashTasks.length)
@@ -1129,6 +1556,20 @@ watch(modalOpen, (open) => {
     query: nextQuery,
   })
 })
+
+function openAiCreateTask() {
+  if (!effectiveProjectId.value) {
+    toast.error('Please select a project first')
+    return
+  }
+
+  if (!defaultStatusId.value) {
+    toast.error('Please create a status before creating tasks')
+    return
+  }
+
+  aiCreateOpen.value = true
+}
 
 async function openTrash() {
   trashOpen.value = true
@@ -1675,5 +2116,386 @@ watch(
   box-shadow: 0 16px 40px rgba(0,0,0,0.2) !important;
   transform: rotate(1.5deg) scale(1.02);
   z-index: 999;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW TOGGLE GROUP
+═══════════════════════════════════════════════════════════════ */
+.view-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--bg-surface-2);
+  border: 1.5px solid var(--border-base);
+}
+
+.view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+.view-toggle-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.view-toggle-btn--active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LIST VIEW CONTAINER
+═══════════════════════════════════════════════════════════════ */
+.lv-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding: 6px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+/* ── Empty state ─────────────────────────────────────────────── */
+.lv-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 10px;
+}
+.lv-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: var(--bg-surface-2);
+  border: 1.5px solid var(--border-base);
+  display: grid;
+  place-items: center;
+  color: var(--text-subtle);
+  margin-bottom: 4px;
+}
+.lv-empty-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-heading);
+  margin: 0;
+}
+.lv-empty-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Status Group ────────────────────────────────────────────── */
+.lv-group {
+  border-radius: 14px;
+  overflow: visible;
+  border: 1px solid var(--border-base);
+  background: var(--bg-surface);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  position: relative;
+}
+
+.lv-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-surface-2);
+  border-bottom: 1px solid var(--border-base);
+  transition: background 0.15s;
+  border-radius: 14px 14px 0 0;
+  position: relative;
+  z-index: 1;
+}
+.lv-group-header:hover { background: var(--bg-hover); }
+
+.lv-group-chevron {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.lv-group-chevron--collapsed { transform: rotate(-90deg); }
+
+.lv-group-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.lv-group-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-heading);
+  flex: 1;
+  min-width: 0;
+}
+
+.lv-group-count {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.lv-group-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  padding: 3px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+}
+.lv-group-header:hover .lv-group-add {
+  opacity: 1;
+  color: #6366f1;
+  background: rgba(99,102,241,0.08);
+}
+
+.lv-group-menu-wrap {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+}
+
+.lv-group-kebab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--text-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+}
+.lv-group-header:hover .lv-group-kebab {
+  opacity: 1;
+}
+.lv-group-kebab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ── Table ───────────────────────────────────────────────────── */
+.lv-table-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 0 0 14px 14px;
+}
+
+.lv-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.lv-col-title   { width: 40%; min-width: 260px; }
+.lv-col-priority { width: 90px; min-width: 80px; }
+.lv-col-label   { width: 110px; min-width: 90px; }
+.lv-col-assignees { width: 120px; min-width: 100px; }
+.lv-col-due     { width: 130px; min-width: 110px; }
+.lv-col-meta    { width: 80px; min-width: 60px; }
+
+.lv-thead-row { background: var(--bg-surface); }
+
+.lv-th {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-subtle);
+  text-align: left;
+  border-bottom: 1px solid var(--border-base);
+  white-space: nowrap;
+}
+.lv-th--center { text-align: center; }
+
+/* ── Task rows ───────────────────────────────────────────────── */
+.lv-row {
+  border-bottom: 1px solid var(--border-base);
+  cursor: pointer;
+  transition: background 0.12s;
+  animation: lvRowIn 0.22s ease both;
+}
+.lv-row:last-child { border-bottom: none; }
+.lv-row:hover { background: rgba(99,102,241,0.045); }
+
+@keyframes lvRowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.lv-td {
+  padding: 10px 14px;
+  vertical-align: middle;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.lv-td--center { text-align: center; }
+
+.lv-td-title { max-width: 400px; }
+
+.lv-task-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lv-task-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.lv-task-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 340px;
+}
+
+.lv-task-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 3px 0 0 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
+.lv-subtask-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(99,102,241,0.1);
+  color: #6366f1;
+}
+
+/* ── Assignees ───────────────────────────────────────────────── */
+.lv-assignees {
+  display: flex;
+  align-items: center;
+  gap: -4px;
+}
+.lv-assignees .kb-avatar-sm { margin-right: -4px; }
+
+/* ── Due date chip ───────────────────────────────────────────── */
+.lv-due-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: var(--bg-surface-2);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.lv-due-chip--overdue {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+}
+
+/* ── Meta icons ──────────────────────────────────────────────── */
+.lv-meta-icons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.lv-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-subtle);
+}
+
+/* ── No value placeholder ────────────────────────────────────── */
+.lv-no-val {
+  font-size: 12px;
+  color: var(--text-subtle);
+  opacity: 0.4;
+}
+
+/* ── Empty row ───────────────────────────────────────────────── */
+.lv-empty-row .lv-empty-cell {
+  padding: 16px 24px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+/* ── Sidebar create button ─────────────────────────────────── */
+.sidebar-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sidebar-create-btn:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+  background: rgba(99,102,241,0.06);
+}
+.sidebar-create-btn--open {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 3px 12px rgba(99,102,241,0.35);
 }
 </style>

@@ -17,6 +17,7 @@ interface UploadSignedFileInput {
   projectId: string
   file: File
   taskId?: string
+  commentId?: string
   folderPath?: string
   onProgress?: (event: UploadProgressEvent) => void
 }
@@ -34,9 +35,10 @@ export function useSignedFileUploadMutation() {
   const queryClient = useQueryClient()
 
   return useMutation<CloudinaryUploadResult, Error, UploadSignedFileInput>({
-    mutationFn: ({ projectId, file, taskId, folderPath, onProgress }) =>
+    mutationFn: ({ projectId, file, taskId, commentId, folderPath, onProgress }) =>
       uploadProjectFileWithSignature(projectId, file, {
         taskId,
+        commentId,
         folderPath,
         onProgress,
       }),

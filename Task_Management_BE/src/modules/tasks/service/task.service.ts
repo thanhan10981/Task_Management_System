@@ -47,6 +47,15 @@ export class TaskService {
       }
     }
 
+    if (createTaskDto.parentTaskId) {
+      const parentTask = await this.tasksRepository.findTaskBasicById(
+        createTaskDto.parentTaskId,
+      );
+      if (!parentTask || parentTask.projectId !== createTaskDto.projectId) {
+        throw new NotFoundException('Parent task not found in project');
+      }
+    }
+
     const assigneeIds = Array.from(
       new Set(createTaskDto.assigneeIds?.length ? createTaskDto.assigneeIds : [userId]),
     );
@@ -152,6 +161,67 @@ export class TaskService {
               ]
             : []),
         ]);
+      }
+
+      const suggestedSubtasks = (createTaskDto.suggestedSubtasks ?? [])
+        .map((subtask) => ({
+          title: subtask.title.trim(),
+          description: subtask.description?.trim() || undefined,
+        }))
+        .filter((subtask) => subtask.title);
+
+      for (const subtask of suggestedSubtasks) {
+        const createdSubtask = await this.tasksRepository.createTask(
+          {
+            title: subtask.title,
+            description: subtask.description,
+            priority: createdTask.priority,
+            project: { connect: { id: createTaskDto.projectId } },
+            status: { connect: { id: createTaskDto.statusId } },
+            group: createTaskDto.groupId
+              ? { connect: { id: createTaskDto.groupId } }
+              : undefined,
+            sprint: createTaskDto.sprintId
+              ? { connect: { id: createTaskDto.sprintId } }
+              : undefined,
+            parentTask: { connect: { id: createdTask.id } },
+            createdByUser: { connect: { id: userId } },
+          } as any,
+          tx,
+        );
+
+        await this.recordHistoryAndActivity(
+          tx,
+          createdSubtask.id,
+          userId,
+          TASK_HISTORY_ACTIONS.CREATED,
+          buildTaskHistoryMetadata({
+            task: {
+              old: null,
+              new: {
+                title: createdSubtask.title,
+                description: createdSubtask.description,
+                status: status.name,
+                priority: createdSubtask.priority,
+                parentTaskId: createdTask.id,
+              },
+            },
+          }),
+        );
+
+        await this.tasksRepository.assignUser(createdSubtask.id, userId, userId, tx);
+        await this.recordHistoryAndActivity(
+          tx,
+          createdSubtask.id,
+          userId,
+          TASK_HISTORY_ACTIONS.ASSIGNED,
+          buildTaskHistoryMetadata({
+            assignee: {
+              old: null,
+              new: userId,
+            },
+          }),
+        );
       }
 
       return createdTask;
@@ -646,32 +716,8 @@ function buildTaskSearchFilters(searchTerm: string): Prisma.TaskWhereInput[] {
   const normalized = searchTerm.trim();
   if (!normalized) return [];
 
-  const priorityMatches = extractPriorityMatches(normalized);
-  const filters: Prisma.TaskWhereInput[] = [
+  return [
     { title: { contains: normalized, mode: 'insensitive' } },
-    { description: { contains: normalized, mode: 'insensitive' } },
-    { status: { name: { contains: normalized, mode: 'insensitive' } } },
-    { group: { name: { contains: normalized, mode: 'insensitive' } } },
-    {
-      tags: {
-        path: ['label'],
-        string_contains: normalized,
-      },
-    },
-    ...(priorityMatches.length ? [{ priority: { in: priorityMatches } }] : []),
   ];
-
-  return filters;
 }
 
-function extractPriorityMatches(searchTerm: string): TaskPriority[] {
-  const normalized = searchTerm.toLowerCase();
-  const matches: TaskPriority[] = [];
-
-  if (normalized.includes('low')) matches.push(TaskPriority.LOW);
-  if (normalized.includes('medium')) matches.push(TaskPriority.MEDIUM);
-  if (normalized.includes('high')) matches.push(TaskPriority.HIGH);
-  if (normalized.includes('urgent')) matches.push(TaskPriority.URGENT);
-
-  return matches;
-}

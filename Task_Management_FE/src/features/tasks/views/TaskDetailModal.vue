@@ -14,6 +14,12 @@
               <span class="td-breadcrumb-item font-semibold" style="color:var(--text-primary)">{{ task?.title?.slice(0,28) }}…</span>
             </div>
             <div class="flex items-center gap-1">
+              <button class="td-topbar-btn" title="AI Create Task" @click="openAiCreateTask">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                  <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+                  <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+                </svg>
+              </button>
               <button class="td-topbar-btn td-topbar-btn--danger" title="Move to trash" @click="showDeleteConfirm = true">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
@@ -72,6 +78,22 @@
                   <!-- Ordered list -->
                   <button class="td-toolbar-btn" @mousedown.prevent @click="toggleList('ol')" title="Ordered list">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke-width="2"/><path d="M4 10h2" stroke-width="2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke-width="2"/></svg>
+                  </button>
+                  <span class="td-toolbar-divider"/>
+                  <button
+                    class="td-toolbar-btn td-toolbar-btn--ai"
+                    :disabled="generatingDescription"
+                    title="Generate with AI"
+                    @mousedown.prevent
+                    @click="generateInlineDescription"
+                  >
+                    <svg v-if="!generatingDescription" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+                      <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+                      <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+                    </svg>
+                    <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="td-spin">
+                      <path d="M21 12a9 9 0 1 1-3-6.7"/>
+                    </svg>
                   </button>
                 </div>
                 <div
@@ -236,16 +258,48 @@
                 <div class="td-comment-wrap">
                   <div class="td-avatar-xs" style="background:#6366f1">AJ</div>
                   <div class="td-comment-input-wrap gap-2">
-                    <textarea
-                      v-model="newComment"
-                      class="td-comment-textarea"
-                      placeholder="Write a comment… (use @ to mention)"
-                      rows="2"
-                      @keydown.ctrl.enter="submitComment"
-                    />
-                    <div class="flex justify-end mt-1">
-                      <button class="td-comment-submit" :disabled="!newComment.trim()" @click="submitComment">
-                        Send
+                    <div class="relative w-full">
+                      <textarea
+                        v-model="newComment"
+                        class="td-comment-textarea"
+                        placeholder="Write a comment… (use @ to mention)"
+                        rows="2"
+                        @input="onCommentInput($event, 'comment')"
+                        @keydown="onCommentKeydown($event, 'comment')"
+                        @keydown.ctrl.enter="submitComment"
+                      />
+                      <!-- Mention Popover for new comment -->
+                      <div v-if="mentionState.active && mentionState.target === 'comment'" class="td-mention-popover">
+                        <div v-if="filteredMentionMembers.length === 0" class="td-popover-empty">No matching members</div>
+                        <div
+                          v-for="(m, idx) in filteredMentionMembers" :key="m.id"
+                          class="td-popover-item"
+                          :class="{ selected: mentionSelectedIndex === idx }"
+                          @mousedown.prevent="insertMention(m)"
+                        >
+                          <span class="td-avatar-xxs" :style="{ background: m.color }">{{ m.initials }}</span>
+                          {{ m.name }}
+                        </div>
+                      </div>
+                    </div>
+                    <div v-if="pendingCommentFiles.length > 0" class="flex flex-wrap gap-2 mt-2">
+                      <div v-for="(file, idx) in pendingCommentFiles" :key="idx" class="td-comment-file-chip">
+                        <img v-if="file.type.startsWith('image/')" :src="getObjectUrl(file)" class="td-comment-file-thumb" />
+                        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span class="truncate max-w-[100px] text-xs">{{ file.name }}</span>
+                        <button class="td-comment-file-remove" @click="removePendingCommentFile(idx)" title="Remove">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="flex justify-between items-center mt-1">
+                      <label class="td-comment-upload-btn" title="Attach image">
+                        <input type="file" multiple class="hidden" @change="onCommentFileSelect" accept="image/*,application/pdf" />
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span>Attach image</span>
+                      </label>
+                      <button class="td-comment-submit" :disabled="(!newComment.trim() && pendingCommentFiles.length === 0) || uploadingCommentFiles" @click="submitComment">
+                        {{ uploadingCommentFiles ? 'Sending...' : 'Send' }}
                       </button>
                     </div>
                   </div>
@@ -274,7 +328,28 @@
                             Remove
                           </button>
                         </div>
-                        <p class="td-comment-card-text">{{ entry.text }}</p>
+                        <p v-if="entry.text && !(entry.text === 'Attached an image' && getCommentAttachments(entry.id).length > 0)" class="td-comment-card-text">{{ entry.text }}</p>
+
+                        <div v-if="getCommentAttachments(entry.id).length > 0" class="td-comment-media-grid mt-2">
+                          <div v-for="att in getCommentAttachments(entry.id)" :key="att.id" class="td-comment-media-item" @click="openAttachmentPreview(att)">
+                            <div v-if="att.type === 'image'" class="td-comment-media-frame">
+                              <div v-if="isCommentImageLoading(att.id)" class="td-comment-media-loading">
+                                <span class="td-comment-spinner" aria-label="Loading image" />
+                              </div>
+                              <img
+                                :src="att.url"
+                                :alt="att.name"
+                                class="td-comment-media-img"
+                                @load="markCommentImageLoaded(att.id)"
+                                @error="markCommentImageFailed(att.id)"
+                              />
+                            </div>
+                            <div v-else class="td-comment-media-file">
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                              <span class="text-xs truncate max-w-full px-1">{{ att.name }}</span>
+                            </div>
+                          </div>
+                        </div>
 
                         <div v-if="entry.replies?.length" class="flex flex-col gap-1.5 mt-3">
                           <div v-for="reply in entry.replies" :key="reply.id" class="td-comment-reply">
@@ -296,28 +371,84 @@
                                   Remove
                                 </button>
                               </div>
-                              <p class="td-comment-card-text">{{ reply.text }}</p>
+                              <p v-if="reply.text && !(reply.text === 'Attached an image' && getCommentAttachments(reply.id).length > 0)" class="td-comment-card-text">{{ reply.text }}</p>
+                              
+                              <div v-if="getCommentAttachments(reply.id).length > 0" class="td-comment-media-grid mt-2">
+                                <div v-for="att in getCommentAttachments(reply.id)" :key="att.id" class="td-comment-media-item" @click="openAttachmentPreview(att)">
+                                  <div v-if="att.type === 'image'" class="td-comment-media-frame">
+                                    <div v-if="isCommentImageLoading(att.id)" class="td-comment-media-loading">
+                                      <span class="td-comment-spinner" aria-label="Loading image" />
+                                    </div>
+                                    <img
+                                      :src="att.url"
+                                      :alt="att.name"
+                                      class="td-comment-media-img"
+                                      @load="markCommentImageLoaded(att.id)"
+                                      @error="markCommentImageFailed(att.id)"
+                                    />
+                                  </div>
+                                  <div v-else class="td-comment-media-file">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                                    <span class="text-xs truncate max-w-full px-1">{{ att.name }}</span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
 
                         <div v-if="replyingToCommentId === entry.id" class="td-reply-box">
-                          <textarea
-                            v-model="replyText"
-                            class="td-comment-textarea"
-                            rows="2"
-                            placeholder="Write a reply..."
-                            @keydown.ctrl.enter="submitReply(entry.id)"
-                          />
-                          <div class="flex justify-end gap-2 mt-1">
-                            <button class="td-comment-action" @click="cancelReply">Cancel</button>
-                            <button
-                              class="td-comment-submit"
-                              :disabled="!replyText.trim()"
-                              @click="submitReply(entry.id)"
-                            >
-                              Reply
-                            </button>
+                          <div class="relative w-full">
+                            <textarea
+                              v-model="replyText"
+                              class="td-comment-textarea"
+                              rows="2"
+                              placeholder="Write a reply... (use @ to mention)"
+                              @input="onCommentInput($event, 'reply')"
+                              @keydown="onCommentKeydown($event, 'reply')"
+                              @keydown.ctrl.enter="submitReply(entry.id)"
+                            />
+                            <!-- Mention Popover for reply -->
+                            <div v-if="mentionState.active && mentionState.target === 'reply'" class="td-mention-popover" style="bottom: 100%; top: auto; margin-bottom: 4px;">
+                              <div v-if="filteredMentionMembers.length === 0" class="td-popover-empty">No matching members</div>
+                              <div
+                                v-for="(m, idx) in filteredMentionMembers" :key="m.id"
+                                class="td-popover-item"
+                                :class="{ selected: mentionSelectedIndex === idx }"
+                                @mousedown.prevent="insertMention(m)"
+                              >
+                                <span class="td-avatar-xxs" :style="{ background: m.color }">{{ m.initials }}</span>
+                                {{ m.name }}
+                              </div>
+                            </div>
+                          </div>
+                          <!-- Pending reply files preview -->
+                          <div v-if="pendingReplyFiles.length > 0" class="flex flex-wrap gap-2 mt-2">
+                            <div v-for="(file, idx) in pendingReplyFiles" :key="idx" class="td-comment-file-chip">
+                              <img v-if="file.type.startsWith('image/')" :src="getObjectUrl(file)" class="td-comment-file-thumb" />
+                              <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                              <span class="truncate max-w-[80px] text-xs">{{ file.name }}</span>
+                              <button class="td-comment-file-remove" @click="pendingReplyFiles.splice(idx, 1)" title="Remove">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                          <div class="flex justify-between items-center mt-1">
+                            <label class="td-comment-upload-btn" title="Attach image to reply">
+                              <input type="file" multiple class="hidden" @change="onReplyFileSelect" accept="image/*,application/pdf" />
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                              <span>Attach image</span>
+                            </label>
+                            <div class="flex gap-2">
+                              <button class="td-comment-action" @click="cancelReply">Cancel</button>
+                              <button
+                                class="td-comment-submit"
+                                :disabled="(!replyText.trim() && pendingReplyFiles.length === 0) || uploadingReplyFiles"
+                                @click="submitReply(entry.id)"
+                              >
+                                {{ uploadingReplyFiles ? 'Sending...' : 'Reply' }}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -436,9 +567,30 @@
               <!-- Priority -->
               <div class="td-prop">
                 <p class="td-prop-label">Priority</p>
-                <button class="td-priority-badge" :class="`prio-${task.priority}`" @click="cyclePriority">
-                  {{ task.priority.charAt(0).toUpperCase() + task.priority.slice(1) }}
-                </button>
+                <div class="relative" ref="priorityDropdownRef">
+                  <button
+                    class="td-status-trigger"
+                    @click.stop="showPriorityDrop = !showPriorityDrop"
+                  >
+                    <span class="td-priority-badge" :class="`prio-${task.priority}`" style="flex:1; width:auto; text-align:center; margin-right: 8px;">
+                      {{ task.priority.charAt(0).toUpperCase() + task.priority.slice(1) }}
+                    </span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:0.5;flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                  <div v-if="showPriorityDrop" class="td-status-drop" @click.stop>
+                    <div
+                      v-for="p in priorityOptions" :key="p.value"
+                      class="td-status-option"
+                      :class="{ active: task.priority === p.value }"
+                      @click="onPriorityChange(p.value)"
+                    >
+                      <span class="td-priority-badge" :class="`prio-${p.value}`" style="flex: 1; text-align:center;">
+                        {{ p.label }}
+                      </span>
+                      <svg v-if="task.priority === p.value" class="ml-auto" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <!-- Group -->
@@ -641,6 +793,14 @@
             </div>
           </Transition>
         </div><!-- /td-panel -->
+        <AICreateTaskModal
+          v-model="aiCreateOpen"
+          :project-id="detailProjectId"
+          :status-id="task?.status ?? null"
+          :sprint-id="task?.sprint ?? null"
+          :group-id="task?.groupId ?? null"
+          @created="onAiTaskCreated"
+        />
       </div><!-- /td-overlay -->
     </Transition>
   </Teleport>
@@ -650,17 +810,21 @@
 import {
   getFilePreviewUrl,
 } from '@/api/cloudinary'
+import { useToast } from '@/composables/useToast'
+import { generateAiTaskDescription } from '@/features/tasks/services/ai-task.service'
 import {
   useDeleteFileMutation,
   useSignedFileUploadMutation,
 } from '@/features/files/composables/useFileMutations'
-import { listProjectGroups, type TaskGroup } from '@/api/tasks'
+import type { TaskGroup } from '@/api/tasks'
+import { fetchProjectGroupsQuery } from '@/features/tasks/composables/useTaskGroupsQuery'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
 import type { Attachment, Comment as TaskComment, Member, Subtask } from '@/stores/task.store'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, ref, watch } from 'vue'
+import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 
 // ── Props / Emits ─────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -683,6 +847,7 @@ type MergedActivityEntry = {
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 const store = useTaskStore()
+const toast = useToast()
 const authStore = useAuthStore()
 const projectStore = useProjectStore()
 const { currentProject, currentProjectId } = storeToRefs(projectStore)
@@ -691,10 +856,12 @@ const deleteFileMutation = useDeleteFileMutation()
 
 // ── Task ref ──────────────────────────────────────────────────────────────────
 const task = computed(() => (props.taskId ? store.getTask(props.taskId) : null))
+const detailProjectId = computed(() => currentProjectId.value ?? store.loadedProjectId)
 const shortTaskCode = computed(() => `T-${task.value?.id?.slice(-5) ?? ''}`)
 const showDeleteConfirm = ref(false)
 const deletingTask = ref(false)
 const deleteTaskError = ref('')
+const aiCreateOpen = ref(false)
 const progress = computed(() =>
   props.taskId ? store.subtaskProgress(props.taskId) : { done: 0, total: 0 }
 )
@@ -703,7 +870,7 @@ const sortedSubtasks = computed(() => {
   const all = store.subtasksByTask(props.taskId)
   return [...all.filter((s) => !s.completed), ...all.filter((s) => s.completed)]
 })
-const taskAttachments = computed(() => (props.taskId ? store.attachmentsByTask(props.taskId) : []))
+const taskAttachments = computed(() => (props.taskId ? store.attachmentsByTaskOnly(props.taskId) : []))
 const commentThreads = computed(() => {
   if (!props.taskId) return []
   const all = store.commentsByTask(props.taskId)
@@ -778,6 +945,21 @@ async function confirmDeleteTask() {
   }
 }
 
+function openAiCreateTask() {
+  if (!detailProjectId.value || !task.value?.status) return
+  aiCreateOpen.value = true
+}
+
+async function onAiTaskCreated() {
+  if (detailProjectId.value) {
+    await store.loadProjectBoard(detailProjectId.value)
+  }
+
+  if (task.value) {
+    await store.loadTaskDetail(task.value.id)
+  }
+}
+
 // ── Title editing ─────────────────────────────────────────────────────────────
 const titleRef = ref<HTMLElement | null>(null)
 watch(
@@ -801,6 +983,7 @@ const descRef = ref<HTMLElement | null>(null)
 const descHtml = ref('')
 const descriptionDirty = ref(false)
 const savingDescription = ref(false)
+const generatingDescription = ref(false)
 
 function syncDescriptionFromTask() {
   if (!props.modelValue || !descRef.value) return
@@ -808,8 +991,9 @@ function syncDescriptionFromTask() {
 
   const serverDesc = task.value?.description ?? ''
   descHtml.value = serverDesc
-  if (descRef.value.innerHTML !== serverDesc) {
-    descRef.value.innerHTML = serverDesc
+  const renderedDesc = renderDescriptionForEditor(serverDesc)
+  if (descRef.value.innerHTML !== renderedDesc) {
+    descRef.value.innerHTML = renderedDesc
   }
 }
 
@@ -821,7 +1005,7 @@ watch(
     const t = store.getTask(id)
     descHtml.value = t?.description ?? ''
     descriptionDirty.value = false
-    if (descRef.value) descRef.value.innerHTML = t?.description ?? ''
+    if (descRef.value) descRef.value.innerHTML = renderDescriptionForEditor(t?.description ?? '')
   },
   { immediate: true }
 )
@@ -860,12 +1044,39 @@ async function saveDescription() {
     const serverDesc = refreshed?.description ?? ''
     descHtml.value = serverDesc
     await nextTick()
-    if (descRef.value) descRef.value.innerHTML = serverDesc
+    if (descRef.value) descRef.value.innerHTML = renderDescriptionForEditor(serverDesc)
     descriptionDirty.value = false
   } finally {
     savingDescription.value = false
   }
 }
+
+async function generateInlineDescription() {
+  if (!task.value || !descRef.value) return
+
+  generatingDescription.value = true
+  try {
+    const currentDescription = normalizeEditorText(descRef.value.innerText || '')
+    const generatedMarkdown = await generateAiTaskDescription(
+      task.value.title,
+      currentDescription
+    )
+    const mergedMarkdown = mergeInlineAiMarkdown(currentDescription, generatedMarkdown)
+    descRef.value.innerHTML = renderDescriptionForEditor(mergedMarkdown)
+    descHtml.value = descRef.value.innerHTML
+    descriptionDirty.value = true
+    const createdSubtasks = await createSuggestedSubtasksFromMarkdown(generatedMarkdown)
+    toast.success('AI description inserted')
+    if (createdSubtasks > 0) {
+      toast.success(`${createdSubtasks} suggested subtask${createdSubtasks > 1 ? 's' : ''} added`)
+    }
+  } catch (error) {
+    toast.error(extractInlineAiError(error))
+  } finally {
+    generatingDescription.value = false
+  }
+}
+
 function toggleList(type: 'ul' | 'ol') {
   if (!descRef.value) return
   ensureDescriptionSelection()
@@ -919,6 +1130,157 @@ function escapeHtml(value: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+function renderDescriptionForEditor(value: string) {
+  const normalized = value.replace(/\r\n/g, '\n').trim()
+  if (!normalized) return ''
+  if (/<[a-z][\s\S]*>/i.test(normalized)) return normalized
+
+  const lines = normalized.split('\n')
+  const output: string[] = []
+  let paragraph: string[] = []
+  let listOpen = false
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return
+    output.push(`<p>${paragraph.join('<br>')}</p>`)
+    paragraph = []
+  }
+
+  const closeList = () => {
+    if (!listOpen) return
+    output.push('</ul>')
+    listOpen = false
+  }
+
+  lines.forEach((line) => {
+    const trimmed = line.trim()
+
+    if (!trimmed) {
+      flushParagraph()
+      closeList()
+      return
+    }
+
+    const heading = trimmed.match(/^(#{2,3})\s+(.+)$/)
+    if (heading) {
+      flushParagraph()
+      closeList()
+      output.push(`<h3>${escapeHtml(heading[2])}</h3>`)
+      return
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/)
+    if (bullet) {
+      flushParagraph()
+      if (!listOpen) {
+        output.push('<ul>')
+        listOpen = true
+      }
+      output.push(`<li>${escapeHtml(bullet[1])}</li>`)
+      return
+    }
+
+    closeList()
+    paragraph.push(escapeHtml(trimmed))
+  })
+
+  flushParagraph()
+  closeList()
+
+  return output.join('')
+}
+
+function normalizeEditorText(value: string) {
+  return value
+    .replace(/\u00a0/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function mergeInlineAiMarkdown(currentDescription: string, generatedMarkdown: string) {
+  const current = normalizeEditorText(currentDescription)
+  const generated = normalizeEditorText(generatedMarkdown)
+  if (!current) return generated
+
+  const aiSections = extractAiSections(generated)
+  const base = removeExistingAiSections(current)
+  return [base, aiSections].filter(Boolean).join('\n\n')
+}
+
+function extractAiSections(markdown: string) {
+  const sectionStart = findFirstAiSectionIndex(markdown)
+  if (sectionStart < 0) return markdown
+  return markdown.slice(sectionStart).trim()
+}
+
+async function createSuggestedSubtasksFromMarkdown(markdown: string) {
+  if (!task.value) return 0
+
+  const titles = extractSuggestedSubtaskTitles(markdown)
+  if (!titles.length) return 0
+
+  const existingTitles = new Set(
+    store
+      .subtasksByTask(task.value.id)
+      .map((subtask) => subtask.title.trim().toLowerCase())
+      .filter(Boolean)
+  )
+  const uniqueTitles = titles.filter((title) => !existingTitles.has(title.toLowerCase()))
+
+  for (const title of uniqueTitles) {
+    await store.createSubtaskRemote(task.value.id, title)
+    existingTitles.add(title.toLowerCase())
+  }
+
+  return uniqueTitles.length
+}
+
+function extractSuggestedSubtaskTitles(markdown: string) {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n')
+  const headingIndex = lines.findIndex((line) =>
+    /^##\s+Suggested Subtasks\s*$/i.test(line.trim())
+  )
+
+  if (headingIndex < 0) return []
+
+  const sectionLines: string[] = []
+  for (const line of lines.slice(headingIndex + 1)) {
+    if (/^##\s+/.test(line.trim())) break
+    sectionLines.push(line)
+  }
+
+  return sectionLines
+    .map((line) => line.trim().match(/^[-*]\s+(.+)$/)?.[1]?.trim() ?? '')
+    .map((title) => title.replace(/\s+/g, ' ').slice(0, 255))
+    .filter(Boolean)
+}
+
+function removeExistingAiSections(markdown: string) {
+  const sectionStart = findFirstAiSectionIndex(markdown)
+  if (sectionStart < 0) return markdown.trim()
+  return markdown.slice(0, sectionStart).trim()
+}
+
+function findFirstAiSectionIndex(markdown: string) {
+  const matches = [
+    markdown.search(/^##\s+Behavior\b/im),
+    markdown.search(/^##\s+Acceptance Criteria\b/im),
+    markdown.search(/^##\s+Suggested Subtasks\b/im),
+    markdown.search(/^Behavior\s*$/im),
+    markdown.search(/^Acceptance Criteria\s*$/im),
+    markdown.search(/^Suggested Subtasks\s*$/im),
+  ].filter((index) => index >= 0)
+
+  return matches.length ? Math.min(...matches) : -1
+}
+
+function extractInlineAiError(error: unknown) {
+  const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
+  if (Array.isArray(message)) return message.join(', ')
+  return message || (error instanceof Error ? error.message : 'Cannot generate description')
 }
 
 // ── Subtasks ──────────────────────────────────────────────────────────────────
@@ -990,6 +1352,7 @@ async function deleteSubtask(subtaskId: string) {
 function onModalClick() {
   stAssigneePickerId.value = null
   showStatusDrop.value = false
+  showPriorityDrop.value = false
   showGroupDrop.value = false
 }
 
@@ -1010,23 +1373,211 @@ const newComment = ref('')
 const replyingToCommentId = ref<string | null>(null)
 const replyText = ref('')
 
+// Mention Logic
+const mentionState = ref({
+  active: false,
+  query: '',
+  target: '' as 'comment' | 'reply',
+  cursorPos: 0,
+  startIdx: 0,
+})
+const mentionSelectedIndex = ref(0)
+
+const filteredMentionMembers = computed(() => {
+  const q = mentionState.value.query.toLowerCase()
+  return store.members.filter(m => m.name.toLowerCase().includes(q))
+})
+
+function onCommentInput(e: Event, target: 'comment' | 'reply') {
+  const el = e.target as HTMLTextAreaElement
+  const val = el.value
+  const cursor = el.selectionStart
+  
+  const lastAtIdx = val.lastIndexOf('@', cursor - 1)
+  if (lastAtIdx >= 0) {
+    if (lastAtIdx === 0 || /[\s\n]/.test(val[lastAtIdx - 1])) {
+      const query = val.slice(lastAtIdx + 1, cursor)
+      if (!/\s/.test(query)) {
+        mentionState.value = {
+          active: true,
+          query,
+          target,
+          cursorPos: cursor,
+          startIdx: lastAtIdx
+        }
+        mentionSelectedIndex.value = 0
+        return
+      }
+    }
+  }
+  mentionState.value.active = false
+}
+
+function onCommentKeydown(e: KeyboardEvent, target: 'comment' | 'reply') {
+  if (!mentionState.value.active || mentionState.value.target !== target) return
+  
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    mentionSelectedIndex.value = (mentionSelectedIndex.value + 1) % filteredMentionMembers.value.length
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    mentionSelectedIndex.value = (mentionSelectedIndex.value - 1 + filteredMentionMembers.value.length) % filteredMentionMembers.value.length
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    const member = filteredMentionMembers.value[mentionSelectedIndex.value]
+    if (member) insertMention(member)
+  } else if (e.key === 'Escape') {
+    mentionState.value.active = false
+  }
+}
+
+function insertMention(member: Member) {
+  const { target, startIdx, cursorPos } = mentionState.value
+  const replacement = `@${member.name} `
+  
+  if (target === 'comment') {
+    const text = newComment.value
+    newComment.value = text.slice(0, startIdx) + replacement + text.slice(cursorPos)
+  } else {
+    const text = replyText.value
+    replyText.value = text.slice(0, startIdx) + replacement + text.slice(cursorPos)
+  }
+  
+  mentionState.value.active = false
+}
+
+const pendingCommentFiles = ref<File[]>([])
+const uploadingCommentFiles = ref(false)
+const pendingReplyFiles = ref<File[]>([])
+const uploadingReplyFiles = ref(false)
+
+// Object URL cache for local file previews
+const objectUrlCache = new WeakMap<File, string>()
+function getObjectUrl(file: File): string {
+  if (!objectUrlCache.has(file)) {
+    objectUrlCache.set(file, URL.createObjectURL(file))
+  }
+  return objectUrlCache.get(file)!
+}
+
+function onCommentFileSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    pendingCommentFiles.value.push(...Array.from(input.files))
+  }
+  input.value = ''
+}
+
+function onReplyFileSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    pendingReplyFiles.value.push(...Array.from(input.files))
+  }
+  input.value = ''
+}
+
+function removePendingCommentFile(idx: number) {
+  pendingCommentFiles.value.splice(idx, 1)
+}
+
 async function submitComment() {
-  if (!task.value || !newComment.value.trim()) return
-  await store.addCommentRemote(task.value.id, newComment.value.trim())
-  newComment.value = ''
+  if (!task.value || (!newComment.value.trim() && pendingCommentFiles.value.length === 0)) return
+  const text = newComment.value.trim()
+  const projectId = currentProjectId.value ?? detailProjectId.value
+  const mentionIds = store.members
+    .filter((m) => new RegExp(`@${m.name}(?:\\s|$)`).test(text))
+    .map((m) => m.id)
+    
+  uploadingCommentFiles.value = true
+  try {
+    const created = await store.addCommentRemote(task.value.id, text, undefined, mentionIds)
+    if (created && created.id && pendingCommentFiles.value.length > 0 && projectId) {
+      const folderPath = buildCommentAttachmentFolderPath(task.value.id, created.id)
+      await Promise.all(
+        pendingCommentFiles.value.map(async (file) => {
+          const result = await signedFileUploadMutation.mutateAsync({
+            projectId: projectId!,
+            file,
+            taskId: task.value!.id,
+            commentId: created.id,
+            folderPath,
+          })
+          store.addAttachment(task.value!.id, {
+            fileId: result.id ?? null,
+            name: result.originalFilename || file.name,
+            url: result.secureUrl,
+            type: result.resourceType === 'image' ? 'image' : 'file',
+            format: result.format,
+            resourceType: result.resourceType,
+            size: formatFileSize(result.bytes || file.size),
+            commentId: created.id,
+          })
+        })
+      )
+    }
+    await store.loadTaskDetail(task.value.id)
+    newComment.value = ''
+  } catch (error) {
+    console.error('Failed to submit comment with attachment', error)
+  } finally {
+    uploadingCommentFiles.value = false
+    pendingCommentFiles.value = []
+  }
+}
+
+async function submitReply(commentId: string) {
+  if (!task.value || (!replyText.value.trim() && pendingReplyFiles.value.length === 0)) return
+  const text = replyText.value.trim()
+  const projectId = currentProjectId.value ?? detailProjectId.value
+  const mentionIds = store.members
+    .filter((m) => new RegExp(`@${m.name}(?:\\s|$)`).test(text))
+    .map((m) => m.id)
+    
+  uploadingReplyFiles.value = true
+  try {
+    const created = await store.addCommentRemote(task.value.id, text, commentId, mentionIds)
+    if (created && created.id && pendingReplyFiles.value.length > 0 && projectId) {
+      const folderPath = buildCommentAttachmentFolderPath(task.value.id, created.id)
+      await Promise.all(
+        pendingReplyFiles.value.map(async (file) => {
+          const result = await signedFileUploadMutation.mutateAsync({
+            projectId: projectId!,
+            file,
+            taskId: task.value!.id,
+            commentId: created.id,
+            folderPath,
+          })
+          store.addAttachment(task.value!.id, {
+            fileId: result.id ?? null,
+            name: result.originalFilename || file.name,
+            url: result.secureUrl,
+            type: result.resourceType === 'image' ? 'image' : 'file',
+            format: result.format,
+            resourceType: result.resourceType,
+            size: formatFileSize(result.bytes || file.size),
+            commentId: created.id,
+          })
+        })
+      )
+    }
+    await store.loadTaskDetail(task.value.id)
+    cancelReply()
+  } catch (error) {
+    console.error('Failed to submit reply with attachment', error)
+  } finally {
+    uploadingReplyFiles.value = false
+    pendingReplyFiles.value = []
+  }
 }
 function startReply(commentId: string) {
   replyingToCommentId.value = commentId
   replyText.value = ''
+  pendingReplyFiles.value = []
 }
 function cancelReply() {
   replyingToCommentId.value = null
   replyText.value = ''
-}
-async function submitReply(parentCommentId: string) {
-  if (!task.value || !replyText.value.trim()) return
-  await store.addCommentRemote(task.value.id, replyText.value.trim(), parentCommentId)
-  cancelReply()
+  pendingReplyFiles.value = []
 }
 async function removeComment(commentId: string) {
   if (!task.value) return
@@ -1037,12 +1588,17 @@ function canRemoveComment(authorId: string) {
   return Boolean(authStore.user?.id && authStore.user.id === authorId)
 }
 
+function getCommentAttachments(commentId: string) {
+  return store.attachments.filter(a => a.commentId === commentId)
+}
+
 // ── File upload ───────────────────────────────────────────────────────────────
 const uploadingAttachments = ref(false)
 const deletingAttachmentId = ref<string | null>(null)
 const attachmentUploadError = ref('')
 const previewAttachment = ref<Attachment | null>(null)
 const previewUrl = ref('')
+const commentImageLoaded = ref<Record<string, boolean>>({})
 
 async function onFileUpload(e: Event) {
   if (!task.value) return
@@ -1146,11 +1702,33 @@ function canInlinePreview(attachment: Attachment) {
   return ['pdf', 'txt', 'json', 'csv'].includes(format ?? '')
 }
 
+function isCommentImageLoading(attachmentId: string) {
+  return commentImageLoaded.value[attachmentId] !== true
+}
+
+function markCommentImageLoaded(attachmentId: string) {
+  commentImageLoaded.value = {
+    ...commentImageLoaded.value,
+    [attachmentId]: true,
+  }
+}
+
+function markCommentImageFailed(attachmentId: string) {
+  commentImageLoaded.value = {
+    ...commentImageLoaded.value,
+    [attachmentId]: true,
+  }
+}
+
 function buildTaskAttachmentFolderPath() {
   const projectFolderName = slugifyFolderSegment(
     currentProject.value?.name || currentProjectId.value || 'project'
   )
   return `${projectFolderName}/task-attachments`
+}
+
+function buildCommentAttachmentFolderPath(taskId: string, commentId: string) {
+  return `comments/${commentId}`
 }
 
 function slugifyFolderSegment(value: string) {
@@ -1169,7 +1747,6 @@ function slugifyFolderSegment(value: string) {
 const showAssigneePicker = ref(false)
 const assigneeSearch = ref('')
 const assigneeSearchRef = ref<HTMLInputElement | null>(null)
-const assigneePickerRef = ref<HTMLElement | null>(null)
 
 const filteredMembers = computed(() =>
   store.members.filter((m) => m.name.toLowerCase().includes(assigneeSearch.value.toLowerCase()))
@@ -1198,7 +1775,6 @@ async function removeAssignee(id: string) {
 const showLabelPicker = ref(false)
 const labelSearch = ref('')
 const labelSearchRef = ref<HTMLInputElement | null>(null)
-const labelPickerRef = ref<HTMLElement | null>(null)
 
 const filteredLabels = computed(() => {
   const q = labelSearch.value.toLowerCase()
@@ -1251,11 +1827,9 @@ async function clearLabel() {
 
 // ── Status / Priority ─────────────────────────────────────────────────────────
 const showStatusDrop = ref(false)
-const statusDropdownRef = ref<HTMLElement | null>(null)
+const showPriorityDrop = ref(false)
 const currentColumn = computed(() => store.columns.find((c) => c.id === task.value?.status))
-
 const showGroupDrop = ref(false)
-const groupDropdownRef = ref<HTMLElement | null>(null)
 const taskGroups = ref<TaskGroup[]>([])
 const loadingGroups = ref(false)
 const currentGroup = computed(() =>
@@ -1270,7 +1844,7 @@ async function loadTaskGroups(projectId: string | null) {
 
   loadingGroups.value = true
   try {
-    taskGroups.value = await listProjectGroups(projectId)
+    taskGroups.value = await fetchProjectGroupsQuery(projectId)
   } catch (error) {
     console.error('Failed to load task groups:', error)
     taskGroups.value = []
@@ -1300,18 +1874,18 @@ async function onGroupChange(groupId: string) {
   showGroupDrop.value = false
 }
 
-const priorityOrder: Array<'low' | 'medium' | 'high' | 'urgent'> = [
-  'low',
-  'medium',
-  'high',
-  'urgent',
+const priorityOptions = [
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
 ]
-async function cyclePriority() {
+async function onPriorityChange(priority: string) {
   if (!task.value) return
-  const idx = priorityOrder.indexOf(task.value.priority)
   await store.updateTaskRemote(task.value.id, {
-    priority: priorityOrder[(idx + 1) % 4].toUpperCase(),
+    priority: priority.toUpperCase(),
   })
+  showPriorityDrop.value = false
 }
 async function onDueDateChange(e: Event) {
   if (!task.value) return
@@ -1380,6 +1954,40 @@ function timeAgo(iso: string) {
 .td-topbar-btn--danger:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #dc2626;
+}
+.td-toolbar-btn--ai {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+}
+.td-toolbar-btn--ai:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.14);
+  color: #6d28d9;
+}
+.td-toolbar-btn--ai:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.td-spin {
+  animation: tdSpin 0.8s linear infinite;
+}
+@keyframes tdSpin {
+  to { transform: rotate(360deg); }
+}
+.td-editor :deep(h3) {
+  margin: 18px 0 8px;
+  color: var(--text-heading);
+  font-size: 15px;
+  font-weight: 800;
+}
+.td-editor :deep(p) {
+  margin: 0 0 12px;
+}
+.td-editor :deep(ul) {
+  margin: 0 0 12px 18px;
+  padding: 0;
+}
+.td-editor :deep(li) {
+  margin: 5px 0;
 }
 .td-confirm-enter-active,
 .td-confirm-leave-active {
@@ -1467,5 +2075,137 @@ function timeAgo(iso: string) {
   color: #fff;
   background: linear-gradient(135deg, #ef4444, #f97316);
   box-shadow: 0 10px 24px rgba(239, 68, 68, 0.28);
+}
+.td-mention-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 220px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-base);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+  z-index: 100;
+  overflow: hidden;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* ── Comment upload button ───────────────────────────────────────────── */
+.td-comment-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-surface-2);
+  border: 1.5px solid var(--border-base);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+.td-comment-upload-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-3);
+  border-color: var(--border-medium);
+}
+
+/* ── Comment file chip (pending) ─────────────────────────────────────── */
+.td-comment-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-base);
+  background: var(--bg-surface-2);
+  font-size: 11px;
+  color: var(--text-primary);
+  max-width: 160px;
+}
+.td-comment-file-thumb {
+  width: 22px;
+  height: 22px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.td-comment-file-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  margin-left: 2px;
+  flex-shrink: 0;
+  transition: color 0.12s ease;
+}
+.td-comment-file-remove:hover {
+  color: #ef4444;
+}
+
+/* ── Comment media grid (in-comment image display) ───────────────────── */
+.td-comment-media-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.td-comment-media-item {
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid var(--border-base);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+  flex-shrink: 0;
+}
+.td-comment-media-frame {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  background: var(--bg-surface-2);
+}
+.td-comment-media-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 1;
+}
+.td-comment-spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: tdSpin 0.8s linear infinite;
+}
+.td-comment-media-item:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+.td-comment-media-img {
+  display: block;
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+}
+.td-comment-media-file {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--bg-surface-2);
+  color: var(--text-muted);
+  padding: 4px;
 }
 </style>

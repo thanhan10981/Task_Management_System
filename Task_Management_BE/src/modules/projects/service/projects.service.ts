@@ -2,26 +2,37 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType, Prisma } from '@prisma/client';
+import { NotificationType, Prisma, ProjectMemberRole } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import Redis from 'ioredis';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import {
   createPaginatedResponse,
   createPaginationOptions,
 } from '../../../common/helpers/pagination.helper';
+import { REDIS_CLIENT } from '../../../config/redis/redis.constants';
 import {
   AddProjectMemberDto,
   CreateProjectDto,
+  JoinProjectDto,
   ProjectQueryDto,
   UpdateProjectDto,
   UpdateProjectMemberRoleDto,
 } from '../dto/project.dto';
 import { SAFE_USER_SELECT } from '../../../common/constants/app.constants';
 import { ProjectsRepository } from '../repository/projects.repository';
+import {
+  INVITE_TOKEN_BYTES,
+  INVITE_TOKEN_ENCODING,
+  INVITE_TOKEN_PREFIX,
+  INVITE_TOKEN_TTL_SECONDS,
+} from '../constants/invite.constants';
 
 @Injectable()
 export class ProjectsService {
@@ -31,7 +42,12 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly projectsRepository: ProjectsRepository,
     private readonly projectAccessService: ProjectAccessService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
+
+  private inviteTokenKey(projectId: string) {
+    return `${INVITE_TOKEN_PREFIX}:${projectId}`;
+  }
 
   async create(userId: string, createProjectDto: CreateProjectDto) {
     const requestedMemberIds = Array.from(
@@ -65,12 +81,12 @@ export class ProjectsService {
             create: [
               {
                 userId,
-                role: 'OWNER',
+                role: ProjectMemberRole.OWNER,
                 addedBy: userId,
               },
               ...requestedMemberIds.map((memberId) => ({
                 userId: memberId,
-                role: 'MEMBER' as const,
+                role: ProjectMemberRole.DEVELOPER,
                 addedBy: userId,
               })),
             ],
@@ -92,11 +108,11 @@ export class ProjectsService {
             projectId: createdProject.id,
             type: NotificationType.SYSTEM,
             title: 'You were added to a project',
-            content: `You have been added to project "${createdProject.name}" as MEMBER.`,
+            content: `You have been added to project "${createdProject.name}" as DEVELOPER.`,
             data: {
               action: 'PROJECT_MEMBER_ADDED',
               projectId: createdProject.id,
-              role: 'MEMBER',
+              role: 'DEVELOPER',
               addedBy: userId,
             },
           })),
@@ -239,7 +255,7 @@ export class ProjectsService {
           data: newMemberIds.map((memberId) => ({
             projectId: id,
             userId: memberId,
-            role: 'MEMBER',
+            role: ProjectMemberRole.DEVELOPER,
             addedBy: userId,
           })),
           skipDuplicates: true,
@@ -251,11 +267,11 @@ export class ProjectsService {
             projectId: id,
             type: NotificationType.SYSTEM,
             title: 'You were added to a project',
-            content: `You have been added to project "${existingProject.name}" as MEMBER.`,
+            content: `You have been added to project "${existingProject.name}" as DEVELOPER.`,
             data: {
               action: 'PROJECT_MEMBER_ADDED',
               projectId: id,
-              role: 'MEMBER',
+              role: 'DEVELOPER',
               addedBy: userId,
             },
           })),
@@ -289,6 +305,58 @@ export class ProjectsService {
     return this.projectsRepository.listProjectMembers(projectId);
   }
 
+  async joinProject(userId: string, projectId: string, dto: JoinProjectDto) {
+    const [project, existingMember] = await Promise.all([
+      this.projectsRepository.findProjectById(projectId),
+      this.projectsRepository.findProjectMember(projectId, userId),
+    ]);
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const storedToken = await this.redis.get(this.inviteTokenKey(projectId));
+    if (!storedToken || storedToken !== dto.token) {
+      throw new ForbiddenException('Invalid invite token');
+    }
+
+    if (existingMember) {
+      return existingMember;
+    }
+
+    const member = await this.projectsRepository.addProjectMember(
+      projectId,
+      userId,
+      ProjectMemberRole.DEVELOPER,
+      userId,
+    );
+
+    this.logger.log(`User ${userId} joined project ${projectId} via invite link`);
+    return member;
+  }
+
+  async createInviteToken(userId: string, projectId: string) {
+    await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
+
+    const project = await this.projectsRepository.findProjectById(projectId);
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const key = this.inviteTokenKey(projectId);
+    const existingToken = await this.redis.get(key);
+    if (existingToken) {
+      return { token: existingToken };
+    }
+
+    const token = randomBytes(INVITE_TOKEN_BYTES).toString(INVITE_TOKEN_ENCODING);
+    await this.redis.set(key, token, 'EX', INVITE_TOKEN_TTL_SECONDS);
+
+    this.logger.log(`Invite token created for project ${projectId} by ${userId}`);
+    return { token };
+  }
+
   async addMember(userId: string, projectId: string, dto: AddProjectMemberDto) {
     await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
 
@@ -309,7 +377,7 @@ export class ProjectsService {
       const member = await this.projectsRepository.addProjectMember(
         projectId,
         dto.userId,
-        dto.role || 'MEMBER',
+        dto.role || ProjectMemberRole.DEVELOPER,
         userId,
         tx,
       );
@@ -321,11 +389,11 @@ export class ProjectsService {
             project: { connect: { id: projectId } },
             type: NotificationType.SYSTEM,
             title: 'You were added to a project',
-            content: `You have been added to project "${project.name}" as ${dto.role || 'MEMBER'}.`,
+            content: `You have been added to project "${project.name}" as ${dto.role || ProjectMemberRole.DEVELOPER}.`,
             data: {
               action: 'PROJECT_MEMBER_ADDED',
               projectId,
-              role: dto.role || 'MEMBER',
+              role: dto.role || ProjectMemberRole.DEVELOPER,
               addedBy: userId,
             },
           },
@@ -337,7 +405,7 @@ export class ProjectsService {
     });
 
     this.logger.log(
-      `User ${dto.userId} added to project ${projectId} by ${userId} as ${dto.role || 'MEMBER'}`,
+      `User ${dto.userId} added to project ${projectId} by ${userId} as ${dto.role || ProjectMemberRole.DEVELOPER}`,
     );
 
     return createdMember;
@@ -364,7 +432,7 @@ export class ProjectsService {
       throw new NotFoundException('Project member not found');
     }
 
-    if (project.createdBy === memberUserId && dto.role !== 'OWNER') {
+    if (project.createdBy === memberUserId && dto.role !== ProjectMemberRole.OWNER) {
       throw new ForbiddenException('Project owner role cannot be downgraded');
     }
 

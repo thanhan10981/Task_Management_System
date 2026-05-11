@@ -27,6 +27,7 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
+    "@google/genai": "^1.52.0",
     "@nestjs-modules/mailer": "^2.3.4",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.2.2",

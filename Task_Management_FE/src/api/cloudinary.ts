@@ -291,12 +291,13 @@ export async function uploadProjectFileToBackend(
 export async function uploadProjectFileWithSignature(
   projectId: string,
   file: File,
-  options?: { taskId?: string; folderPath?: string; onProgress?: (event: UploadProgressEvent) => void },
+  options?: { taskId?: string; commentId?: string; folderPath?: string; onProgress?: (event: UploadProgressEvent) => void },
 ): Promise<CloudinaryUploadResult> {
   const normalizedFolderPath = normalizeFolderPath(options?.folderPath)
   const signature = await post<SignedUploadParams | ApiEnvelope<SignedUploadParams>>('/files/upload-signature', {
     projectId,
     taskId: options?.taskId,
+    commentId: options?.commentId,
     folderPath: normalizedFolderPath || undefined,
     fileName: file.name,
     mimeType: file.type || 'application/octet-stream',
@@ -307,6 +308,7 @@ export async function uploadProjectFileWithSignature(
   const finalizeResponse = await post<BackendUploadResponse | ApiEnvelope<BackendUploadResponse>>('/files/upload-finalize', {
     uploadId: signedPayload.uploadId,
     projectId,
+    commentId: options?.commentId,
     publicId: cloudinaryResult.public_id,
     secureUrl: cloudinaryResult.secure_url,
     originalFilename: file.name,

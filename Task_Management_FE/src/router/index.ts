@@ -94,6 +94,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Board', requiresProject: true },
       },
       {
+        path: 'projects/:projectId/join',
+        name: 'project-join',
+        component: () => import('@/features/dashboard/views/JoinProjectView.vue'),
+        meta: { title: 'Join Project' },
+      },
+      {
         path: 'projects/:projectId/settings',
         name: 'project-settings',
         component: () => import('@/features/settings/views/SettingsView.vue'),

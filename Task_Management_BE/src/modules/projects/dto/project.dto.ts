@@ -132,7 +132,7 @@ export class AddProjectMemberDto {
   @IsUUID()
   userId: string;
 
-  @ApiPropertyOptional({ description: 'Role for member', enum: ProjectMemberRole, example: 'MEMBER' })
+  @ApiPropertyOptional({ description: 'Role for member', enum: ProjectMemberRole, example: 'DEVELOPER' })
   @IsOptional()
   @IsEnum(ProjectMemberRole)
   role?: ProjectMemberRole;
@@ -143,4 +143,11 @@ export class UpdateProjectMemberRoleDto {
   @IsNotEmpty({ message: 'Role is required' })
   @IsEnum(ProjectMemberRole)
   role: ProjectMemberRole;
+}
+
+export class JoinProjectDto {
+  @ApiProperty({ description: 'Invite token', example: 'a1b2c3d4e5f6g7h8' })
+  @IsNotEmpty({ message: 'Invite token is required' })
+  @IsString()
+  token: string;
 }

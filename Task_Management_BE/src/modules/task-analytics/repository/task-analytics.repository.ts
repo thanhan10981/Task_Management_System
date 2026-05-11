@@ -29,6 +29,7 @@ export class TaskAnalyticsRepository {
     return this.prisma.task.findMany({
       where: {
         isDeleted: false,
+        parentTaskId: null,
         createdAt: {
           gte: startDate,
           lte: endDate,

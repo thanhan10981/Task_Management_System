@@ -25,6 +25,8 @@ export function useTaskAnalyticsChartQuery(
       ),
     ),
     enabled: computed(() => Boolean(unref(enabled))),
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       const pid = unref(projectId)
       const m = unref(month)

@@ -1417,7 +1417,7 @@ async function openMemberPicker() {
   memberPickerOpen.value = true
   await nextTick()
   updateMemberPickerPos()
-  memberSearchInput.value?.focus()
+  memberSearchInput.value?.focus({ preventScroll: true })
 }
 
 async function addMemberFromPicker(user: User) {

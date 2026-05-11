@@ -2,26 +2,37 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { NotificationType, Prisma, ProjectMemberRole } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import Redis from 'ioredis';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import {
   createPaginatedResponse,
   createPaginationOptions,
 } from '../../../common/helpers/pagination.helper';
+import { REDIS_CLIENT } from '../../../config/redis/redis.constants';
 import {
   AddProjectMemberDto,
   CreateProjectDto,
+  JoinProjectDto,
   ProjectQueryDto,
   UpdateProjectDto,
   UpdateProjectMemberRoleDto,
 } from '../dto/project.dto';
 import { SAFE_USER_SELECT } from '../../../common/constants/app.constants';
 import { ProjectsRepository } from '../repository/projects.repository';
+import {
+  INVITE_TOKEN_BYTES,
+  INVITE_TOKEN_ENCODING,
+  INVITE_TOKEN_PREFIX,
+  INVITE_TOKEN_TTL_SECONDS,
+} from '../constants/invite.constants';
 
 @Injectable()
 export class ProjectsService {
@@ -31,7 +42,12 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly projectsRepository: ProjectsRepository,
     private readonly projectAccessService: ProjectAccessService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
+
+  private inviteTokenKey(projectId: string) {
+    return `${INVITE_TOKEN_PREFIX}:${projectId}`;
+  }
 
   async create(userId: string, createProjectDto: CreateProjectDto) {
     const requestedMemberIds = Array.from(
@@ -287,6 +303,58 @@ export class ProjectsService {
   async listMembers(userId: string, projectId: string) {
     await this.projectAccessService.ensureProjectMember(userId, projectId);
     return this.projectsRepository.listProjectMembers(projectId);
+  }
+
+  async joinProject(userId: string, projectId: string, dto: JoinProjectDto) {
+    const [project, existingMember] = await Promise.all([
+      this.projectsRepository.findProjectById(projectId),
+      this.projectsRepository.findProjectMember(projectId, userId),
+    ]);
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const storedToken = await this.redis.get(this.inviteTokenKey(projectId));
+    if (!storedToken || storedToken !== dto.token) {
+      throw new ForbiddenException('Invalid invite token');
+    }
+
+    if (existingMember) {
+      return existingMember;
+    }
+
+    const member = await this.projectsRepository.addProjectMember(
+      projectId,
+      userId,
+      ProjectMemberRole.DEVELOPER,
+      userId,
+    );
+
+    this.logger.log(`User ${userId} joined project ${projectId} via invite link`);
+    return member;
+  }
+
+  async createInviteToken(userId: string, projectId: string) {
+    await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
+
+    const project = await this.projectsRepository.findProjectById(projectId);
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const key = this.inviteTokenKey(projectId);
+    const existingToken = await this.redis.get(key);
+    if (existingToken) {
+      return { token: existingToken };
+    }
+
+    const token = randomBytes(INVITE_TOKEN_BYTES).toString(INVITE_TOKEN_ENCODING);
+    await this.redis.set(key, token, 'EX', INVITE_TOKEN_TTL_SECONDS);
+
+    this.logger.log(`Invite token created for project ${projectId} by ${userId}`);
+    return { token };
   }
 
   async addMember(userId: string, projectId: string, dto: AddProjectMemberDto) {

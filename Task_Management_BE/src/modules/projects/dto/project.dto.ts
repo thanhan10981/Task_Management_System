@@ -144,3 +144,10 @@ export class UpdateProjectMemberRoleDto {
   @IsEnum(ProjectMemberRole)
   role: ProjectMemberRole;
 }
+
+export class JoinProjectDto {
+  @ApiProperty({ description: 'Invite token', example: 'a1b2c3d4e5f6g7h8' })
+  @IsNotEmpty({ message: 'Invite token is required' })
+  @IsString()
+  token: string;
+}

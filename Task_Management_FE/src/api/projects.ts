@@ -83,6 +83,18 @@ export async function listProjectMembers(projectId: string): Promise<unknown[]> 
   return Array.isArray(payload) ? payload : []
 }
 
+export async function joinProject(projectId: string, token: string): Promise<unknown> {
+  const response = await post(`/projects/${projectId}/join`, { token })
+  return unwrapApiPayload(response)
+}
+
+export async function createProjectInviteToken(projectId: string): Promise<{ token: string }> {
+  const response = await post<{ token: string } | ApiEnvelope<{ token: string }>>(
+    `/projects/${projectId}/invite`
+  )
+  return unwrapApiPayload(response)
+}
+
 export function useProjectMembersQuery(projectId: MaybeRef<string | null | undefined>) {
   return useQuery({
     queryKey: computed(() => QUERY_KEYS.projects.members(unref(projectId) ?? 'none')),

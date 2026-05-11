@@ -1013,18 +1013,21 @@ export const useTaskStore = defineStore('tasks', () => {
       isDefault: columns.value.length === 0,
     })
 
-    await invalidateProjectTaskQueries(payload.projectId)
-    await loadProjectBoard(payload.projectId)
-
-    // Persist the chosen icon for the newly created column
-    if (payload.icon) {
-      const newCol = columns.value.find((c) => !existingIds.has(c.id))
-      if (newCol) setStatusIcon(newCol.id, payload.icon)
-      // Re-apply so the column in memory shows the right icon immediately
-      columns.value = columns.value.map((c) =>
-        c.id === newCol?.id ? { ...c, icon: payload.icon! } : c
-      )
-    }
+    void (async () => {
+      try {
+        await invalidateProjectTaskQueries(payload.projectId)
+        await loadProjectBoard(payload.projectId)
+        if (payload.icon) {
+          const newCol = columns.value.find((c) => !existingIds.has(c.id))
+          if (newCol) setStatusIcon(newCol.id, payload.icon)
+          columns.value = columns.value.map((c) =>
+            c.id === newCol?.id ? { ...c, icon: payload.icon! } : c
+          )
+        }
+      } catch (error) {
+        console.error('Failed to refresh board after creating status:', error)
+      }
+    })()
   }
 
   async function updateStatusPosition(projectId: string, statusId: string, position: number) {

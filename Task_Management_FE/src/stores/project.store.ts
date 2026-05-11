@@ -85,6 +85,10 @@ export const useProjectStore = defineStore('project', () => {
       return
     }
 
+    if (forceReload) {
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.list() })
+    }
+
     projectContextResolved.value = false
 
     initializePromise = (async () => {

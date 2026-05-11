@@ -716,32 +716,8 @@ function buildTaskSearchFilters(searchTerm: string): Prisma.TaskWhereInput[] {
   const normalized = searchTerm.trim();
   if (!normalized) return [];
 
-  const priorityMatches = extractPriorityMatches(normalized);
-  const filters: Prisma.TaskWhereInput[] = [
+  return [
     { title: { contains: normalized, mode: 'insensitive' } },
-    { description: { contains: normalized, mode: 'insensitive' } },
-    { status: { name: { contains: normalized, mode: 'insensitive' } } },
-    { group: { name: { contains: normalized, mode: 'insensitive' } } },
-    {
-      tags: {
-        path: ['label'],
-        string_contains: normalized,
-      },
-    },
-    ...(priorityMatches.length ? [{ priority: { in: priorityMatches } }] : []),
   ];
-
-  return filters;
 }
 
-function extractPriorityMatches(searchTerm: string): TaskPriority[] {
-  const normalized = searchTerm.toLowerCase();
-  const matches: TaskPriority[] = [];
-
-  if (normalized.includes('low')) matches.push(TaskPriority.LOW);
-  if (normalized.includes('medium')) matches.push(TaskPriority.MEDIUM);
-  if (normalized.includes('high')) matches.push(TaskPriority.HIGH);
-  if (normalized.includes('urgent')) matches.push(TaskPriority.URGENT);
-
-  return matches;
-}

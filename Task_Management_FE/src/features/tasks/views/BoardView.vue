@@ -286,19 +286,13 @@
       </div>
     </div>
 
-    <!-- SPRINT STATS BAR -->
-    <div class="flex items-center gap-3 md:gap-6 px-4 md:px-6 py-1.5 md:py-2 shrink-0 overflow-x-auto" style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);scrollbar-width:none;">
-      <div v-for="stat in sprintStats" :key="stat.label" class="flex items-center gap-1.5 shrink-0">
-        <span class="text-lg md:text-xl font-extrabold leading-none" :style="{ color: stat.color }">{{ stat.value }}</span>
-        <span class="text-[11px] font-medium whitespace-nowrap" style="color:var(--text-muted);">{{ stat.label }}</span>
+    <!-- SPRINT PROGRESS BAR -->
+    <div class="flex items-center justify-end gap-2 px-4 md:px-6 py-1.5 shrink-0" style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);">
+      <span class="text-[11px] font-semibold whitespace-nowrap" style="color:var(--text-muted);">Sprint progress</span>
+      <div class="w-[80px] md:w-[120px] h-1.5 rounded-full overflow-hidden" style="background:var(--bg-surface-3);">
+        <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-indigo-500 to-emerald-500" :style="{ width: sprintProgress + '%' }"></div>
       </div>
-      <div class="flex items-center gap-2 ml-auto shrink-0">
-        <span class="text-[11px] font-semibold whitespace-nowrap" style="color:var(--text-muted);">Sprint progress</span>
-        <div class="w-[80px] md:w-[120px] h-1.5 rounded-full overflow-hidden" style="background:var(--bg-surface-3);">
-          <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-indigo-500 to-emerald-500" :style="{ width: sprintProgress + '%' }"></div>
-        </div>
-        <span class="text-[12px] font-bold min-w-[36px]" style="color:var(--text-primary);">{{ sprintProgress }}%</span>
-      </div>
+      <span class="text-[12px] font-bold min-w-[36px]" style="color:var(--text-primary);">{{ sprintProgress }}%</span>
     </div>
 
     <!-- BOARD + SIDEBAR WRAPPER -->
@@ -889,6 +883,8 @@ import {
   useCreateProjectSprintMutation,
 } from '@/features/tasks/composables/useSprintsQuery'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
+import { createProjectInviteToken } from '@/api/projects'
+import { INVITE_TOKEN_QUERY_KEY } from '@/features/projects/constants/invite.constants'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
 import { useAuthStore } from '@/stores/auth.store'
@@ -1022,11 +1018,18 @@ const searchedUsers = computed(() => {
     .filter((user) => !selectedProjectMemberIds.value.has(user.id))
     .slice(0, 8)
 })
-const inviteLink = computed(() => {
+const inviteToken = ref<string | null>(null)
+const baseInviteLink = computed(() => {
   if (!effectiveProjectId.value) return ''
-  if (typeof window === 'undefined') return `/projects/${effectiveProjectId.value}`
-  return `${window.location.origin}/projects/${effectiveProjectId.value}`
+  if (typeof window === 'undefined') return `/projects/${effectiveProjectId.value}/join`
+  return `${window.location.origin}/projects/${effectiveProjectId.value}/join`
 })
+
+function buildInviteLink(token: string) {
+  const base = baseInviteLink.value
+  if (!base) return ''
+  return `${base}?${INVITE_TOKEN_QUERY_KEY}=${encodeURIComponent(token)}`
+}
 const currentUserProjectMember = computed<ProjectMember | null>(() =>
   (store.members.find((member) => member.id === authStore.user?.id) as ProjectMember | undefined) ?? null
 )
@@ -1187,17 +1190,25 @@ function onMemberPickerDocClick(e: MouseEvent) {
 }
 
 async function copyInviteLink() {
-  if (!inviteLink.value) {
+  if (!effectiveProjectId.value || !baseInviteLink.value) {
     toast.error('Cannot create invite link for this project')
     return
   }
 
   try {
+    const tokenResponse = await createProjectInviteToken(effectiveProjectId.value)
+    inviteToken.value = tokenResponse?.token || null
+    if (!inviteToken.value) {
+      toast.error('Cannot create invite link for this project')
+      return
+    }
+
+    const link = buildInviteLink(inviteToken.value)
     if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(inviteLink.value)
+      await navigator.clipboard.writeText(link)
     } else {
       const input = document.createElement('input')
-      input.value = inviteLink.value
+      input.value = link
       document.body.appendChild(input)
       input.select()
       document.execCommand('copy')
@@ -1510,17 +1521,19 @@ function resetNewStatus() {
 }
 
 async function createStatus() {
-  if (!newStatus.value.title.trim() || !currentProjectId.value) return
+  const projectId = effectiveProjectId.value
+  if (!newStatus.value.title.trim() || !projectId) return
 
   submittingStatus.value = true
+  let created = false
   try {
     await store.createStatusInProject({
-      projectId: currentProjectId.value,
+      projectId,
       title: newStatus.value.title.trim(),
       color: newStatus.value.color,
       icon: newStatus.value.iconId,
     })
-    await syncProjectBoard(currentProjectId.value)
+    created = true
     resetNewStatus()
     statusPanelOpen.value = false
     toast.success('Status created successfully')
@@ -1528,6 +1541,10 @@ async function createStatus() {
     toast.error('Cannot create status')
   } finally {
     submittingStatus.value = false
+  }
+
+  if (created) {
+    syncProjectBoard(projectId).catch(() => undefined)
   }
 }
 

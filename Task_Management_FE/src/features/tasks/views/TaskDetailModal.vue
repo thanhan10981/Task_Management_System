@@ -332,7 +332,18 @@
 
                         <div v-if="getCommentAttachments(entry.id).length > 0" class="td-comment-media-grid mt-2">
                           <div v-for="att in getCommentAttachments(entry.id)" :key="att.id" class="td-comment-media-item" @click="openAttachmentPreview(att)">
-                            <img v-if="att.type === 'image'" :src="att.url" :alt="att.name" class="td-comment-media-img" />
+                            <div v-if="att.type === 'image'" class="td-comment-media-frame">
+                              <div v-if="isCommentImageLoading(att.id)" class="td-comment-media-loading">
+                                <span class="td-comment-spinner" aria-label="Loading image" />
+                              </div>
+                              <img
+                                :src="att.url"
+                                :alt="att.name"
+                                class="td-comment-media-img"
+                                @load="markCommentImageLoaded(att.id)"
+                                @error="markCommentImageFailed(att.id)"
+                              />
+                            </div>
                             <div v-else class="td-comment-media-file">
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                               <span class="text-xs truncate max-w-full px-1">{{ att.name }}</span>
@@ -364,7 +375,18 @@
                               
                               <div v-if="getCommentAttachments(reply.id).length > 0" class="td-comment-media-grid mt-2">
                                 <div v-for="att in getCommentAttachments(reply.id)" :key="att.id" class="td-comment-media-item" @click="openAttachmentPreview(att)">
-                                  <img v-if="att.type === 'image'" :src="att.url" :alt="att.name" class="td-comment-media-img" />
+                                  <div v-if="att.type === 'image'" class="td-comment-media-frame">
+                                    <div v-if="isCommentImageLoading(att.id)" class="td-comment-media-loading">
+                                      <span class="td-comment-spinner" aria-label="Loading image" />
+                                    </div>
+                                    <img
+                                      :src="att.url"
+                                      :alt="att.name"
+                                      class="td-comment-media-img"
+                                      @load="markCommentImageLoaded(att.id)"
+                                      @error="markCommentImageFailed(att.id)"
+                                    />
+                                  </div>
                                   <div v-else class="td-comment-media-file">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                                     <span class="text-xs truncate max-w-full px-1">{{ att.name }}</span>
@@ -1470,26 +1492,36 @@ async function submitComment() {
   try {
     const created = await store.addCommentRemote(task.value.id, text, undefined, mentionIds)
     if (created && created.id && pendingCommentFiles.value.length > 0 && projectId) {
-      const folderPath = `tasks/${projectId}/comments/${created.id}`
+      const folderPath = buildCommentAttachmentFolderPath(task.value.id, created.id)
       await Promise.all(
-        pendingCommentFiles.value.map(file => 
-          signedFileUploadMutation.mutateAsync({
+        pendingCommentFiles.value.map(async (file) => {
+          const result = await signedFileUploadMutation.mutateAsync({
             projectId: projectId!,
             file,
             taskId: task.value!.id,
             commentId: created.id,
             folderPath,
           })
-        )
+          store.addAttachment(task.value!.id, {
+            fileId: result.id ?? null,
+            name: result.originalFilename || file.name,
+            url: result.secureUrl,
+            type: result.resourceType === 'image' ? 'image' : 'file',
+            format: result.format,
+            resourceType: result.resourceType,
+            size: formatFileSize(result.bytes || file.size),
+            commentId: created.id,
+          })
+        })
       )
     }
     await store.loadTaskDetail(task.value.id)
     newComment.value = ''
-    pendingCommentFiles.value = []
   } catch (error) {
     console.error('Failed to submit comment with attachment', error)
   } finally {
     uploadingCommentFiles.value = false
+    pendingCommentFiles.value = []
   }
 }
 
@@ -1505,26 +1537,36 @@ async function submitReply(commentId: string) {
   try {
     const created = await store.addCommentRemote(task.value.id, text, commentId, mentionIds)
     if (created && created.id && pendingReplyFiles.value.length > 0 && projectId) {
-      const folderPath = `tasks/${projectId}/comments/${created.id}`
+      const folderPath = buildCommentAttachmentFolderPath(task.value.id, created.id)
       await Promise.all(
-        pendingReplyFiles.value.map(file =>
-          signedFileUploadMutation.mutateAsync({
+        pendingReplyFiles.value.map(async (file) => {
+          const result = await signedFileUploadMutation.mutateAsync({
             projectId: projectId!,
             file,
             taskId: task.value!.id,
             commentId: created.id,
             folderPath,
           })
-        )
+          store.addAttachment(task.value!.id, {
+            fileId: result.id ?? null,
+            name: result.originalFilename || file.name,
+            url: result.secureUrl,
+            type: result.resourceType === 'image' ? 'image' : 'file',
+            format: result.format,
+            resourceType: result.resourceType,
+            size: formatFileSize(result.bytes || file.size),
+            commentId: created.id,
+          })
+        })
       )
     }
     await store.loadTaskDetail(task.value.id)
-    pendingReplyFiles.value = []
     cancelReply()
   } catch (error) {
     console.error('Failed to submit reply with attachment', error)
   } finally {
     uploadingReplyFiles.value = false
+    pendingReplyFiles.value = []
   }
 }
 function startReply(commentId: string) {
@@ -1556,6 +1598,7 @@ const deletingAttachmentId = ref<string | null>(null)
 const attachmentUploadError = ref('')
 const previewAttachment = ref<Attachment | null>(null)
 const previewUrl = ref('')
+const commentImageLoaded = ref<Record<string, boolean>>({})
 
 async function onFileUpload(e: Event) {
   if (!task.value) return
@@ -1659,11 +1702,33 @@ function canInlinePreview(attachment: Attachment) {
   return ['pdf', 'txt', 'json', 'csv'].includes(format ?? '')
 }
 
+function isCommentImageLoading(attachmentId: string) {
+  return commentImageLoaded.value[attachmentId] !== true
+}
+
+function markCommentImageLoaded(attachmentId: string) {
+  commentImageLoaded.value = {
+    ...commentImageLoaded.value,
+    [attachmentId]: true,
+  }
+}
+
+function markCommentImageFailed(attachmentId: string) {
+  commentImageLoaded.value = {
+    ...commentImageLoaded.value,
+    [attachmentId]: true,
+  }
+}
+
 function buildTaskAttachmentFolderPath() {
   const projectFolderName = slugifyFolderSegment(
     currentProject.value?.name || currentProjectId.value || 'project'
   )
   return `${projectFolderName}/task-attachments`
+}
+
+function buildCommentAttachmentFolderPath(taskId: string, commentId: string) {
+  return `comments/${commentId}`
 }
 
 function slugifyFolderSegment(value: string) {
@@ -2098,6 +2163,28 @@ function timeAgo(iso: string) {
   border: 1.5px solid var(--border-base);
   transition: transform 0.14s ease, box-shadow 0.14s ease;
   flex-shrink: 0;
+}
+.td-comment-media-frame {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  background: var(--bg-surface-2);
+}
+.td-comment-media-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 1;
+}
+.td-comment-spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: tdSpin 0.8s linear infinite;
 }
 .td-comment-media-item:hover {
   transform: scale(1.03);

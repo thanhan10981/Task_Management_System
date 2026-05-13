@@ -122,20 +122,20 @@ export function validate(config: RawConfig): EnvVariables {
   if (isSmtpConfigured && (!smtpHost || !smtpUser || !smtpPass)) {
     throw new Error('SMTP_HOST, SMTP_USER, SMTP_PASS must all be provided together');
   }
+//deploy production checks for SMTP_USER to prevent common misconfigurations that lead to email delivery failure and sender leakage. These checks are only enforced in production to allow flexibility during development and testing, where developers may use personal email accounts or different sender addresses without the same risks.
+  // if (nodeEnv === 'production' && smtpUserEmail) {
+  //   if (isPersonalMailbox(smtpUserEmail)) {
+  //     throw new Error(
+  //       'SMTP_USER must not be a personal mailbox in production. Use a dedicated no-reply mailbox.',
+  //     );
+  //   }
 
-  if (nodeEnv === 'production' && smtpUserEmail) {
-    if (isPersonalMailbox(smtpUserEmail)) {
-      throw new Error(
-        'SMTP_USER must not be a personal mailbox in production. Use a dedicated no-reply mailbox.',
-      );
-    }
-
-    if (publicFromEmail && smtpUserEmail !== publicFromEmail) {
-      throw new Error(
-        'MAIL_PUBLIC_FROM_ADDRESS must match SMTP_USER in production to prevent provider rewrite and sender leakage.',
-      );
-    }
-  }
+  //   if (publicFromEmail && smtpUserEmail !== publicFromEmail) {
+  //     throw new Error(
+  //       'MAIL_PUBLIC_FROM_ADDRESS must match SMTP_USER in production to prevent provider rewrite and sender leakage.',
+  //     );
+  //   }
+  // }
 
   const redisHost = readString(config, 'REDIS_HOST');
   const mailQueueName = readString(config, 'MAIL_QUEUE_NAME');

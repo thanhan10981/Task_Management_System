@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ProjectAccessModule } from '../../common/access/project-access.module';
 import { MailModule } from '../../common/mail/mail.module';
+import { NotificationPreferencesModule } from '../../common/notifications/notification-preferences.module';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { ReminderController } from './controller/reminder.controller';
 import { TaskRepository } from './repository/task.repository';
@@ -14,6 +15,7 @@ import { ReminderService } from './service/reminder.service';
     ConfigModule,
     PrismaModule,
     ProjectAccessModule,
+    NotificationPreferencesModule,
     ScheduleModule.forRoot(),
     MailModule,
   ],

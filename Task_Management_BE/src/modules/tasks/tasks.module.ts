@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { ProjectAccessModule } from '../../common/access/project-access.module';
+import { NotificationPreferencesModule } from '../../common/notifications/notification-preferences.module';
 import { TasksController } from './controller/tasks.controller';
 import { ProjectTasksController } from './controller/project-tasks.controller';
 import { TasksRepository } from './repository/tasks.repository';
@@ -10,7 +11,7 @@ import { TaskAssigneeService } from './service/task-assignee.service';
 import { TaskStatusService } from './service/task-status.service';
 
 @Module({
-  imports: [PrismaModule, ProjectAccessModule],
+  imports: [PrismaModule, ProjectAccessModule, NotificationPreferencesModule],
   controllers: [TasksController, ProjectTasksController],
   providers: [
     TasksRepository,

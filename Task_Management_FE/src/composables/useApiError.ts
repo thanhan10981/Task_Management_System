@@ -1,13 +1,20 @@
 import type { AxiosError } from 'axios'
 import { ref } from 'vue'
 
+export function extractApiErrorMessage(error: unknown, fallback = 'An unexpected error occurred.') {
+  const axiosError = error as AxiosError<{ message?: string | string[] }>
+  const responseMessage = axiosError.response?.data?.message
+
+  if (Array.isArray(responseMessage)) return responseMessage.join(', ')
+  if (responseMessage) return responseMessage
+  return error instanceof Error ? error.message : fallback
+}
+
 export function useApiError() {
   const apiError = ref<string | null>(null)
 
   function handleError(error: unknown) {
-    const axiosError = error as AxiosError<{ message: string }>
-    apiError.value =
-      axiosError.response?.data?.message ?? axiosError.message ?? 'An unexpected error occurred.'
+    apiError.value = extractApiErrorMessage(error)
   }
 
   function clearError() {

@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { NotificationType, Prisma, TaskPriority } from '@prisma/client';
+import { NOTIFICATION_PREFERENCE_KEYS } from '../../../common/notifications/notification-preferences.constants';
+import { NotificationPreferencesService } from '../../../common/notifications/notification-preferences.service';
 import {
   createPaginatedResponse,
   createPaginationOptions,
@@ -30,10 +32,11 @@ export class TaskService {
   constructor(
     private readonly tasksRepository: TasksRepository,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly notificationPreferencesService: NotificationPreferencesService,
   ) {}
 
   async create(userId: string, createTaskDto: CreateTaskDto) {
-    await this.projectAccessService.ensureProjectMember(userId, createTaskDto.projectId);
+    await this.projectAccessService.ensureCanCreateTask(userId, createTaskDto.projectId);
 
     const status = await this.tasksRepository.findStatusById(createTaskDto.statusId);
     if (!status || status.projectId !== createTaskDto.projectId) {
@@ -140,7 +143,11 @@ export class TaskService {
               },
             }),
           ),
-          ...(assigneeId !== userId
+          ...(assigneeId !== userId &&
+          (await this.notificationPreferencesService.isEnabled(
+            assigneeId,
+            NOTIFICATION_PREFERENCE_KEYS.taskAssigned,
+          ))
             ? [
                 this.tasksRepository.createNotification(
                   {
@@ -538,7 +545,11 @@ export class TaskService {
                 },
               }),
             ),
-            ...(assigneeId !== userId
+            ...(assigneeId !== userId &&
+            (await this.notificationPreferencesService.isEnabled(
+              assigneeId,
+              NOTIFICATION_PREFERENCE_KEYS.taskAssigned,
+            ))
               ? [
                   this.tasksRepository.createNotification(
                     {
@@ -560,6 +571,46 @@ export class TaskService {
               : []),
           ]);
         }
+      }
+
+      const shouldNotifyTeamActivity =
+        Object.keys(updateChanges).length > 0 ||
+        Boolean(
+          nextStatus &&
+            taskPatch.statusId &&
+            taskPatch.statusId !== existingTask.statusId,
+        );
+
+      if (shouldNotifyTeamActivity) {
+        const assignees = await this.tasksRepository.listAssignees(id, tx);
+        const notificationUserIds =
+          await this.notificationPreferencesService.filterEnabledUserIds(
+            assignees
+              .map((assignee) => assignee.userId)
+              .filter((assigneeId) => assigneeId !== userId),
+            NOTIFICATION_PREFERENCE_KEYS.teamActivity,
+          );
+
+        await Promise.all(
+          notificationUserIds.map((assigneeId) =>
+            this.tasksRepository.createNotification(
+              {
+                user: { connect: { id: assigneeId } },
+                project: { connect: { id: existingTask.projectId } },
+                type: NotificationType.TASK_UPDATED,
+                title: 'Task updated',
+                content: `Task "${task.title}" was updated.`,
+                data: {
+                  taskId: id,
+                  projectId: existingTask.projectId,
+                  updatedBy: userId,
+                  action: TASK_HISTORY_ACTIONS.UPDATED,
+                },
+              },
+              tx,
+            ),
+          ),
+        );
       }
 
       return task;

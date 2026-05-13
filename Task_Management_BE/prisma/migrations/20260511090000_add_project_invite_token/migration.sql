@@ -1,0 +1,1 @@
+-- Invite tokens are stored in Redis; no database changes are required.

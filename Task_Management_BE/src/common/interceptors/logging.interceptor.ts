@@ -27,8 +27,10 @@ export class LoggingInterceptor implements NestInterceptor {
           ...(body && { body: this.sanitizeBody(body) }),
         };
 
-        if (statusCode >= 400) {
+        if (statusCode >= 500) {
           this.logger.error(JSON.stringify(logObject));
+        } else if (statusCode >= 400) {
+          this.logger.warn(JSON.stringify(logObject));
         } else {
           this.logger.log(JSON.stringify(logObject));
         }
@@ -47,7 +49,13 @@ export class LoggingInterceptor implements NestInterceptor {
           ...(body && { body: this.sanitizeBody(body) }),
         };
 
-        this.logger.error(JSON.stringify(logObject));
+        if (statusCode >= 500) {
+          this.logger.error(JSON.stringify(logObject));
+        } else if (statusCode >= 400) {
+          this.logger.warn(JSON.stringify(logObject));
+        } else {
+          this.logger.log(JSON.stringify(logObject));
+        }
       }),
     );
   }

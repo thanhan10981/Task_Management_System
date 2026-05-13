@@ -18,6 +18,7 @@ export const QUERY_KEYS = {
     all: ['projects'] as const,
     list: () => [...QUERY_KEYS.projects.all, 'list'] as const,
     members: (projectId: string) => [...QUERY_KEYS.projects.all, 'members', projectId] as const,
+    settings: (projectId: string) => [...QUERY_KEYS.projects.all, 'settings', projectId] as const,
   },
   sprints: {
     all: ['sprints'] as const,

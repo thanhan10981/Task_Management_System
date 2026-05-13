@@ -276,6 +276,7 @@
 </template>
 
 <script setup lang="ts">
+import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
 import { useTaskStore } from '@/stores/task.store'
 import { computed, ref, watch } from 'vue'
@@ -369,7 +370,8 @@ async function createTask() {
     emit('update:modelValue', false)
     resetState()
   } catch (error) {
-    errorMessage.value = extractErrorMessage(error, 'Cannot create task.')
+    errorMessage.value = extractApiErrorMessage(error, 'Cannot create task.')
+    toast.error(errorMessage.value)
   } finally {
     creating.value = false
   }

@@ -31,12 +31,16 @@ function resolveLegacyProjectRoute(name: string, to: { query?: LocationQueryRaw;
 
 async function restoreAuthFromCookie(authStore: ReturnType<typeof useAuthStore>) {
   try {
-    const response = await get<{ data: User }>('/auth/me')
-    if (!response.data?.id) {
-      return false
-    }
+    const raw = await get<{ data: User } | User>('/auth/me')
+    // Backend may return raw User or { data: User }
+    const user: User | undefined =
+      raw && typeof raw === 'object' && 'data' in raw && typeof (raw as { data: User }).data?.id === 'string'
+        ? (raw as { data: User }).data
+        : (raw as User)?.id ? (raw as User) : undefined
 
-    authStore.setAuth(null, response.data)
+    if (!user?.id) return false
+
+    authStore.setAuth(null, user)
     return true
   } catch {
     return false

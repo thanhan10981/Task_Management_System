@@ -506,6 +506,10 @@
     z-index: 200;
     overflow: hidden;
   }
+  /* Override for teleported (to body) variant — position is controlled via inline style */
+  .board-mp-dropdown {
+    position: fixed !important;
+  }
   /* Dropdown animation */
   .mp-drop-enter-active { animation: mpDropIn 0.18s cubic-bezier(0.34,1.1,0.64,1); }
   .mp-drop-leave-active { animation: mpDropIn 0.13s ease reverse; }

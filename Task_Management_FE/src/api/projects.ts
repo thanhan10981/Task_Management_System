@@ -126,6 +126,70 @@ export async function updateProjectMemberRole(
   return unwrapApiPayload(response)
 }
 
+export type ProjectRolePermissionMatrix = Record<string, { canCreateTask: boolean }>
+
+export interface ProjectSettings {
+  projectId: string
+  rolePermissions: ProjectRolePermissionMatrix
+  updatedAt?: string | null
+}
+
+export async function getProjectSettings(projectId: string): Promise<ProjectSettings> {
+  const response = await get<ProjectSettings | ApiEnvelope<ProjectSettings>>(`/projects/${projectId}/settings`)
+  return unwrapApiPayload(response)
+}
+
+export async function updateProjectSettings(
+  projectId: string,
+  payload: { rolePermissions: ProjectRolePermissionMatrix }
+): Promise<ProjectSettings> {
+  const response = await patch<ProjectSettings | ApiEnvelope<ProjectSettings>>(
+    `/projects/${projectId}/settings`,
+    payload,
+  )
+  return unwrapApiPayload(response)
+}
+
+export function useProjectSettingsQuery(projectId: MaybeRef<string | null | undefined>) {
+  return useQuery({
+    queryKey: computed(() => QUERY_KEYS.projects.settings(unref(projectId) ?? 'none')),
+    enabled: computed(() => !!unref(projectId)),
+    queryFn: () => {
+      const id = unref(projectId)
+      if (!id) {
+        return Promise.resolve({
+          projectId: '',
+          rolePermissions: {
+            OWNER: { canCreateTask: true },
+            ADMIN: { canCreateTask: true },
+            DEVELOPER: { canCreateTask: true },
+            VIEWER: { canCreateTask: false },
+          },
+          updatedAt: null,
+        })
+      }
+      return getProjectSettings(id)
+    },
+  })
+}
+
+export function useUpdateProjectSettingsMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      rolePermissions,
+    }: {
+      projectId: string
+      rolePermissions: ProjectRolePermissionMatrix
+    }) => updateProjectSettings(projectId, { rolePermissions }),
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.settings(projectId) })
+    },
+  })
+}
+
 export function useAddProjectMemberMutation() {
   const queryClient = useQueryClient()
 

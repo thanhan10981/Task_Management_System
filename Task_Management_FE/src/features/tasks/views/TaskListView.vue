@@ -323,7 +323,7 @@
                     <button
                       class="kb-col-action flex-shrink-0"
                       title="Add task"
-                      @click.stop="sidebarOpen=true;activeTab='task';newTask.status=col.id"
+                      @click.stop="openTaskPanelForStatus(col.id)"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     </button>
@@ -508,7 +508,7 @@
               <span class="lv-group-count" :style="{ background: col.color + '20', color: col.color }">
                 {{ store.tasksByCol(col.id).length }}
               </span>
-              <span class="lv-group-add" @click.stop="sidebarOpen=true; activeTab='task'; newTask.status=col.id" title="Add task">
+              <span class="lv-group-add" @click.stop="openTaskPanelForStatus(col.id)" title="Add task">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add task
             </span>
@@ -912,7 +912,7 @@
               </div>
             </div>
 
-            <button class="fp-submit" :disabled="!newTask.title.trim() || submittingTask" @click="addTask">
+            <button class="fp-submit" :disabled="!newTask.title.trim() || submittingTask || !canCurrentUserCreateTask" @click="addTask">
               {{ submittingTask ? 'Creating...' : 'Create Task' }}
             </button>
           </template>
@@ -1169,9 +1169,11 @@
 </template>
 
 <script setup lang="ts">
+import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
+import { useProjectSettingsQuery, type ProjectRolePermissionMatrix } from '@/api/projects'
 import { listProjectSprints, type SprintSummary } from '@/api/sprints'
 import { listProjectGroups, createProjectGroup, type TaskGroup } from '@/api/tasks'
 import { useProjectStore } from '@/stores/project.store'
@@ -1196,6 +1198,7 @@ const routeProjectId = computed(() =>
   typeof route.params.projectId === 'string' ? route.params.projectId : null
 )
 const effectiveProjectId = computed(() => routeProjectId.value ?? currentProjectId.value)
+const projectSettingsQuery = useProjectSettingsQuery(effectiveProjectId)
 
 // ── View mode (persisted to localStorage) ────────────────────────────────────────────
 const VIEW_MODE_KEY = 'task-view-mode'
@@ -1340,12 +1343,6 @@ const assignableUsersQuery = useUsersQuery(memberSearch, {
   ),
 })
 
-const filteredPickerMembers = computed(() => {
-  const q = memberSearch.value.trim().toLowerCase()
-  if (!q) return store.members
-  return store.members.filter((m) => m.name.toLowerCase().includes(q))
-})
-
 const selectedProjectMemberIds = computed(() => new Set(store.members.map((member) => member.id)))
 const searchedUsers = computed(() => {
   if (!memberSearch.value.trim()) return []
@@ -1369,6 +1366,31 @@ const canManageProjectMembers = computed(() => {
   return role === 'OWNER' || role === 'ADMIN'
 })
 
+const defaultRolePermissions: ProjectRolePermissionMatrix = {
+  OWNER: { canCreateTask: true },
+  ADMIN: { canCreateTask: true },
+  DEVELOPER: { canCreateTask: true },
+  VIEWER: { canCreateTask: false },
+}
+
+const canCurrentUserCreateTask = computed(() => {
+  const role = (currentUserProjectMember.value?.role || 'DEVELOPER').toUpperCase()
+  if (role === 'OWNER' || role === 'ADMIN') return true
+  const rolePermissions = projectSettingsQuery.data.value?.rolePermissions ?? defaultRolePermissions
+  return rolePermissions[role]?.canCreateTask ?? false
+})
+
+function openTaskPanelForStatus(statusId: string) {
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
+
+  sidebarOpen.value = true
+  activeTab.value = 'task'
+  newTask.value.status = statusId
+}
+
 function isProjectOwner(member: { role?: string | null }) {
   return (member.role || '').toUpperCase() === 'OWNER'
 }
@@ -1391,6 +1413,7 @@ function updateMemberPickerPos() {
     position: 'fixed',
     top: `${rect.bottom + 10}px`,
     left: `${left}px`,
+    right: 'auto',
     width: `${dropWidth}px`,
     zIndex: '9999',
   }
@@ -1560,6 +1583,11 @@ watch(modalOpen, (open) => {
 function openAiCreateTask() {
   if (!effectiveProjectId.value) {
     toast.error('Please select a project first')
+    return
+  }
+
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
     return
   }
 
@@ -1828,6 +1856,11 @@ async function addTask() {
     return
   }
 
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
+
   submittingTask.value = true
 
   try {
@@ -1859,8 +1892,8 @@ async function addTask() {
     }
     sidebarOpen.value = false
     toast.success('Task created successfully')
-  } catch (_error) {
-    toast.error('Cannot create task')
+  } catch (error) {
+    toast.error(extractApiErrorMessage(error, 'Cannot create task'))
   } finally {
     submittingTask.value = false
   }

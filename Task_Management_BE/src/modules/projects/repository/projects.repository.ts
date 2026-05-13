@@ -120,6 +120,31 @@ export class ProjectsRepository {
     });
   }
 
+  findProjectSettings(projectId: string) {
+    return this.prisma
+      .$queryRaw<Array<{ projectId: string; rolePermissions: unknown; updatedAt: Date }>>`
+        SELECT "projectId", "rolePermissions", "updatedAt"
+        FROM "project_settings"
+        WHERE "projectId" = ${projectId}
+        LIMIT 1
+      `
+      .then((rows) => rows[0] ?? null);
+  }
+
+  upsertProjectSettings(projectId: string, data: { rolePermissions?: Record<string, unknown> }) {
+    return this.prisma
+      .$queryRaw<Array<{ projectId: string; rolePermissions: unknown; updatedAt: Date }>>`
+        INSERT INTO "project_settings" ("projectId", "rolePermissions", "updatedAt")
+        VALUES (${projectId}, ${JSON.stringify(data.rolePermissions ?? {})}::jsonb, NOW())
+        ON CONFLICT ("projectId")
+        DO UPDATE SET
+          "rolePermissions" = EXCLUDED."rolePermissions",
+          "updatedAt" = NOW()
+        RETURNING "projectId", "rolePermissions", "updatedAt"
+      `
+      .then((rows) => rows[0]);
+  }
+
   listProjectMembers(projectId: string) {
     return this.prisma.projectMember.findMany({
       where: { projectId },

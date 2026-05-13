@@ -3,8 +3,17 @@
 
     <!-- ── Cover ──────────────────────────────────────────────────────── -->
     <div class="h-[172px] rounded-[18px] relative overflow-hidden flex-shrink-0" :style="coverStyle">
-      <label class="sp-cover-upload absolute bottom-3 right-3.5 inline-flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] text-xs font-semibold text-gray-700 cursor-pointer transition-colors duration-[180ms] border border-white/60" style="background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);">
-        <input type="file" accept="image/*" hidden @change="onCoverChange">
+      <!-- Upload overlay when uploading cover -->
+      <div v-if="uploadingCover" class="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
+        <span class="btn-spinner w-7 h-7 rounded-full border-[3px] border-white/30 border-t-white" />
+        <span class="text-xs font-semibold text-white">Uploading… {{ coverUploadProgress }}%</span>
+      </div>
+      <label
+        class="sp-cover-upload absolute bottom-3 right-3.5 inline-flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] text-xs font-semibold text-gray-700 transition-colors duration-[180ms] border border-white/60"
+        :class="uploadingCover ? 'opacity-50 pointer-events-none cursor-not-allowed' : 'cursor-pointer'"
+        style="background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);"
+      >
+        <input type="file" accept="image/*" hidden :disabled="uploadingCover" @change="onCoverChange">
         <img :src="uploadCloudIcon" alt="" width="16" height="16" aria-hidden="true">
         Change cover
       </label>
@@ -13,10 +22,18 @@
     <!-- ── Page Header ─────────────────────────────────────────────────── -->
     <div class="flex items-end gap-4 px-1 -mt-8 relative z-10 flex-wrap">
       <!-- Avatar -->
-      <label class="sp-avatar-wrap relative cursor-pointer flex-shrink-0" title="Change photo">
-        <input type="file" accept="image/*" hidden @change="onAvatarChange">
+      <label
+        class="sp-avatar-wrap relative flex-shrink-0"
+        :class="uploadingAvatar ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'"
+        title="Change photo"
+      >
+        <input type="file" accept="image/*" hidden :disabled="uploadingAvatar" @change="onAvatarChange">
         <div class="sp-avatar w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 border-4 flex items-center justify-center overflow-hidden transition-transform duration-[180ms]" style="border-color: var(--bg-app); box-shadow: 0 4px 20px rgba(99,102,241,0.30);">
-          <img v-if="preview.avatarUrl" :src="preview.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+          <!-- Uploading spinner -->
+          <div v-if="uploadingAvatar" class="absolute inset-0 rounded-full flex items-center justify-center z-10" style="background: rgba(0,0,0,0.45);">
+            <span class="btn-spinner w-5 h-5 rounded-full border-2 border-white/30 border-t-white" />
+          </div>
+          <img v-else-if="preview.avatarUrl" :src="preview.avatarUrl" alt="avatar" class="w-full h-full object-cover">
           <span v-else class="text-[1.6rem] font-bold text-white leading-none">{{ initials }}</span>
         </div>
         <div class="sp-avatar-overlay absolute bottom-0.5 right-0.5 w-6 h-6 rounded-full flex items-center justify-center text-indigo-500 transition-colors duration-150" style="background: var(--bg-surface); border: 2px solid var(--bg-app); box-shadow: 0 1px 4px rgba(0,0,0,0.18);">
@@ -32,13 +49,13 @@
         <button
           class="sp-btn-secondary"
           style="border-color: var(--border-medium); background: var(--bg-surface); color: var(--text-muted);"
-          :disabled="!isDirty || saving"
+          :disabled="!isDirty || saving || uploadingAvatar || uploadingCover"
           @click="handleCancel"
         >Cancel</button>
         <button
           class="sp-btn-primary"
           style="box-shadow: 0 2px 10px rgba(99,102,241,0.30);"
-          :disabled="!isDirty || saving"
+          :disabled="!isDirty || saving || uploadingAvatar || uploadingCover"
           @click="handleSave"
         >
           <span v-if="saving" class="btn-spinner w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white" />
@@ -331,6 +348,12 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
 import { useTheme } from '@/composables/useTheme'
+import { uploadToCloudinary } from '@/api/cloudinary'
+import {
+  useProjectSettingsQuery,
+  useUpdateProjectSettingsMutation,
+  type ProjectRolePermissionMatrix,
+} from '@/api/projects'
 import uploadCloudIcon from '@/assets/icons/upload-cloud.svg?url'
 import pencilEditIcon from '@/assets/icons/pencil-edit.svg?url'
 import emailIcon from '@/assets/icons/email.svg?url'
@@ -365,14 +388,16 @@ const taskStore = useTaskStore()
 const { themeMode, setTheme } = useTheme()
 const userSettingsQuery = useUserSettingsQuery()
 const saveUserSettingsMutation = useSaveUserSettingsMutation()
+const projectSettingsQuery = useProjectSettingsQuery(computed(() => projectStore.currentProjectId))
+const updateProjectSettingsMutation = useUpdateProjectSettingsMutation()
 
 const DUMMY: ProfileForm = {
-  firstName: authStore.user?.fullName?.split(' ')[0] ?? 'Alex',
-  lastName: authStore.user?.fullName?.split(' ').slice(1).join(' ') ?? 'Johnson',
-  email: authStore.user?.email ?? 'alex.johnson@example.com',
-  jobTitle: authStore.user?.jobTitle ?? 'Product Designer',
-  phone: authStore.user?.phone ?? '+1 234 567 8900',
-  bio: authStore.user?.bio ?? 'Passionate product designer with 5+ years of experience crafting intuitive user experiences.',
+  firstName: authStore.user?.fullName?.split(' ')[0] ?? '',
+  lastName: authStore.user?.fullName?.split(' ').slice(1).join(' ') ?? '',
+  email: authStore.user?.email ?? '',
+  jobTitle: authStore.user?.jobTitle ?? '',
+  phone: authStore.user?.phone ?? '',
+  bio: authStore.user?.bio ?? '',
   avatarUrl: authStore.user?.avatarUrl ?? '',
   coverUrl: authStore.user?.coverUrl ?? '',
 }
@@ -465,16 +490,77 @@ const pwStrength = computed(() => {
 const pwStrengthLabel = computed(() => ['Weak', 'Fair', 'Good', 'Strong'][pwStrength.value - 1] ?? 'Weak')
 const pwMismatch = computed(() => pwForm.newPw.length > 0 && pwForm.confirm.length > 0 && pwForm.newPw !== pwForm.confirm)
 
-function readFile(file: File): Promise<string> {
-  return new Promise((resolve) => { const reader = new FileReader(); reader.onload = (e) => resolve(e.target?.result as string); reader.readAsDataURL(file) })
+// ── Upload state ────────────────────────────────────────────────────────────
+const uploadingAvatar = ref(false)
+const uploadingCover = ref(false)
+const coverUploadProgress = ref(0)
+
+/** Upload a file directly to Cloudinary (unsigned preset) and return the secure URL */
+async function uploadImageToCloudinary(file: File, folder: string, onProgress?: (pct: number) => void): Promise<string> {
+  const result = await uploadToCloudinary(
+    file,
+    folder,
+    onProgress ? (evt) => onProgress(evt.percentage) : undefined,
+  )
+  return result.secureUrl
 }
 
-async function onAvatarChange(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) form.avatarUrl = await readFile(file) }
-async function onCoverChange(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) form.coverUrl = await readFile(file) }
+async function onAvatarChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  // Show optimistic local preview immediately while uploading
+  const localUrl = URL.createObjectURL(file)
+  preview.avatarUrl = localUrl
+  uploadingAvatar.value = true
+  try {
+    const secureUrl = await uploadImageToCloudinary(file, 'profile/avatars')
+    form.avatarUrl = secureUrl
+    // Immediately persist to authStore so navbar + other components see new avatar
+    if (authStore.user) {
+      authStore.setAuth(authStore.accessToken, { ...authStore.user, avatarUrl: secureUrl })
+    }
+  } catch (err) {
+    console.error('[SettingsView] Avatar upload failed', err)
+    // Revert preview on failure
+    preview.avatarUrl = form.avatarUrl
+  } finally {
+    uploadingAvatar.value = false
+    URL.revokeObjectURL(localUrl)
+  }
+  // reset input so same file can be re-selected
+  ;(e.target as HTMLInputElement).value = ''
+}
+
+async function onCoverChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const localUrl = URL.createObjectURL(file)
+  preview.coverUrl = localUrl
+  uploadingCover.value = true
+  coverUploadProgress.value = 0
+  try {
+    const secureUrl = await uploadImageToCloudinary(file, 'profile/covers', (pct) => {
+      coverUploadProgress.value = pct
+    })
+    form.coverUrl = secureUrl
+    // Immediately persist to authStore so other parts of the app see new cover
+    if (authStore.user) {
+      authStore.setAuth(authStore.accessToken, { ...authStore.user, coverUrl: secureUrl })
+    }
+  } catch (err) {
+    console.error('[SettingsView] Cover upload failed', err)
+    preview.coverUrl = form.coverUrl
+  } finally {
+    uploadingCover.value = false
+    coverUploadProgress.value = 0
+    URL.revokeObjectURL(localUrl)
+  }
+  ;(e.target as HTMLInputElement).value = ''
+}
 
 const saveSuccess = ref(false)
-const saving = computed(() => saveUserSettingsMutation.isPending.value)
-const loadingSettings = computed(() => userSettingsQuery.isLoading.value)
+const saving = computed(() => saveUserSettingsMutation.isPending.value || updateProjectSettingsMutation.isPending.value)
+const loadingSettings = computed(() => userSettingsQuery.isLoading.value || projectSettingsQuery.isLoading.value)
 
 function toApiTheme(theme: UserSettings['theme']): 'LIGHT' | 'DARK' | 'SYSTEM' {
   if (theme === 'dark') return 'DARK'; if (theme === 'light') return 'LIGHT'; return 'SYSTEM'
@@ -495,31 +581,48 @@ function applyLoadedUserSettings(payload?: UserSettingsApiData) {
     }
   }
   const profile = isRecord(payload.preferences) && isRecord(payload.preferences['profile']) ? payload.preferences['profile'] : null
-  const rolePermPayload =
-    isRecord(payload.preferences) && isRecord(payload.preferences['projectRolePermissions'])
-      ? payload.preferences['projectRolePermissions']
-      : null
   if (profile) {
     if (typeof profile.firstName === 'string') form.firstName = profile.firstName
     if (typeof profile.lastName === 'string') form.lastName = profile.lastName
     if (typeof profile.jobTitle === 'string') form.jobTitle = profile.jobTitle
     if (typeof profile.phone === 'string') form.phone = profile.phone
     if (typeof profile.bio === 'string') form.bio = profile.bio
-    if (typeof profile.avatarUrl === 'string') form.avatarUrl = profile.avatarUrl
-    if (typeof profile.coverUrl === 'string') form.coverUrl = profile.coverUrl
-  }
-  if (rolePermPayload) {
-    for (const item of rolePermissions) {
-      const maybeRole = rolePermPayload[item.role]
-      if (isRecord(maybeRole) && typeof maybeRole.canCreateTask === 'boolean') {
-        item.canCreateTask = maybeRole.canCreateTask
-      }
-    }
+    // Prefer: preferences URL → authStore.user URL → keep existing
+    const resolvedAvatarUrl = (typeof profile.avatarUrl === 'string' && profile.avatarUrl)
+      || authStore.user?.avatarUrl
+      || form.avatarUrl
+    const resolvedCoverUrl = (typeof profile.coverUrl === 'string' && profile.coverUrl)
+      || authStore.user?.coverUrl
+      || form.coverUrl
+    if (resolvedAvatarUrl) form.avatarUrl = resolvedAvatarUrl
+    if (resolvedCoverUrl) form.coverUrl = resolvedCoverUrl
+  } else {
+    // No saved preferences profile: seed from authStore directly
+    if (!form.avatarUrl && authStore.user?.avatarUrl) form.avatarUrl = authStore.user.avatarUrl
+    if (!form.coverUrl && authStore.user?.coverUrl) form.coverUrl = authStore.user.coverUrl
   }
   originalSnapshot.value = buildSnapshot()
 }
 
+function applyLoadedProjectSettings(rolePermissionsPayload?: ProjectRolePermissionMatrix | null) {
+  if (!rolePermissionsPayload) return
+
+  for (const item of rolePermissions) {
+    const maybeRole = rolePermissionsPayload[item.role]
+    if (maybeRole && typeof maybeRole.canCreateTask === 'boolean') {
+      item.canCreateTask = maybeRole.canCreateTask
+    }
+  }
+
+  originalSnapshot.value = buildSnapshot()
+}
+
 watch(() => userSettingsQuery.data.value?.data, (payload) => { applyLoadedUserSettings(payload) }, { immediate: true })
+watch(
+  () => projectSettingsQuery.data.value?.rolePermissions,
+  (payload) => { applyLoadedProjectSettings(payload) },
+  { immediate: true },
+)
 watch(() => userSettingsQuery.error.value, (error) => { if (error) console.error('[SettingsView] Cannot load user settings', error) })
 
 onMounted(async () => {
@@ -532,13 +635,13 @@ onMounted(async () => {
 })
 
 async function handleSave() {
-  if (!isDirty.value || saving.value || loadingSettings.value || pwMismatch.value) return
+  if (!isDirty.value || saving.value || loadingSettings.value || pwMismatch.value || uploadingAvatar.value || uploadingCover.value) return
   const userId = authStore.user?.id
   const notificationSettings = Object.fromEntries(notifications.map((item) => [item.id, item.enabled]))
   const fullName = `${form.firstName} ${form.lastName}`.trim()
   const projectRolePermissions = Object.fromEntries(
     rolePermissions.map((item) => [item.role, { canCreateTask: item.canCreateTask }])
-  )
+  ) as ProjectRolePermissionMatrix
   const preferences = {
     profile: {
       firstName: form.firstName,
@@ -549,11 +652,16 @@ async function handleSave() {
       avatarUrl: form.avatarUrl,
       coverUrl: form.coverUrl,
     },
-    projectRolePermissions,
     currentProjectId: projectStore.currentProjectId ?? null,
   }
   try {
     await saveUserSettingsMutation.mutateAsync({ userId, userProfile: { fullName, avatarUrl: form.avatarUrl, coverUrl: form.coverUrl, jobTitle: form.jobTitle, phone: form.phone, bio: form.bio, password: pwForm.newPw || undefined }, settings: { theme: toApiTheme(settings.theme), notificationSettings, preferences } })
+    if (projectStore.currentProjectId && canManageRolePermissions.value) {
+      await updateProjectSettingsMutation.mutateAsync({
+        projectId: projectStore.currentProjectId,
+        rolePermissions: projectRolePermissions,
+      })
+    }
     setTheme(settings.theme)
     Object.assign(pwForm, { current: '', newPw: '', confirm: '' })
     originalSnapshot.value = buildSnapshot()

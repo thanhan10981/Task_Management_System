@@ -3,6 +3,7 @@ import {
   IsDateString,
   IsEnum,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -143,6 +144,19 @@ export class UpdateProjectMemberRoleDto {
   @IsNotEmpty({ message: 'Role is required' })
   @IsEnum(ProjectMemberRole)
   role: ProjectMemberRole;
+}
+
+export class UpdateProjectSettingsDto {
+  @ApiPropertyOptional({
+    description: 'Role permissions for project-level actions',
+    example: {
+      DEVELOPER: { canCreateTask: true },
+      VIEWER: { canCreateTask: false },
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  rolePermissions?: Record<string, unknown>;
 }
 
 export class JoinProjectDto {

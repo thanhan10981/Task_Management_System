@@ -22,6 +22,7 @@ import {
   CreateProjectDto,
   JoinProjectDto,
   ProjectQueryDto,
+  UpdateProjectSettingsDto,
   UpdateProjectDto,
   UpdateProjectMemberRoleDto,
 } from '../dto/project.dto';
@@ -98,6 +99,35 @@ export class ProjectsController {
   @ApiResponse({ status: 404, description: 'Project not found' })
   listMembers(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.projectsService.listMembers(req.user.id, id);
+  }
+
+  @Get(':id/settings')
+  @ApiOperation({ summary: 'Get project settings' })
+  @ApiResponse({ status: 200, description: 'Project settings fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  getSettings(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.projectsService.getSettings(req.user.id, id);
+  }
+
+  @Patch(':id/settings')
+  @ApiOperation({ summary: 'Update project settings (owner/admin only)' })
+  @ApiBody({ type: UpdateProjectSettingsDto })
+  @ApiResponse({ status: 200, description: 'Project settings updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  updateSettings(
+    @Request() req,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() updateProjectSettingsDto: UpdateProjectSettingsDto,
+  ) {
+    return this.projectsService.updateSettings(
+      req.user.id,
+      id,
+      updateProjectSettingsDto,
+    );
   }
 
   @Post(':id/join')

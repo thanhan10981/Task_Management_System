@@ -12,6 +12,8 @@ import { randomBytes } from 'crypto';
 import Redis from 'ioredis';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
+import { NOTIFICATION_PREFERENCE_KEYS } from '../../../common/notifications/notification-preferences.constants';
+import { NotificationPreferencesService } from '../../../common/notifications/notification-preferences.service';
 import {
   createPaginatedResponse,
   createPaginationOptions,
@@ -22,6 +24,7 @@ import {
   CreateProjectDto,
   JoinProjectDto,
   ProjectQueryDto,
+  UpdateProjectSettingsDto,
   UpdateProjectDto,
   UpdateProjectMemberRoleDto,
 } from '../dto/project.dto';
@@ -33,6 +36,7 @@ import {
   INVITE_TOKEN_PREFIX,
   INVITE_TOKEN_TTL_SECONDS,
 } from '../constants/invite.constants';
+import { normalizeProjectRolePermissions } from '../constants/project-role-permissions.constants';
 
 @Injectable()
 export class ProjectsService {
@@ -42,6 +46,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly projectsRepository: ProjectsRepository,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly notificationPreferencesService: NotificationPreferencesService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
@@ -101,9 +106,15 @@ export class ProjectsService {
         },
       });
 
-      if (requestedMemberIds.length > 0) {
+      const notificationUserIds =
+        await this.notificationPreferencesService.filterEnabledUserIds(
+          requestedMemberIds,
+          NOTIFICATION_PREFERENCE_KEYS.project,
+        );
+
+      if (notificationUserIds.length > 0) {
         await tx.notification.createMany({
-          data: requestedMemberIds.map((memberId) => ({
+          data: notificationUserIds.map((memberId) => ({
             userId: memberId,
             projectId: createdProject.id,
             type: NotificationType.SYSTEM,
@@ -261,21 +272,29 @@ export class ProjectsService {
           skipDuplicates: true,
         });
 
-        await tx.notification.createMany({
-          data: newMemberIds.map((memberId) => ({
-            userId: memberId,
-            projectId: id,
-            type: NotificationType.SYSTEM,
-            title: 'You were added to a project',
-            content: `You have been added to project "${existingProject.name}" as DEVELOPER.`,
-            data: {
-              action: 'PROJECT_MEMBER_ADDED',
+        const notificationUserIds =
+          await this.notificationPreferencesService.filterEnabledUserIds(
+            newMemberIds,
+            NOTIFICATION_PREFERENCE_KEYS.project,
+          );
+
+        if (notificationUserIds.length > 0) {
+          await tx.notification.createMany({
+            data: notificationUserIds.map((memberId) => ({
+              userId: memberId,
               projectId: id,
-              role: 'DEVELOPER',
-              addedBy: userId,
-            },
-          })),
-        });
+              type: NotificationType.SYSTEM,
+              title: 'You were added to a project',
+              content: `You have been added to project "${existingProject.name}" as DEVELOPER.`,
+              data: {
+                action: 'PROJECT_MEMBER_ADDED',
+                projectId: id,
+                role: 'DEVELOPER',
+                addedBy: userId,
+              },
+            })),
+          });
+        }
       }
     });
 
@@ -303,6 +322,41 @@ export class ProjectsService {
   async listMembers(userId: string, projectId: string) {
     await this.projectAccessService.ensureProjectMember(userId, projectId);
     return this.projectsRepository.listProjectMembers(projectId);
+  }
+
+  async getSettings(userId: string, projectId: string) {
+    await this.projectAccessService.ensureProjectMember(userId, projectId);
+    const settings = await this.projectsRepository.findProjectSettings(projectId);
+
+    return {
+      projectId,
+      rolePermissions: normalizeProjectRolePermissions(settings?.rolePermissions),
+      updatedAt: settings?.updatedAt ?? null,
+    };
+  }
+
+  async updateSettings(
+    userId: string,
+    projectId: string,
+    dto: UpdateProjectSettingsDto,
+  ) {
+    await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
+
+    const project = await this.projectsRepository.findProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const rolePermissions = normalizeProjectRolePermissions(dto.rolePermissions);
+    const settings = await this.projectsRepository.upsertProjectSettings(projectId, {
+      rolePermissions,
+    });
+
+    return {
+      projectId,
+      rolePermissions: normalizeProjectRolePermissions(settings.rolePermissions),
+      updatedAt: settings.updatedAt,
+    };
   }
 
   async joinProject(userId: string, projectId: string, dto: JoinProjectDto) {
@@ -382,7 +436,14 @@ export class ProjectsService {
         tx,
       );
 
-      if (dto.userId !== userId) {
+      const shouldNotify =
+        dto.userId !== userId &&
+        (await this.notificationPreferencesService.isEnabled(
+          dto.userId,
+          NOTIFICATION_PREFERENCE_KEYS.project,
+        ));
+
+      if (shouldNotify) {
         await this.projectsRepository.createNotification(
           {
             user: { connect: { id: dto.userId } },

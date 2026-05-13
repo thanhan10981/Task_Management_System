@@ -1492,7 +1492,7 @@ async function submitComment() {
   try {
     const created = await store.addCommentRemote(task.value.id, text, undefined, mentionIds)
     if (created && created.id && pendingCommentFiles.value.length > 0 && projectId) {
-      const folderPath = buildCommentAttachmentFolderPath(task.value.id, created.id)
+      const folderPath = buildCommentAttachmentFolderPath(created.id)
       await Promise.all(
         pendingCommentFiles.value.map(async (file) => {
           const result = await signedFileUploadMutation.mutateAsync({
@@ -1537,7 +1537,7 @@ async function submitReply(commentId: string) {
   try {
     const created = await store.addCommentRemote(task.value.id, text, commentId, mentionIds)
     if (created && created.id && pendingReplyFiles.value.length > 0 && projectId) {
-      const folderPath = buildCommentAttachmentFolderPath(task.value.id, created.id)
+      const folderPath = buildCommentAttachmentFolderPath(created.id)
       await Promise.all(
         pendingReplyFiles.value.map(async (file) => {
           const result = await signedFileUploadMutation.mutateAsync({
@@ -1727,7 +1727,7 @@ function buildTaskAttachmentFolderPath() {
   return `${projectFolderName}/task-attachments`
 }
 
-function buildCommentAttachmentFolderPath(taskId: string, commentId: string) {
+function buildCommentAttachmentFolderPath(commentId: string) {
   return `comments/${commentId}`
 }
 

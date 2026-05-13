@@ -7,7 +7,255 @@
     <title>Task Management System</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div id="app-splash" class="splash-screen">
+        <div class="splash-bar"></div>
+        <div class="splash-drift splash-drift-left"></div>
+        <div class="splash-drift splash-drift-right"></div>
+        <div class="splash-drift splash-drift-top"></div>
+        <div class="splash-ring-out"></div>
+        <div class="splash-ring-mid"></div>
+
+        <div class="splash-logo">
+          <div class="splash-logo-shine"></div>
+          <img
+            src="/src/assets/octom-logo.svg"
+            alt="Octom"
+            width="58"
+            height="58"
+            class="splash-logo-img"
+          />
+        </div>
+
+        <div class="splash-copy splash-fade-up" style="animation-delay: 0.3s;">
+          <p class="splash-title">Task Management</p>
+          <p class="splash-subtitle">Loading your workspace...</p>
+        </div>
+
+        <div class="splash-dots splash-fade-up" style="animation-delay: 0.5s;">
+          <span class="splash-dot splash-dot-indigo" style="animation-delay: 0s;"></span>
+          <span class="splash-dot splash-dot-violet" style="animation-delay: 0.2s;"></span>
+          <span class="splash-dot splash-dot-cyan" style="animation-delay: 0.4s;"></span>
+        </div>
+      </div>
+
+      <style>
+        html,
+        body,
+        #app {
+          min-height: 100%;
+          margin: 0;
+          background: #0d0f17;
+        }
+
+        .splash-screen {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          background: #0d0f17;
+          color: #f8fafc;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .splash-bar {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background-image: linear-gradient(90deg, transparent, #6366f1, #8b5cf6, #06b6d4, transparent);
+          background-size: 200% 100%;
+          animation: splash-bar 1.8s ease-in-out infinite;
+        }
+
+        .splash-drift {
+          position: absolute;
+          pointer-events: none;
+          border-radius: 999px;
+          animation: splash-drift-kf 6s ease-in-out infinite alternate;
+        }
+
+        .splash-drift-left {
+          left: -112px;
+          top: -80px;
+          width: 420px;
+          height: 420px;
+          background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%);
+        }
+
+        .splash-drift-right {
+          right: -96px;
+          bottom: -96px;
+          width: 380px;
+          height: 380px;
+          background: radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%);
+          animation-duration: 7s;
+          animation-direction: alternate-reverse;
+        }
+
+        .splash-drift-top {
+          top: -64px;
+          left: 50%;
+          width: 300px;
+          height: 200px;
+          transform: translateX(-50%);
+          background: radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%);
+          animation-duration: 5s;
+        }
+
+        .splash-ring-out,
+        .splash-ring-mid {
+          position: absolute;
+          pointer-events: none;
+          border-radius: 999px;
+        }
+
+        .splash-ring-out {
+          width: 220px;
+          height: 220px;
+          border: 1px solid rgba(99,102,241,0.15);
+          animation: splash-ring-out-kf 3s ease-in-out infinite;
+        }
+
+        .splash-ring-mid {
+          width: 168px;
+          height: 168px;
+          border: 1px solid rgba(139,92,246,0.2);
+          animation: splash-ring-mid-kf 3s ease-in-out infinite;
+        }
+
+        .splash-logo {
+          position: relative;
+          display: flex;
+          width: 100px;
+          height: 100px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 28px;
+          background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.18));
+          animation: splash-logo-kf 3.2s ease-in-out infinite;
+        }
+
+        .splash-logo-shine {
+          position: absolute;
+          inset: 1px;
+          pointer-events: none;
+          border-radius: 27px;
+          background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+        }
+
+        .splash-logo-img {
+          position: relative;
+          filter: drop-shadow(0 2px 8px rgba(99,102,241,0.5));
+        }
+
+        .splash-copy {
+          margin-top: 32px;
+          text-align: center;
+        }
+
+        .splash-title {
+          margin: 0;
+          background: linear-gradient(90deg, #c7d2fe, #f8fafc, #ddd6fe);
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          font-size: 22px;
+          font-weight: 800;
+          letter-spacing: 0;
+        }
+
+        .splash-subtitle {
+          margin: 6px 0 0;
+          color: rgba(148,163,184,0.7);
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .splash-dots {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          margin-top: 36px;
+        }
+
+        .splash-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 999px;
+          animation: splash-dot-kf 1.2s ease-in-out infinite;
+        }
+
+        .splash-dot-indigo { background: #6366f1; }
+        .splash-dot-violet { background: #8b5cf6; }
+        .splash-dot-cyan { background: #06b6d4; }
+
+        @keyframes splash-bar {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+
+        @keyframes splash-logo-kf {
+          0%,
+          100% {
+            transform: translateY(0);
+            box-shadow: 0 0 0 1px rgba(99,102,241,0.25), 0 0 40px rgba(99,102,241,0.2), 0 8px 32px rgba(0,0,0,0.4);
+          }
+          50% {
+            transform: translateY(-10px);
+            box-shadow: 0 0 0 1px rgba(99,102,241,0.35), 0 0 60px rgba(99,102,241,0.35), 0 16px 40px rgba(0,0,0,0.5);
+          }
+        }
+
+        @keyframes splash-ring-out-kf {
+          0%,
+          100% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.06); opacity: 1; }
+        }
+
+        @keyframes splash-ring-mid-kf {
+          0%,
+          100% { transform: scale(1); opacity: 0.8; }
+          50% { transform: scale(0.94); opacity: 0.4; }
+        }
+
+        @keyframes splash-drift-kf {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(30px, 20px); }
+        }
+
+        @keyframes splash-dot-kf {
+          0%,
+          80%,
+          100% { transform: scale(0.7); opacity: 0.4; }
+          40% { transform: scale(1.2); opacity: 1; }
+        }
+
+        @keyframes splash-fade-up-kf {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes splash-out-kf {
+          to { opacity: 0; pointer-events: none; }
+        }
+
+        .splash-fade-up {
+          animation: splash-fade-up-kf 0.8s ease both;
+        }
+
+        #app-splash.is-hiding {
+          animation: splash-out-kf 0.45s ease forwards;
+        }
+      </style>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

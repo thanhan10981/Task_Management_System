@@ -64,6 +64,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Dashboard' },
       },
       {
+        path: 'projects',
+        name: 'projects-list',
+        component: () => import('@/features/projects/views/ProjectsView.vue'),
+        meta: { title: 'My Projects' },
+      },
+      {
         path: 'projects/create',
         name: 'create-project',
         component: () => import('@/features/dashboard/views/CreateProjectView.vue'),

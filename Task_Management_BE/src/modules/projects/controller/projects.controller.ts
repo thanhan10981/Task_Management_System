@@ -145,6 +145,16 @@ export class ProjectsController {
     return this.projectsService.joinProject(req.user.id, id, joinProjectDto);
   }
 
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Leave project as current user' })
+  @ApiResponse({ status: 201, description: 'Left project successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Project owner cannot leave project' })
+  @ApiResponse({ status: 404, description: 'Project or member not found' })
+  leaveProject(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.projectsService.leaveProject(req.user.id, id);
+  }
+
   @Post(':id/invite')
   @ApiOperation({ summary: 'Create or fetch project invite token (owner/admin only)' })
   @ApiResponse({ status: 201, description: 'Invite token created successfully' })

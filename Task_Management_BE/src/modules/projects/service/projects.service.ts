@@ -389,6 +389,30 @@ export class ProjectsService {
     return member;
   }
 
+  async leaveProject(userId: string, projectId: string) {
+    const [project, member] = await Promise.all([
+      this.projectsRepository.findProjectById(projectId),
+      this.projectsRepository.findProjectMember(projectId, userId),
+    ]);
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!member) {
+      throw new NotFoundException('Project member not found');
+    }
+
+    if (project.createdBy === userId) {
+      throw new ForbiddenException('Project owner cannot leave project');
+    }
+
+    await this.projectsRepository.removeProjectMember(projectId, userId);
+
+    this.logger.log(`User ${userId} left project ${projectId}`);
+    return { success: true };
+  }
+
   async createInviteToken(userId: string, projectId: string) {
     await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
 

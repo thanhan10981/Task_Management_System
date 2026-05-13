@@ -1,5 +1,5 @@
 import { del, get, patch, post } from './client'
-import type { CreateProjectPayload, ProjectSummary } from '@/types/project.types'
+import type { CreateProjectPayload, ProjectSummary, UpdateProjectPayload } from '@/types/project.types'
 import { QUERY_KEYS } from '@/constants/query-keys'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, unref, type MaybeRef } from 'vue'
@@ -22,8 +22,15 @@ function unwrapApiPayload<T>(response: T | ApiEnvelope<T>): T {
 }
 
 function extractProjectsList(payload: unknown): ProjectSummary[] {
+  const normalizeProjects = (projects: ProjectSummary[]) =>
+    projects.map((project) => ({
+      ...project,
+      taskCount: project.taskCount ?? project._count?.tasks ?? 0,
+      memberCount: project.memberCount ?? project._count?.members ?? project.members?.length ?? 0,
+    }))
+
   if (Array.isArray(payload)) {
-    return payload as ProjectSummary[]
+    return normalizeProjects(payload as ProjectSummary[])
   }
 
   if (!payload || typeof payload !== 'object') {
@@ -32,12 +39,12 @@ function extractProjectsList(payload: unknown): ProjectSummary[] {
 
   const directData = (payload as PaginatedProjectsPayload).data
   if (Array.isArray(directData)) {
-    return directData
+    return normalizeProjects(directData)
   }
 
   const nestedData = (payload as { data?: PaginatedProjectsPayload }).data
   if (nestedData && Array.isArray(nestedData.data)) {
-    return nestedData.data
+    return normalizeProjects(nestedData.data)
   }
 
   return []
@@ -202,5 +209,57 @@ export function useAddProjectMemberMutation() {
     },
   })
 }
+export async function updateProject(projectId: string, payload: UpdateProjectPayload): Promise<ProjectSummary> {
+  const response = await patch<ProjectSummary | ApiEnvelope<ProjectSummary>>(`/projects/${projectId}`, payload)
+  return unwrapApiPayload(response)
+}
 
+export function useUpdateProjectMutation() {
+  const queryClient = useQueryClient()
 
+  return useMutation({
+    mutationFn: ({ projectId, payload }: { projectId: string; payload: UpdateProjectPayload }) =>
+      updateProject(projectId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.list() })
+    },
+  })
+}
+
+export async function deleteProject(projectId: string): Promise<unknown> {
+  const response = await del<unknown>(`/projects/${projectId}`)
+  return response
+}
+
+export function useDeleteProjectMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (projectId: string) => deleteProject(projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.list() })
+    },
+  })
+}
+
+export async function leaveProject(projectId: string, userId: string): Promise<unknown> {
+  try {
+    const response = await post<unknown>(`/projects/${projectId}/leave`, {})
+    return response
+  } catch {
+    // Fallback: use remove member endpoint
+    return removeProjectMember(projectId, userId)
+  }
+}
+
+export function useLeaveProjectMutation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ projectId, userId }: { projectId: string; userId: string }) =>
+      leaveProject(projectId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.list() })
+    },
+  })
+}

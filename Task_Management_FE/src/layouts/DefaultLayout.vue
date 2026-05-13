@@ -915,6 +915,14 @@ const navItems = [
     </svg>`,
   },
   {
+    name: 'projects', label: 'Projects', routeName: 'projects-list', requiresProject: false,
+    icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 8.25A2.25 2.25 0 0 1 6.25 6h3.6l1.95 2.2h5.95A2.25 2.25 0 0 1 20 10.45v6.3A2.25 2.25 0 0 1 17.75 19H6.25A2.25 2.25 0 0 1 4 16.75z"/>
+      <line x1="12" y1="11.25" x2="12" y2="16.25"/>
+      <line x1="9.5" y1="13.75" x2="14.5" y2="13.75"/>
+    </svg>`,
+  },
+  {
     name: 'board', label: 'Board', routeName: 'project-board', requiresProject: true,
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>

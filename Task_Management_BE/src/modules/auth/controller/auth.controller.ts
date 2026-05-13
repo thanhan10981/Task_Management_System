@@ -20,19 +20,19 @@ export class AuthController {
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data' })
   async register(@Body() registerDto: RegisterDto, @Response() res: any) {
     const data = await this.authService.register(registerDto);
-    
+    const isProduction = process.env.NODE_ENV === 'production';
     // Set httpOnly cookies
     res.cookie('accessToken', data.accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+       sameSite: isProduction ? 'none' : 'lax',
       maxAge: 60 * 60 * 1000, // 1 hour
     });
 
     res.cookie('refreshToken', data.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+       sameSite: isProduction ? 'none' : 'lax',
       maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
     });
 

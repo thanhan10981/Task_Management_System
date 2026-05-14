@@ -569,6 +569,16 @@ function toUiTheme(theme?: UserSettingsApiData['theme']): UserSettings['theme'] 
   if (theme === 'DARK') return 'dark'; if (theme === 'LIGHT') return 'light'; return 'system'
 }
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null }
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+function authNameParts() {
+  const parts = (authStore.user?.fullName ?? '').trim().split(/\s+/).filter(Boolean)
+  return {
+    firstName: parts[0] ?? '',
+    lastName: parts.slice(1).join(' '),
+  }
+}
 
 function applyLoadedUserSettings(payload?: UserSettingsApiData) {
   if (!payload) return
@@ -581,23 +591,30 @@ function applyLoadedUserSettings(payload?: UserSettingsApiData) {
     }
   }
   const profile = isRecord(payload.preferences) && isRecord(payload.preferences['profile']) ? payload.preferences['profile'] : null
+  const fallbackName = authNameParts()
+  form.email = authStore.user?.email ?? form.email
   if (profile) {
-    if (typeof profile.firstName === 'string') form.firstName = profile.firstName
-    if (typeof profile.lastName === 'string') form.lastName = profile.lastName
-    if (typeof profile.jobTitle === 'string') form.jobTitle = profile.jobTitle
-    if (typeof profile.phone === 'string') form.phone = profile.phone
-    if (typeof profile.bio === 'string') form.bio = profile.bio
+    form.firstName = nonEmptyString(profile.firstName) ?? fallbackName.firstName
+    form.lastName = nonEmptyString(profile.lastName) ?? fallbackName.lastName
+    form.jobTitle = nonEmptyString(profile.jobTitle) ?? authStore.user?.jobTitle ?? ''
+    form.phone = nonEmptyString(profile.phone) ?? authStore.user?.phone ?? ''
+    form.bio = nonEmptyString(profile.bio) ?? authStore.user?.bio ?? ''
     // Prefer: preferences URL → authStore.user URL → keep existing
-    const resolvedAvatarUrl = (typeof profile.avatarUrl === 'string' && profile.avatarUrl)
+    const resolvedAvatarUrl = nonEmptyString(profile.avatarUrl)
       || authStore.user?.avatarUrl
       || form.avatarUrl
-    const resolvedCoverUrl = (typeof profile.coverUrl === 'string' && profile.coverUrl)
+    const resolvedCoverUrl = nonEmptyString(profile.coverUrl)
       || authStore.user?.coverUrl
       || form.coverUrl
     if (resolvedAvatarUrl) form.avatarUrl = resolvedAvatarUrl
     if (resolvedCoverUrl) form.coverUrl = resolvedCoverUrl
   } else {
     // No saved preferences profile: seed from authStore directly
+    form.firstName = fallbackName.firstName
+    form.lastName = fallbackName.lastName
+    form.jobTitle = authStore.user?.jobTitle ?? ''
+    form.phone = authStore.user?.phone ?? ''
+    form.bio = authStore.user?.bio ?? ''
     if (!form.avatarUrl && authStore.user?.avatarUrl) form.avatarUrl = authStore.user.avatarUrl
     if (!form.coverUrl && authStore.user?.coverUrl) form.coverUrl = authStore.user.coverUrl
   }

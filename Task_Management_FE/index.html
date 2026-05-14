@@ -7,39 +7,39 @@
     <title>Task Management System</title>
   </head>
   <body>
-    <div id="app">
-      <div id="app-splash" class="splash-screen">
-        <div class="splash-bar"></div>
-        <div class="splash-drift splash-drift-left"></div>
-        <div class="splash-drift splash-drift-right"></div>
-        <div class="splash-drift splash-drift-top"></div>
-        <div class="splash-ring-out"></div>
-        <div class="splash-ring-mid"></div>
+    <div id="app"></div>
+    <div id="app-splash" class="splash-screen">
+      <div class="splash-bar"></div>
+      <div class="splash-drift splash-drift-left"></div>
+      <div class="splash-drift splash-drift-right"></div>
+      <div class="splash-drift splash-drift-top"></div>
+      <div class="splash-ring-out"></div>
+      <div class="splash-ring-mid"></div>
 
-        <div class="splash-logo">
-          <div class="splash-logo-shine"></div>
-          <img
-            src="/src/assets/octom-logo.svg"
-            alt="Octom"
-            width="58"
-            height="58"
-            class="splash-logo-img"
-          />
-        </div>
-
-        <div class="splash-copy splash-fade-up" style="animation-delay: 0.3s;">
-          <p class="splash-title">Task Management</p>
-          <p class="splash-subtitle">Loading your workspace...</p>
-        </div>
-
-        <div class="splash-dots splash-fade-up" style="animation-delay: 0.5s;">
-          <span class="splash-dot splash-dot-indigo" style="animation-delay: 0s;"></span>
-          <span class="splash-dot splash-dot-violet" style="animation-delay: 0.2s;"></span>
-          <span class="splash-dot splash-dot-cyan" style="animation-delay: 0.4s;"></span>
-        </div>
+      <div class="splash-logo">
+        <div class="splash-logo-shine"></div>
+        <img
+          src="/src/assets/octom-logo.svg"
+          alt="Octom"
+          width="58"
+          height="58"
+          class="splash-logo-img"
+        />
       </div>
 
-      <style>
+      <div class="splash-copy splash-fade-up" style="animation-delay: 0.3s;">
+        <p class="splash-title">Task Management</p>
+        <p class="splash-subtitle">Loading your workspace...</p>
+      </div>
+
+      <div class="splash-dots splash-fade-up" style="animation-delay: 0.5s;">
+        <span class="splash-dot splash-dot-indigo" style="animation-delay: 0s;"></span>
+        <span class="splash-dot splash-dot-violet" style="animation-delay: 0.2s;"></span>
+        <span class="splash-dot splash-dot-cyan" style="animation-delay: 0.4s;"></span>
+      </div>
+    </div>
+
+    <style>
         html,
         body,
         #app {
@@ -254,8 +254,7 @@
         #app-splash.is-hiding {
           animation: splash-out-kf 0.45s ease forwards;
         }
-      </style>
-    </div>
+    </style>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

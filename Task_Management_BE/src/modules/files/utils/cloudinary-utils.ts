@@ -40,8 +40,47 @@ export function isNotFoundError(error: unknown): boolean {
     return false;
   }
 
-  const payload = error as { http_code?: number };
-  return payload.http_code === 404;
+  const payload = error as {
+    http_code?: number;
+    statusCode?: number;
+    status?: number;
+    message?: string;
+    response?: {
+      status?: number;
+      data?: {
+        error?: {
+          message?: string;
+        };
+        message?: string;
+      };
+    };
+  };
+
+  if (
+    payload.http_code === 404 ||
+    payload.statusCode === 404 ||
+    payload.status === 404 ||
+    payload.response?.status === 404
+  ) {
+    return true;
+  }
+
+  const message = [
+    payload.message,
+    payload.response?.data?.message,
+    payload.response?.data?.error?.message,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase();
+
+  return (
+    message.includes('not found') ||
+    message.includes('does not exist') ||
+    message.includes('doesn\'t exist') ||
+    message.includes('folder not found') ||
+    message.includes('folder does not exist')
+  );
 }
 
 export function isAlreadyExistsError(error: unknown): boolean {

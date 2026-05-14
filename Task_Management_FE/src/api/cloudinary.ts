@@ -72,11 +72,42 @@ interface CloudinaryDirectUploadResponse {
 }
 
 function isNotFoundError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null || !('response' in error)) {
+  if (typeof error !== 'object' || error === null) {
     return false
   }
-  const response = (error as { response?: { status?: number } }).response
-  return response?.status === 404
+
+  const payload = error as {
+    message?: string
+    response?: {
+      status?: number
+      data?: {
+        message?: string
+        error?: {
+          message?: string
+        }
+      }
+    }
+  }
+
+  if (payload.response?.status === 404) {
+    return true
+  }
+
+  const message = [
+    payload.message,
+    payload.response?.data?.message,
+    payload.response?.data?.error?.message,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    message.includes('not found') ||
+    message.includes('does not exist') ||
+    message.includes('doesn\'t exist') ||
+    message.includes('failed to list cloudinary folders recursively')
+  )
 }
 
 function extractFilesFromPayload(payload: unknown): CloudinaryFileMetadata[] | null {

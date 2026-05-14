@@ -18,3 +18,13 @@ app.use(router)
 app.use(VueQueryPlugin, vueQueryOptions)
 
 app.mount('#app')
+
+void router.isReady().finally(() => {
+  const splash = document.getElementById('app-splash')
+  if (!splash) return
+
+  requestAnimationFrame(() => {
+    splash.classList.add('is-hiding')
+    window.setTimeout(() => splash.remove(), 480)
+  })
+})

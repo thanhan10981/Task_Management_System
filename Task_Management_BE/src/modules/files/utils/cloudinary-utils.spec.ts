@@ -22,6 +22,9 @@ describe('cloudinary-utils', () => {
 
   it('detects Cloudinary error shapes', () => {
     expect(isNotFoundError({ http_code: 404 })).toBe(true);
+    expect(isNotFoundError({ statusCode: 404 })).toBe(true);
+    expect(isNotFoundError({ response: { status: 404 } })).toBe(true);
+    expect(isNotFoundError({ message: 'Folder projects/new-id does not exist' })).toBe(true);
     expect(isAlreadyExistsError({ http_code: 409, message: 'Folder already exists' })).toBe(true);
     expect(isAlreadyExistsError({ http_code: 409, message: 'Conflict' })).toBe(false);
   });

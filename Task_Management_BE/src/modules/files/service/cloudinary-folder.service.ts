@@ -13,6 +13,7 @@ import {
   hasRootFoldersApi,
   isAlreadyExistsError,
   isFolderMarkerResource,
+  isNotFoundError,
   normalizePath,
 } from '../utils/cloudinary-utils';
 import { CloudinaryResourceService } from './cloudinary-resource.service';
@@ -233,7 +234,16 @@ export class CloudinaryFolderService {
     let nextCursor: string | undefined;
 
     do {
-      const response = await this.fetchFolderPage(parentPath, nextCursor);
+      let response: CloudinaryFolderListResponse;
+      try {
+        response = await this.fetchFolderPage(parentPath, nextCursor);
+      } catch (error) {
+        if (isNotFoundError(error)) {
+          return [];
+        }
+
+        throw error;
+      }
 
       const current = (Array.isArray(response?.folders) ? response.folders : [])
         .map((folder) => ({

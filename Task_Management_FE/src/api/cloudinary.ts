@@ -476,11 +476,20 @@ export async function getFolderMetadata(projectId: string): Promise<CloudinaryFo
     params: { projectId, recursive: true },
   })
 
-  const response = await get<
-    { folders: CloudinaryFolderMetadata[] } | { data: { folders: CloudinaryFolderMetadata[] } }
-  >('/files/cloudinary/folders', {
-    params: { projectId, recursive: true },
-  })
+  let response: { folders: CloudinaryFolderMetadata[] } | { data: { folders: CloudinaryFolderMetadata[] } }
+  try {
+    response = await get<
+      { folders: CloudinaryFolderMetadata[] } | { data: { folders: CloudinaryFolderMetadata[] } }
+    >('/files/cloudinary/folders', {
+      params: { projectId, recursive: true },
+    })
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return []
+    }
+
+    throw error instanceof Error ? error : new Error('Cannot load folders metadata')
+  }
 
   const payload = unwrapApiPayload(response)
   if (!payload || !Array.isArray(payload.folders)) {

@@ -1,7 +1,5 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import Redis from 'ioredis';
-import { REDIS_CLIENT } from '../../../config/redis/redis.constants';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateFileRecordDto } from '../dto/create-file-record.dto';
 import { CreateUploadSignatureDto } from '../dto/create-upload-signature.dto';
@@ -51,6 +49,8 @@ const MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 const MAX_PROFILE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const PENDING_UPLOAD_TTL_SECONDS = 10 * 60;
 
+const pendingUploadMemoryStore = new Map<string, { expiresAt: number; value: PendingUpload }>();
+
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
@@ -59,7 +59,6 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly filesRepository: FilesRepository,
     private readonly cloudinaryFileManagerService: CloudinaryFileManagerService,
-    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   async createUploadSignature(userId: string, dto: CreateUploadSignatureDto) {
@@ -89,12 +88,7 @@ export class FilesService {
       enforcedFormat: fileKind.enforcedFormat,
     };
 
-    await this.redis.set(
-      this.pendingUploadKey(uploadId),
-      JSON.stringify(pendingUpload),
-      'EX',
-      PENDING_UPLOAD_TTL_SECONDS,
-    );
+    await this.storePendingUpload(uploadId, pendingUpload);
 
     return {
       uploadId,
@@ -163,7 +157,7 @@ export class FilesService {
         uploadedBy: userId,
       });
 
-      await this.redis.del(this.pendingUploadKey(dto.uploadId));
+      await this.deletePendingUpload(dto.uploadId);
       const uploader = await this.getUploaderProfile(userId);
 
       return {
@@ -868,7 +862,7 @@ export class FilesService {
   }
 
   private async resolvePendingUpload(userId: string, dto: FinalizeUploadDto): Promise<PendingUpload> {
-    const rawPendingUpload = await this.redis.get(this.pendingUploadKey(dto.uploadId));
+    const rawPendingUpload = await this.getPendingUploadPayload(dto.uploadId);
     if (!rawPendingUpload) {
       throw new BadRequestException('Upload signature is expired or invalid');
     }
@@ -877,7 +871,7 @@ export class FilesService {
     try {
       pendingUpload = JSON.parse(rawPendingUpload) as PendingUpload;
     } catch {
-      await this.redis.del(this.pendingUploadKey(dto.uploadId));
+      await this.deletePendingUpload(dto.uploadId);
       throw new BadRequestException('Upload signature is invalid');
     }
 
@@ -886,6 +880,45 @@ export class FilesService {
     }
 
     return pendingUpload;
+  }
+
+  private async storePendingUpload(uploadId: string, pendingUpload: PendingUpload) {
+    this.storePendingUploadInMemory(uploadId, pendingUpload);
+  }
+
+  private getPendingUploadPayload(uploadId: string) {
+    const memoryItem = pendingUploadMemoryStore.get(uploadId);
+    if (!memoryItem) {
+      return null;
+    }
+
+    if (memoryItem.expiresAt <= Date.now()) {
+      pendingUploadMemoryStore.delete(uploadId);
+      return null;
+    }
+
+    return JSON.stringify(memoryItem.value);
+  }
+
+  private deletePendingUpload(uploadId: string) {
+    pendingUploadMemoryStore.delete(uploadId);
+  }
+
+  private storePendingUploadInMemory(uploadId: string, pendingUpload: PendingUpload) {
+    this.pruneExpiredPendingUploads();
+    pendingUploadMemoryStore.set(uploadId, {
+      expiresAt: Date.now() + PENDING_UPLOAD_TTL_SECONDS * 1000,
+      value: pendingUpload,
+    });
+  }
+
+  private pruneExpiredPendingUploads() {
+    const now = Date.now();
+    for (const [uploadId, item] of pendingUploadMemoryStore.entries()) {
+      if (item.expiresAt <= now) {
+        pendingUploadMemoryStore.delete(uploadId);
+      }
+    }
   }
 
   private verifyFinalizedUploadPayload(
@@ -932,10 +965,6 @@ export class FilesService {
         this.logger.warn(error.message);
       }
     }
-  }
-
-  private pendingUploadKey(uploadId: string) {
-    return `files:upload:pending:${uploadId}`;
   }
 
   private async getUploaderProfile(userId: string): Promise<UploaderProfile | null> {

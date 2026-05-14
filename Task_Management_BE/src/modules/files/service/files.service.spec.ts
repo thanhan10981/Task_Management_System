@@ -6,7 +6,6 @@ describe('FilesService', () => {
   let prisma: any;
   let repository: any;
   let cloudinary: any;
-  let redis: any;
 
   const fileRecord = {
     id: 'file-1',
@@ -72,30 +71,25 @@ describe('FilesService', () => {
       createFolder: jest.fn().mockResolvedValue({ path: 'projects/project-1/docs', name: 'docs' }),
       ensureFolderPath: jest.fn((value: string) => value.trim()),
     };
-    redis = {
-      set: jest.fn(),
-      get: jest.fn(),
-      del: jest.fn(),
-    };
-    service = new FilesService(prisma, repository, cloudinary, redis);
+    service = new FilesService(prisma, repository, cloudinary);
   });
 
   it('creates a signed upload after validating project and task access', async () => {
-    await expect(
-      service.createUploadSignature('user-1', {
-        projectId: 'project-1',
-        taskId: 'task-1',
-        fileName: 'doc.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: 100,
-        folderPath: '/tasks/',
-      } as any),
-    ).resolves.toMatchObject({
+    const signature = await service.createUploadSignature('user-1', {
+      projectId: 'project-1',
+      taskId: 'task-1',
+      fileName: 'doc.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 100,
+      folderPath: '/tasks/',
+    } as any);
+
+    expect(signature).toMatchObject({
       folder: 'projects/project-1/tasks',
       signature: 'sig',
       expiresInSeconds: 600,
     });
-    expect(redis.set).toHaveBeenCalledWith(expect.stringContaining('files:upload:pending:'), expect.any(String), 'EX', 600);
+    expect(signature.uploadId).toEqual(expect.any(String));
   });
 
   it('rejects invalid upload metadata and inaccessible projects', async () => {
@@ -138,44 +132,45 @@ describe('FilesService', () => {
   });
 
   it('finalizes pending signed uploads and deletes invalid pending assets', async () => {
-    redis.get.mockResolvedValue(
-      JSON.stringify({
-        userId: 'user-1',
-        projectId: 'project-1',
-        taskId: 'task-1',
-        folderPath: 'tasks',
-        scopedFolder: 'projects/project-1/tasks',
-        fileName: 'doc.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: 100,
-        resourceType: 'raw',
-        enforcedFormat: 'pdf',
-      }),
-    );
-    cloudinary.getResource.mockResolvedValue({
-      public_id: 'projects/project-1/tasks/doc',
-      secure_url: 'https://cdn/doc.pdf',
-      format: 'pdf',
-      resource_type: 'raw',
-      bytes: 10,
-    });
+    const signature = await service.createUploadSignature('user-1', {
+      projectId: 'project-1',
+      taskId: 'task-1',
+      fileName: 'doc.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 100,
+      folderPath: 'tasks',
+    } as any);
 
     await expect(
       service.finalizeUpload('user-1', {
-        uploadId: 'upload-1',
+        uploadId: signature.uploadId,
         projectId: 'project-1',
         publicId: 'projects/project-1/tasks/doc',
+        secureUrl: 'https://cdn/doc.pdf',
+        format: 'pdf',
         resourceType: 'raw',
+        bytes: 10,
       } as any),
     ).resolves.toMatchObject({ id: 'file-1', originalFilename: 'doc.pdf' });
 
-    cloudinary.getResource.mockResolvedValue({ public_id: 'outside/doc', resource_type: 'raw', bytes: 10, format: 'pdf' });
+    const invalidSignature = await service.createUploadSignature('user-1', {
+      projectId: 'project-1',
+      taskId: 'task-1',
+      fileName: 'doc.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 100,
+      folderPath: 'tasks',
+    } as any);
+
     await expect(
       service.finalizeUpload('user-1', {
-        uploadId: 'upload-1',
+        uploadId: invalidSignature.uploadId,
         projectId: 'project-1',
         publicId: 'outside/doc',
+        secureUrl: 'https://cdn/doc.pdf',
+        format: 'pdf',
         resourceType: 'raw',
+        bytes: 10,
       } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

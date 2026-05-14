@@ -43,6 +43,16 @@ export class CloudinaryFileManagerService {
     return this.cloudinaryAccessHelper.uploadProjectTaskFile(input);
   }
 
+  async uploadProfileImage(input: {
+    fileBuffer: Buffer;
+    originalFilename: string;
+    mimeType: string;
+    userId: string;
+    kind: 'avatar' | 'cover';
+  }) {
+    return this.cloudinaryAccessHelper.uploadProfileImage(input);
+  }
+
   createSignedUploadParams(input: {
     originalFilename: string;
     mimeType: string;

@@ -75,6 +75,7 @@ export class TasksRepository {
         startDate: true,
         dueDate: true,
         parentTaskId: true,
+        isDeleted: true,
         status: {
           select: {
             id: true,
@@ -168,6 +169,13 @@ export class TasksRepository {
           },
         },
       },
+    });
+  }
+
+  hardDeleteTask(id: string, tx?: TxClient) {
+    const client = tx ?? this.prisma;
+    return client.task.delete({
+      where: { id },
     });
   }
 

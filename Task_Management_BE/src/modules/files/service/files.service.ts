@@ -48,6 +48,7 @@ type UploaderProfile = {
 };
 
 const MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_PROFILE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const PENDING_UPLOAD_TTL_SECONDS = 10 * 60;
 
 @Injectable()
@@ -99,6 +100,36 @@ export class FilesService {
       uploadId,
       ...signedUpload,
       expiresInSeconds: PENDING_UPLOAD_TTL_SECONDS,
+    };
+  }
+
+  async uploadProfileImage(userId: string, kind: string | undefined, file: UploadedProjectFile) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    const normalizedKind = kind === 'cover' ? 'cover' : kind === 'avatar' ? 'avatar' : null;
+    if (!normalizedKind) {
+      throw new BadRequestException('Profile image kind must be avatar or cover');
+    }
+
+    this.validateProfileImage(file.originalname, file.mimetype, file.buffer.length);
+
+    const uploaded = await this.cloudinaryFileManagerService.uploadProfileImage({
+      fileBuffer: file.buffer,
+      originalFilename: file.originalname,
+      mimeType: file.mimetype,
+      userId,
+      kind: normalizedKind,
+    });
+
+    return {
+      publicId: uploaded.public_id,
+      secureUrl: uploaded.secure_url,
+      format: uploaded.format,
+      resourceType: uploaded.resource_type,
+      bytes: uploaded.bytes,
+      kind: normalizedKind,
     };
   }
 
@@ -811,6 +842,29 @@ export class FilesService {
 
     if (!isKnownExtension && !isKnownMimeType) {
       throw new BadRequestException('Unsupported file type');
+    }
+  }
+
+  private validateProfileImage(fileName: string, mimeType: string, sizeBytes: number) {
+    if (!fileName?.trim()) {
+      throw new BadRequestException('File name is required');
+    }
+
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      throw new BadRequestException('File size is invalid');
+    }
+
+    if (sizeBytes > MAX_PROFILE_IMAGE_SIZE_BYTES) {
+      throw new BadRequestException('Profile image exceeds 5MB limit');
+    }
+
+    const extension = this.cloudinaryFileManagerService.extractFileExtension(fileName);
+    const normalizedMime = mimeType.toLowerCase();
+    const knownImageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg']);
+    const isKnownImage = normalizedMime.startsWith('image/') || (extension ? knownImageExtensions.has(extension) : false);
+
+    if (!isKnownImage) {
+      throw new BadRequestException('Profile image must be an image file');
     }
   }
 

@@ -68,6 +68,7 @@ export interface ActivityLog {
 
 export interface Task {
   id: string
+  projectId?: string | null
   parentTaskId?: string | null
   groupId?: string | null
   title: string
@@ -366,6 +367,7 @@ export const useTaskStore = defineStore('tasks', () => {
 
     return {
       id: rawTask.id ?? '',
+      projectId: rawTask.projectId ?? null,
       parentTaskId: rawTask.parentTaskId ?? null,
       groupId: rawTask.groupId ?? rawTask.group?.id ?? null,
       title: rawTask.title ?? '',
@@ -942,8 +944,11 @@ export const useTaskStore = defineStore('tasks', () => {
     loadingTrash.value = true
 
     try {
+      trashTasks.value = []
       const rawTasks = await fetchTrashTasks(projectId)
-      trashTasks.value = rawTasks.map(mapTask)
+      trashTasks.value = rawTasks
+        .filter((task) => task.projectId === projectId)
+        .map(mapTask)
     } finally {
       loadingTrash.value = false
     }
@@ -1244,6 +1249,18 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
+  async function permanentlyDeleteTaskRemote(taskId: string, projectId?: string | null) {
+    await taskService.permanentlyDeleteTask(taskId)
+    trashTasks.value = trashTasks.value.filter((task) => task.id !== taskId)
+
+    const nextProjectId = projectId ?? loadedProjectId.value
+    await invalidateTaskDetailQueries(taskId)
+    await invalidateProjectTaskQueries(nextProjectId)
+    if (nextProjectId) {
+      await loadProjectTrash(nextProjectId)
+    }
+  }
+
   function addTask(
     data: Omit<Task, 'id' | 'start' | 'createdAt' | 'updatedAt' | 'comments' | 'files'>
   ) {
@@ -1412,6 +1429,7 @@ export const useTaskStore = defineStore('tasks', () => {
     unassignTaskMemberRemote,
     deleteTaskRemote,
     restoreTaskRemote,
+    permanentlyDeleteTaskRemote,
     addTask,
     updateTask,
     moveTask,

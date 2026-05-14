@@ -683,6 +683,32 @@ export class TaskService {
     return restoredTask;
   }
 
+  async permanentlyDelete(userId: string, id: string) {
+    const task = await this.tasksRepository.findTaskBasicById(id, true);
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (!task.isDeleted) {
+      throw new ConflictException('Only tasks in Trash can be permanently deleted');
+    }
+
+    const access = await this.projectAccessService.ensureProjectMember(
+      userId,
+      task.projectId,
+    );
+
+    if (!access.isOwner && access.role !== 'ADMIN' && task.createdBy !== userId) {
+      throw new ConflictException('Only owner/admin or task creator can permanently delete task');
+    }
+
+    await this.tasksRepository.hardDeleteTask(id);
+
+    this.logger.log(`Task ${id} permanently deleted by user ${userId}`);
+    return { success: true };
+  }
+
   async getHistory(userId: string, taskId: string, queryDto: TaskQueryDto) {
     // Task history is read-only by design; writes only occur as task side effects.
     await this.projectAccessService.ensureTaskAccess(userId, taskId);

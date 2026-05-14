@@ -33,17 +33,20 @@ apiClient.interceptors.response.use(
   async (error) => {
     const status = error.response?.status
     if (status === 401) {
+      const requestUrl = String(error.config?.url ?? '')
+      const isAuthRequest = requestUrl.includes('/auth/')
+      const currentPath = window.location.pathname
+      const isOnAuthRoute = currentPath.startsWith('/auth/')
+
+      if (isAuthRequest || isOnAuthRoute) {
+        return Promise.reject(error)
+      }
+
       const authStore = useAuthStore()
       authStore.logout()
 
       const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
-      const isOnAuthRoute = redirectPath.startsWith('/auth/')
-
-      if (isOnAuthRoute) {
-        window.location.href = '/auth/login'
-      } else {
-        window.location.href = `/auth/login?redirect=${encodeURIComponent(redirectPath)}`
-      }
+      window.location.href = `/auth/login?redirect=${encodeURIComponent(redirectPath)}`
     }
 
     return Promise.reject(error)

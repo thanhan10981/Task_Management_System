@@ -58,6 +58,15 @@ interface BackendUploadResponse {
   uploader?: CloudinaryUploadResult['uploader']
 }
 
+interface ProfileImageUploadResponse {
+  publicId: string
+  secureUrl: string
+  format?: string
+  resourceType?: string
+  bytes?: number
+  kind: 'avatar' | 'cover'
+}
+
 interface CloudinaryDirectUploadResponse {
   public_id: string
   url: string
@@ -317,6 +326,38 @@ export async function uploadProjectFileToBackend(
     folder: payload.publicId.split('/').slice(0, -1).join('/'),
     originalFilename: payload.originalFilename,
   }
+}
+
+export async function uploadProfileImageToBackend(
+  file: File,
+  kind: 'avatar' | 'cover',
+  onProgress?: (event: UploadProgressEvent) => void,
+): Promise<ProfileImageUploadResponse> {
+  const formData = new FormData()
+  formData.append('kind', kind)
+  formData.append('file', file)
+
+  const response = await apiClient.post<ProfileImageUploadResponse | ApiEnvelope<ProfileImageUploadResponse>>(
+    '/files/profile-image',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 60000,
+      onUploadProgress: (event) => {
+        if (!onProgress) return
+        const total = event.total ?? file.size ?? 1
+        onProgress({
+          loaded: event.loaded,
+          total,
+          percentage: Math.max(1, Math.round((event.loaded / total) * 100)),
+        })
+      },
+    },
+  )
+
+  return unwrapApiPayload(response.data)
 }
 
 export async function uploadProjectFileWithSignature(

@@ -348,7 +348,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
 import { useTheme } from '@/composables/useTheme'
-import { uploadToCloudinary } from '@/api/cloudinary'
+import { uploadProfileImageToBackend } from '@/api/cloudinary'
 import {
   useProjectSettingsQuery,
   useUpdateProjectSettingsMutation,
@@ -495,11 +495,10 @@ const uploadingAvatar = ref(false)
 const uploadingCover = ref(false)
 const coverUploadProgress = ref(0)
 
-/** Upload a file directly to Cloudinary (unsigned preset) and return the secure URL */
-async function uploadImageToCloudinary(file: File, folder: string, onProgress?: (pct: number) => void): Promise<string> {
-  const result = await uploadToCloudinary(
+async function uploadProfileImage(file: File, kind: 'avatar' | 'cover', onProgress?: (pct: number) => void): Promise<string> {
+  const result = await uploadProfileImageToBackend(
     file,
-    folder,
+    kind,
     onProgress ? (evt) => onProgress(evt.percentage) : undefined,
   )
   return result.secureUrl
@@ -513,7 +512,7 @@ async function onAvatarChange(e: Event) {
   preview.avatarUrl = localUrl
   uploadingAvatar.value = true
   try {
-    const secureUrl = await uploadImageToCloudinary(file, 'profile/avatars')
+    const secureUrl = await uploadProfileImage(file, 'avatar')
     form.avatarUrl = secureUrl
     // Immediately persist to authStore so navbar + other components see new avatar
     if (authStore.user) {
@@ -539,7 +538,7 @@ async function onCoverChange(e: Event) {
   uploadingCover.value = true
   coverUploadProgress.value = 0
   try {
-    const secureUrl = await uploadImageToCloudinary(file, 'profile/covers', (pct) => {
+    const secureUrl = await uploadProfileImage(file, 'cover', (pct) => {
       coverUploadProgress.value = pct
     })
     form.coverUrl = secureUrl

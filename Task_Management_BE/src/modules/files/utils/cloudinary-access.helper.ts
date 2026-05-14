@@ -11,6 +11,14 @@ interface UploadProjectTaskFileParams {
   folderPath?: string;
 }
 
+interface UploadProfileImageParams {
+  fileBuffer: Buffer;
+  originalFilename: string;
+  mimeType: string;
+  userId: string;
+  kind: 'avatar' | 'cover';
+}
+
 interface CreateSignedUrlParams {
   publicId: string;
   resourceType: 'image' | 'video' | 'raw';
@@ -67,6 +75,40 @@ export class CloudinaryAccessHelper {
         (error, result) => {
           if (error || !result) {
             reject(new InternalServerErrorException('Failed to upload file to Cloudinary'));
+            return;
+          }
+
+          resolve(result);
+        },
+      );
+
+      stream.end(params.fileBuffer);
+    });
+  }
+
+  async uploadProfileImage(params: UploadProfileImageParams): Promise<UploadApiResponse> {
+    this.ensureConfigured();
+
+    const fileKind = this.resolveSupportedFileKind(params.originalFilename, params.mimeType);
+    if (fileKind.resourceType !== 'image') {
+      throw new InternalServerErrorException('Profile image upload requires an image file');
+    }
+
+    const targetFolder = `users/${params.userId}/${params.kind}s`;
+
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'image',
+          type: 'upload',
+          folder: targetFolder,
+          use_filename: false,
+          unique_filename: true,
+          overwrite: false,
+        },
+        (error, result) => {
+          if (error || !result) {
+            reject(new InternalServerErrorException('Failed to upload profile image to Cloudinary'));
             return;
           }
 

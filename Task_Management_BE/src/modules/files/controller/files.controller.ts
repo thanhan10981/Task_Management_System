@@ -97,6 +97,38 @@ export class FilesController {
     return this.filesService.uploadProjectFile(req.user.id, dto, normalizedFile);
   }
 
+  @Post('profile-image')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload current user profile avatar or cover image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['kind', 'file'],
+      properties: {
+        kind: { type: 'string', enum: ['avatar', 'cover'] },
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Profile image uploaded successfully' })
+  uploadProfileImage(
+    @Request() req,
+    @Body('kind') kind: string | undefined,
+    @UploadedFile() file: UploadedProjectFile,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
+    const normalizedFile: UploadedProjectFile = {
+      ...file,
+      originalname: normalizeUploadedFileName(file.originalname),
+    };
+
+    return this.filesService.uploadProfileImage(req.user.id, kind, normalizedFile);
+  }
+
   @Get()
   @ApiOperation({ summary: 'List user file metadata from database' })
   @ApiQuery({ name: 'projectId', required: true, type: String })

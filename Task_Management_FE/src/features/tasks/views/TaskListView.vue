@@ -1125,14 +1125,14 @@
               <p class="text-sm font-black text-[var(--text-heading)] mt-2">Loading trash...</p>
             </div>
 
-            <div v-else-if="store.trashTasks.length === 0" class="min-h-[280px] grid place-items-center text-center text-[var(--text-subtle)]">
+            <div v-else-if="currentProjectTrashTasks.length === 0" class="min-h-[280px] grid place-items-center text-center text-[var(--text-subtle)]">
               <span class="w-12 h-12 grid place-items-center rounded-[18px] bg-[var(--bg-surface-2)] text-emerald-500 text-[20px] font-black">✓</span>
               <p class="text-sm font-black text-[var(--text-heading)] mt-2">Trash is clean</p>
               <span class="text-xs">No deleted tasks in this project.</span>
             </div>
 
             <div v-else class="flex flex-col gap-2.5">
-              <div v-for="task in store.trashTasks" :key="task.id" class="relative overflow-hidden p-3 border border-[var(--border-base)] rounded-2xl bg-[var(--bg-surface)] shadow-[0_10px_28px_rgba(15,23,42,0.08)]">
+              <div v-for="task in currentProjectTrashTasks" :key="task.id" class="relative overflow-hidden p-3 border border-[var(--border-base)] rounded-2xl bg-[var(--bg-surface)] shadow-[0_10px_28px_rgba(15,23,42,0.08)]">
                 <div class="absolute inset-y-0 left-0 w-[3px] rounded-r bg-gradient-to-b from-red-500 to-orange-400"></div>
                 <div class="flex items-center justify-between gap-2 mb-2">
                   <span v-if="task.label" class="kb-card-label" :style="{ background: task.labelBg, color: task.labelColor }">{{ task.label }}</span>
@@ -1150,13 +1150,22 @@
                 <p v-if="task.description && !task.description.startsWith('<')" class="mt-1 line-clamp-2 text-[11px] leading-[1.45] text-[var(--text-muted)]">{{ task.description }}</p>
                 <div class="flex items-center justify-between gap-2 mt-3 text-[10px] text-[var(--text-subtle)]">
                   <span>{{ task.due ? `Due ${formatDate(task.due)}` : 'No due date' }}</span>
-                  <button
-                    class="h-7 px-2.5 border-0 rounded-[10px] bg-gradient-to-br from-emerald-500 to-cyan-500 text-white text-[11px] font-black cursor-pointer shadow-[0_8px_18px_rgba(16,185,129,0.2)] disabled:opacity-60 disabled:cursor-not-allowed"
-                    :disabled="restoringTaskId === task.id"
-                    @click="restoreTrashTask(task.id)"
-                  >
-                    {{ restoringTaskId === task.id ? 'Restoring...' : 'Restore' }}
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button
+                      class="h-7 px-2.5 border-0 rounded-[10px] bg-red-500 text-white text-[11px] font-black cursor-pointer shadow-[0_8px_18px_rgba(239,68,68,0.18)] disabled:opacity-60 disabled:cursor-not-allowed"
+                      :disabled="deletingTrashTaskId === task.id || restoringTaskId === task.id"
+                      @click="permanentlyDeleteTrashTask(task.id)"
+                    >
+                      {{ deletingTrashTaskId === task.id ? 'Deleting...' : 'Delete' }}
+                    </button>
+                    <button
+                      class="h-7 px-2.5 border-0 rounded-[10px] bg-gradient-to-br from-emerald-500 to-cyan-500 text-white text-[11px] font-black cursor-pointer shadow-[0_8px_18px_rgba(16,185,129,0.2)] disabled:opacity-60 disabled:cursor-not-allowed"
+                      :disabled="restoringTaskId === task.id || deletingTrashTaskId === task.id"
+                      @click="restoreTrashTask(task.id)"
+                    >
+                      {{ restoringTaskId === task.id ? 'Restoring...' : 'Restore' }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1545,7 +1554,13 @@ const selectedTaskId = ref<string | null>(null)
 const aiCreateOpen = ref(false)
 const trashOpen = ref(false)
 const restoringTaskId = ref<string | null>(null)
-const trashCount = computed(() => store.trashTasks.length)
+const deletingTrashTaskId = ref<string | null>(null)
+const currentProjectTrashTasks = computed(() =>
+  effectiveProjectId.value
+    ? store.trashTasks.filter((task) => task.projectId === effectiveProjectId.value)
+    : []
+)
+const trashCount = computed(() => currentProjectTrashTasks.value.length)
 
 function openTaskModal(id: string) {
   if (!routeProjectId.value) return
@@ -1621,6 +1636,23 @@ async function restoreTrashTask(taskId: string) {
     toast.error('Cannot restore task')
   } finally {
     restoringTaskId.value = null
+  }
+}
+
+async function permanentlyDeleteTrashTask(taskId: string) {
+  if (!effectiveProjectId.value) return
+
+  const confirmed = window.confirm('Permanently delete this task? This action cannot be undone.')
+  if (!confirmed) return
+
+  deletingTrashTaskId.value = taskId
+  try {
+    await store.permanentlyDeleteTaskRemote(taskId, effectiveProjectId.value)
+    toast.success('Task permanently deleted')
+  } catch {
+    toast.error('Cannot permanently delete task')
+  } finally {
+    deletingTrashTaskId.value = null
   }
 }
 

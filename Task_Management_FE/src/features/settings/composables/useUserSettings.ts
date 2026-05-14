@@ -3,6 +3,7 @@ import { QUERY_KEYS } from '@/constants/query-keys'
 import { useAuthStore } from '@/stores/auth.store'
 import type { User } from '@/types/user.types'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { computed } from 'vue'
 
 export interface UserSettingsApiData {
   theme?: 'LIGHT' | 'DARK' | 'SYSTEM' | null
@@ -10,8 +11,8 @@ export interface UserSettingsApiData {
   preferences?: Record<string, unknown> | null
 }
 
-interface UserSettingsResponse {
-  data: UserSettingsApiData
+interface ApiEnvelope<T> {
+  data?: T
 }
 
 export interface SaveUserSettingsPayload {
@@ -43,10 +44,25 @@ export interface SaveUserSettingsPayload {
 }
 
 export function useUserSettingsQuery() {
+  const authStore = useAuthStore()
+
   return useQuery({
     queryKey: QUERY_KEYS.userSettings.me(),
-    queryFn: () => get<UserSettingsResponse>('/user-settings/me'),
+    enabled: computed(() => authStore.isAuthenticated),
+    refetchOnMount: 'always',
+    queryFn: async () => {
+      const response = await get<UserSettingsApiData | ApiEnvelope<UserSettingsApiData>>('/user-settings/me')
+      return unwrapApiPayload(response)
+    },
   })
+}
+
+function unwrapApiPayload<T>(response: T | ApiEnvelope<T>): T {
+  if (response && typeof response === 'object' && 'data' in response) {
+    return (response as ApiEnvelope<T>).data as T
+  }
+
+  return response as T
 }
 
 export function useSaveUserSettingsMutation() {
@@ -59,7 +75,8 @@ export function useSaveUserSettingsMutation() {
       let updatedUser: User | null = authStore.user
 
       if (payload.userId) {
-        updatedUser = await patch<User>(`/users/${payload.userId}`, payload.userProfile)
+        const response = await patch<User | ApiEnvelope<User>>(`/users/${payload.userId}`, payload.userProfile)
+        updatedUser = unwrapApiPayload(response)
       }
 
       await patch('/user-settings/me', payload.settings)

@@ -617,7 +617,7 @@ function applyLoadedProjectSettings(rolePermissionsPayload?: ProjectRolePermissi
   originalSnapshot.value = buildSnapshot()
 }
 
-watch(() => userSettingsQuery.data.value?.data, (payload) => { applyLoadedUserSettings(payload) }, { immediate: true })
+watch(() => userSettingsQuery.data.value, (payload) => { applyLoadedUserSettings(payload) }, { immediate: true })
 watch(
   () => projectSettingsQuery.data.value?.rolePermissions,
   (payload) => { applyLoadedProjectSettings(payload) },

@@ -161,6 +161,7 @@ export function useProjectSettingsQuery(projectId: MaybeRef<string | null | unde
   return useQuery({
     queryKey: computed(() => QUERY_KEYS.projects.settings(unref(projectId) ?? 'none')),
     enabled: computed(() => !!unref(projectId)),
+    refetchOnMount: 'always',
     queryFn: () => {
       const id = unref(projectId)
       if (!id) {

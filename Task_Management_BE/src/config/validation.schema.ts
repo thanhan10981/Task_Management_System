@@ -147,6 +147,19 @@ export function validate(config: RawConfig): EnvVariables {
   if (!mailQueueName) {
     throw new Error('MAIL_QUEUE_NAME is required');
   }
+  //if (nodeEnv === 'production' && smtpUserEmail) {
+  //   if (isPersonalMailbox(smtpUserEmail)) {
+  //     throw new Error(
+  //       'SMTP_USER must not be a personal mailbox in production. Use a dedicated no-reply mailbox.',
+  //     );
+  //   }
+
+  //   if (publicFromEmail && smtpUserEmail !== publicFromEmail) {
+  //     throw new Error(
+  //       'MAIL_PUBLIC_FROM_ADDRESS must match SMTP_USER in production to prevent provider rewrite and sender leakage.',
+  //     );
+  //   }
+  // }
 
   return {
     NODE_ENV: nodeEnv as EnvVariables['NODE_ENV'],

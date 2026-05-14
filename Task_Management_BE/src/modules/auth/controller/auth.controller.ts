@@ -1,5 +1,20 @@
-import { Controller, Post, Body, Get, Request, Response, HttpStatus, BadRequestException } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Request,
+  Response,
+  HttpStatus,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthService } from '../service/auth.service';
 import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
@@ -12,31 +27,57 @@ import { Public } from '../decorators/public.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  private getCookieOptions(maxAge: number) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: '/',
+      maxAge,
+    };
+  }
+
+  private getClearCookieOptions() {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: '/',
+    };
+  }
+
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register a new user account' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'User created successfully' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'User created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
   async register(@Body() registerDto: RegisterDto, @Response() res: any) {
     const data = await this.authService.register(registerDto);
-    
-    // Set httpOnly cookies
-    res.cookie('accessToken', data.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000, // 1 hour
-    });
 
-    res.cookie('refreshToken', data.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
-    });
+    res.cookie(
+      'accessToken',
+      data.accessToken,
+      this.getCookieOptions(60 * 60 * 1000), // 1 hour
+    );
 
-    return res.json({
+    res.cookie(
+      'refreshToken',
+      data.refreshToken,
+      this.getCookieOptions(14 * 24 * 60 * 60 * 1000), // 14 days
+    );
+
+    return res.status(HttpStatus.CREATED).json({
       data: { user: data.user },
       message: 'Registration successful',
     });
@@ -46,27 +87,30 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Login and receive auth cookies' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Login successful' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid credentials' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Login successful',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid credentials',
+  })
   async login(@Body() loginDto: LoginDto, @Response() res: any) {
     const data = await this.authService.login(loginDto);
 
-    // Set httpOnly cookies
-    res.cookie('accessToken', data.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000, // 1 hour
-    });
+    res.cookie(
+      'accessToken',
+      data.accessToken,
+      this.getCookieOptions(60 * 60 * 1000), // 1 hour
+    );
 
-    res.cookie('refreshToken', data.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
-    });
+    res.cookie(
+      'refreshToken',
+      data.refreshToken,
+      this.getCookieOptions(14 * 24 * 60 * 60 * 1000), // 14 days
+    );
 
-    return res.json({
+    return res.status(HttpStatus.CREATED).json({
       data: { user: data.user },
       message: 'Login successful',
     });
@@ -76,26 +120,30 @@ export class AuthController {
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token using refreshToken cookie' })
   @ApiCookieAuth('accessToken')
-  @ApiResponse({ status: HttpStatus.OK, description: 'Token refreshed successfully' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid refresh token' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Token refreshed successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid refresh token',
+  })
   async refresh(@Request() req: any, @Response() res: any) {
     const refreshToken = req.cookies?.refreshToken;
-    
+
     if (!refreshToken) {
       throw new BadRequestException('Refresh token is required');
     }
-    
+
     const data = await this.authService.refreshToken(refreshToken);
 
-    // Set new accessToken cookie
-    res.cookie('accessToken', data.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 1000, // 1 hour
-    });
+    res.cookie(
+      'accessToken',
+      data.accessToken,
+      this.getCookieOptions(60 * 60 * 1000), // 1 hour
+    );
 
-    return res.json({
+    return res.status(HttpStatus.OK).json({
       message: 'Token refreshed successfully',
     });
   }
@@ -104,9 +152,13 @@ export class AuthController {
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset email' })
   @ApiBody({ type: ForgotPasswordDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'If email exists, reset link is sent' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'If email exists, reset link is sent',
+  })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     await this.authService.forgotPassword(forgotPasswordDto);
+
     return {
       message: 'If your email is registered, a reset link has been sent',
     };
@@ -116,10 +168,17 @@ export class AuthController {
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password using reset token' })
   @ApiBody({ type: ResetPasswordDto })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Password has been reset successfully' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid reset token or payload' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Password has been reset successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid reset token or payload',
+  })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     await this.authService.resetPassword(resetPasswordDto);
+
     return {
       message: 'Password has been reset successfully',
     };
@@ -128,15 +187,17 @@ export class AuthController {
   @Post('logout')
   @ApiOperation({ summary: 'Logout current user and clear cookies' })
   @ApiCookieAuth('accessToken')
-  @ApiResponse({ status: HttpStatus.OK, description: 'Logout successful' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Logout successful',
+  })
   async logout(@Request() req: any, @Response() res: any) {
     await this.authService.logout(req.user.id);
-    
-    // Clear cookies
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
 
-    return res.json({
+    res.clearCookie('accessToken', this.getClearCookieOptions());
+    res.clearCookie('refreshToken', this.getClearCookieOptions());
+
+    return res.status(HttpStatus.OK).json({
       message: 'Logged out successfully',
     });
   }
@@ -144,7 +205,10 @@ export class AuthController {
   @Get('me')
   @ApiOperation({ summary: 'Get current authenticated user profile' })
   @ApiCookieAuth('accessToken')
-  @ApiResponse({ status: HttpStatus.OK, description: 'User profile retrieved successfully' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User profile retrieved successfully',
+  })
   getProfile(@Request() req: any) {
     return req.user;
   }

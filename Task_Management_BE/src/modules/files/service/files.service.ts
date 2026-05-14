@@ -1,6 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import Redis from 'ioredis';
+import { REDIS_CLIENT } from '../../../config/redis/redis.constants';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateFileRecordDto } from '../dto/create-file-record.dto';
+import { CreateUploadSignatureDto } from '../dto/create-upload-signature.dto';
+import { FinalizeUploadDto } from '../dto/finalize-upload.dto';
 import { UploadProjectFileDto } from '../dto/upload-project-file.dto';
 import { FilesRepository } from '../repository/files.repository';
 import { CloudinaryFileManagerService } from './cloudinary-file-manager.service';
@@ -22,6 +27,29 @@ type UploadedProjectFile = {
   mimetype: string;
 };
 
+type PendingUpload = {
+  userId: string;
+  projectId: string;
+  taskId?: string;
+  folderPath: string;
+  scopedFolder: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  resourceType: 'image' | 'video' | 'raw';
+  enforcedFormat?: 'pdf';
+};
+
+type UploaderProfile = {
+  id: string;
+  name: string;
+  email: string | null;
+  avatar: string | null;
+};
+
+const MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+const PENDING_UPLOAD_TTL_SECONDS = 10 * 60;
+
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
@@ -30,7 +58,116 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly filesRepository: FilesRepository,
     private readonly cloudinaryFileManagerService: CloudinaryFileManagerService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
+
+  async createUploadSignature(userId: string, dto: CreateUploadSignatureDto) {
+    await this.ensureProjectAccess(userId, dto.projectId);
+    await this.ensureTaskBelongsToProject(userId, dto.taskId, dto.projectId);
+    this.validateUploadFile(dto.fileName, dto.mimeType, dto.sizeBytes);
+
+    const logicalFolderPath = this.cloudinaryFileManagerService.normalizePath(dto.folderPath) || 'tasks';
+    const fileKind = this.cloudinaryFileManagerService.resolveSupportedFileKind(dto.fileName, dto.mimeType);
+    const signedUpload = this.cloudinaryFileManagerService.createSignedUploadParams({
+      originalFilename: dto.fileName,
+      mimeType: dto.mimeType,
+      projectId: dto.projectId,
+      folderPath: logicalFolderPath,
+    });
+    const uploadId = randomUUID();
+    const pendingUpload: PendingUpload = {
+      userId,
+      projectId: dto.projectId,
+      taskId: dto.taskId,
+      folderPath: logicalFolderPath,
+      scopedFolder: signedUpload.folder,
+      fileName: dto.fileName,
+      mimeType: dto.mimeType,
+      sizeBytes: dto.sizeBytes,
+      resourceType: fileKind.resourceType,
+      enforcedFormat: fileKind.enforcedFormat,
+    };
+
+    await this.redis.set(
+      this.pendingUploadKey(uploadId),
+      JSON.stringify(pendingUpload),
+      'EX',
+      PENDING_UPLOAD_TTL_SECONDS,
+    );
+
+    return {
+      uploadId,
+      ...signedUpload,
+      expiresInSeconds: PENDING_UPLOAD_TTL_SECONDS,
+    };
+  }
+
+  async finalizeUpload(userId: string, dto: FinalizeUploadDto) {
+    const pendingUpload = await this.resolvePendingUpload(userId, dto);
+
+    try {
+      await this.ensureProjectAccess(userId, pendingUpload.projectId);
+      await this.ensureTaskBelongsToProject(userId, pendingUpload.taskId, pendingUpload.projectId);
+
+      const cloudinaryAsset = await this.cloudinaryFileManagerService.getResource(dto.publicId, dto.resourceType ?? pendingUpload.resourceType);
+      if (!cloudinaryAsset?.public_id) {
+        throw new BadRequestException('Cloudinary asset does not exist or is not accessible');
+      }
+
+      this.verifyFinalizedAsset(pendingUpload, cloudinaryAsset, dto);
+
+      const fileRecord = await this.filesRepository.createFileMetadata({
+        fileName: pendingUpload.fileName || dto.originalFilename || this.cloudinaryFileManagerService.extractFileName(cloudinaryAsset.public_id),
+        fileUrl: cloudinaryAsset.secure_url ?? dto.secureUrl,
+        fileType: cloudinaryAsset.format
+          ?? dto.format
+          ?? pendingUpload.enforcedFormat
+          ?? this.cloudinaryFileManagerService.extractFileExtension(pendingUpload.fileName)
+          ?? this.cloudinaryFileManagerService.extractFileExtension(cloudinaryAsset.public_id),
+        fileCategory: cloudinaryAsset.resource_type ?? pendingUpload.resourceType,
+        storageKey: cloudinaryAsset.public_id,
+        folderPath: this.cloudinaryFileManagerService.resolveLogicalFolderPath(
+          pendingUpload.projectId,
+          pendingUpload.folderPath,
+          cloudinaryAsset.public_id,
+        ),
+        sizeBytes: typeof cloudinaryAsset.bytes === 'number' ? BigInt(cloudinaryAsset.bytes) : BigInt(pendingUpload.sizeBytes),
+        projectId: pendingUpload.projectId,
+        taskId: pendingUpload.taskId,
+        commentId: dto.commentId,
+        uploadedBy: userId,
+      });
+
+      await this.redis.del(this.pendingUploadKey(dto.uploadId));
+      const uploader = await this.getUploaderProfile(userId);
+
+      return {
+        id: fileRecord.id,
+        originalFilename: fileRecord.fileName,
+        publicId: fileRecord.storageKey,
+        resourceType: this.cloudinaryFileManagerService.normalizeStoredResourceType(
+          fileRecord.fileCategory,
+          fileRecord.fileName,
+          fileRecord.fileType,
+        ),
+        format: this.cloudinaryFileManagerService.normalizeStoredFormat(
+          fileRecord.fileType,
+          fileRecord.fileName,
+          fileRecord.storageKey,
+        ) ?? '',
+        projectId: fileRecord.projectId,
+        taskId: fileRecord.taskId,
+        secureUrl: fileRecord.fileUrl,
+        bytes: this.serializeSizeBytes(fileRecord.sizeBytes),
+        folderPath: fileRecord.folderPath,
+        uploadedBy: userId,
+        uploader,
+      };
+    } catch (error) {
+      await this.bestEffortDeletePendingAsset(pendingUpload, dto.publicId, dto.resourceType);
+      throw error;
+    }
+  }
 
   async create(userId: string, dto: CreateFileRecordDto) {
     const normalizedFolderPath = this.cloudinaryFileManagerService.resolveLogicalFolderPath(
@@ -105,6 +242,8 @@ export class FilesService {
       throw new BadRequestException('File is required');
     }
 
+    this.validateUploadFile(file.originalname, file.mimetype, file.buffer.length);
+
     await this.ensureProjectAccess(userId, dto.projectId);
 
     if (dto.taskId) {
@@ -142,6 +281,7 @@ export class FilesService {
       taskId: dto.taskId,
       uploadedBy: userId,
     });
+    const uploader = await this.getUploaderProfile(userId);
 
     return {
       id: fileRecord.id,
@@ -160,6 +300,10 @@ export class FilesService {
       projectId: fileRecord.projectId,
       taskId: fileRecord.taskId,
       secureUrl: fileRecord.fileUrl,
+      bytes: this.serializeSizeBytes(fileRecord.sizeBytes),
+      folderPath: fileRecord.folderPath,
+      uploadedBy: userId,
+      uploader,
     };
   }
 
@@ -293,7 +437,16 @@ export class FilesService {
         createdAt: true,
         uploadedBy: true,
         taskId: true,
+        commentId: true,
         folderPath: true,
+        uploader: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
       },
     });
 
@@ -312,7 +465,9 @@ export class FilesService {
         bytes: this.serializeSizeBytes(file.sizeBytes),
         createdAt: file.createdAt,
         uploadedBy: file.uploadedBy,
+        uploader: this.serializeUploaderProfile(file.uploader),
         taskId: file.taskId,
+        commentId: file.commentId,
         folderPath: file.folderPath,
         isSaved: true,
         canSaveToProject: true,
@@ -448,7 +603,16 @@ export class FilesService {
         fileType: true,
         fileCategory: true,
         sizeBytes: true,
+        commentId: true,
         fileUrl: true,
+        uploader: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -472,9 +636,11 @@ export class FilesService {
         secureUrl: savedFile.fileUrl ?? '',
         createdAt: savedFile.createdAt ?? null,
         uploadedBy: savedFile.uploadedBy ?? null,
+        uploader: this.serializeUploaderProfile(savedFile.uploader),
         isSaved: true,
         canSaveToProject: true,
         projectId: savedFile.projectId,
+        commentId: savedFile.commentId,
         folderPath: this.cloudinaryFileManagerService.normalizePath(savedFile.folderPath) ?? '',
       })),
       requestedBy: userId,
@@ -600,6 +766,167 @@ export class FilesService {
     }
 
     return byPath;
+  }
+
+  private validateUploadFile(fileName: string, mimeType: string, sizeBytes: number) {
+    if (!fileName?.trim()) {
+      throw new BadRequestException('File name is required');
+    }
+
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      throw new BadRequestException('File size is invalid');
+    }
+
+    if (sizeBytes > MAX_UPLOAD_FILE_SIZE_BYTES) {
+      throw new BadRequestException('File exceeds 20MB limit');
+    }
+
+    const extension = this.cloudinaryFileManagerService.extractFileExtension(fileName);
+    const normalizedMime = mimeType.toLowerCase();
+    const knownRawExtensions = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'zip', 'rar', '7z']);
+    const knownImageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg', 'tiff']);
+    const knownVideoExtensions = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi']);
+    const knownRawMimeTypes = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'text/csv',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/vnd.rar',
+      'application/x-rar-compressed',
+      'application/x-7z-compressed',
+    ]);
+    const isKnownExtension = extension
+      ? knownRawExtensions.has(extension) || knownImageExtensions.has(extension) || knownVideoExtensions.has(extension)
+      : false;
+    const isKnownMimeType = normalizedMime.startsWith('image/')
+      || normalizedMime.startsWith('video/')
+      || knownRawMimeTypes.has(normalizedMime);
+
+    if (!isKnownExtension && !isKnownMimeType) {
+      throw new BadRequestException('Unsupported file type');
+    }
+  }
+
+  private async resolvePendingUpload(userId: string, dto: FinalizeUploadDto): Promise<PendingUpload> {
+    const rawPendingUpload = await this.redis.get(this.pendingUploadKey(dto.uploadId));
+    if (!rawPendingUpload) {
+      throw new BadRequestException('Upload signature is expired or invalid');
+    }
+
+    let pendingUpload: PendingUpload;
+    try {
+      pendingUpload = JSON.parse(rawPendingUpload) as PendingUpload;
+    } catch {
+      await this.redis.del(this.pendingUploadKey(dto.uploadId));
+      throw new BadRequestException('Upload signature is invalid');
+    }
+
+    if (pendingUpload.userId !== userId || pendingUpload.projectId !== dto.projectId) {
+      throw new ForbiddenException('Upload signature does not belong to this user or project');
+    }
+
+    return pendingUpload;
+  }
+
+  private verifyFinalizedAsset(
+    pendingUpload: PendingUpload,
+    cloudinaryAsset: { public_id: string; resource_type?: string; bytes?: number; secure_url?: string; format?: string },
+    dto: FinalizeUploadDto,
+  ) {
+    if (cloudinaryAsset.public_id !== dto.publicId) {
+      throw new BadRequestException('Cloudinary asset public ID mismatch');
+    }
+
+    if (!cloudinaryAsset.public_id.startsWith(`${pendingUpload.scopedFolder}/`)) {
+      throw new BadRequestException('Cloudinary asset is outside the signed upload folder');
+    }
+
+    const actualResourceType = this.cloudinaryFileManagerService.toAllowedResourceType(cloudinaryAsset.resource_type ?? dto.resourceType);
+    if (actualResourceType !== pendingUpload.resourceType) {
+      throw new BadRequestException('Cloudinary asset resource type mismatch');
+    }
+
+    if (pendingUpload.enforcedFormat && (cloudinaryAsset.format ?? dto.format)?.toLowerCase() !== pendingUpload.enforcedFormat) {
+      throw new BadRequestException('Cloudinary asset format mismatch');
+    }
+
+    const actualBytes = typeof cloudinaryAsset.bytes === 'number' ? cloudinaryAsset.bytes : dto.bytes;
+    if (typeof actualBytes === 'number') {
+      if (actualBytes <= 0 || actualBytes > MAX_UPLOAD_FILE_SIZE_BYTES) {
+        throw new BadRequestException('Cloudinary asset size is invalid');
+      }
+
+      if (actualBytes > pendingUpload.sizeBytes) {
+        throw new BadRequestException('Cloudinary asset size does not match the signed upload');
+      }
+    }
+  }
+
+  private async bestEffortDeletePendingAsset(pendingUpload: PendingUpload, publicId?: string, resourceType?: string) {
+    if (!publicId || !publicId.startsWith(`${pendingUpload.scopedFolder}/`)) {
+      return;
+    }
+
+    try {
+      await this.cloudinaryFileManagerService.deleteAsset(
+        publicId,
+        this.cloudinaryFileManagerService.toAllowedResourceType(resourceType ?? pendingUpload.resourceType),
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to clean up rejected Cloudinary upload publicId=${publicId}`);
+      if (error instanceof Error) {
+        this.logger.warn(error.message);
+      }
+    }
+  }
+
+  private pendingUploadKey(uploadId: string) {
+    return `files:upload:pending:${uploadId}`;
+  }
+
+  private async getUploaderProfile(userId: string): Promise<UploaderProfile | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        avatarUrl: true,
+      },
+    });
+
+    return this.serializeUploaderProfile(user);
+  }
+
+  private serializeUploaderProfile(user?: { id: string; fullName: string; email: string | null; avatarUrl: string | null } | null): UploaderProfile | null {
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      name: user.fullName,
+      email: user.email,
+      avatar: user.avatarUrl,
+    };
+  }
+
+  private async ensureTaskBelongsToProject(userId: string, taskId: string | undefined, projectId: string) {
+    if (!taskId) {
+      return;
+    }
+
+    const task = await this.ensureTaskAccess(userId, taskId);
+    if (task.projectId !== projectId) {
+      throw new BadRequestException('Task does not belong to the provided project');
+    }
   }
 
   private async ensureProjectAccess(userId: string, projectId: string) {

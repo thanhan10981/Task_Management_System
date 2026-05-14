@@ -3,11 +3,26 @@ export const QUERY_KEYS = {
     all: ['tasks'] as const,
     lists: () => [...QUERY_KEYS.tasks.all, 'list'] as const,
     list: (params: Record<string, unknown>) => [...QUERY_KEYS.tasks.lists(), params] as const,
+    search: (params: Record<string, unknown>) => [...QUERY_KEYS.tasks.all, 'search', params] as const,
     detail: (id: string) => [...QUERY_KEYS.tasks.all, 'detail', id] as const,
+    statuses: (projectId: string) => [...QUERY_KEYS.tasks.all, 'statuses', projectId] as const,
+    members: (projectId: string) => [...QUERY_KEYS.tasks.all, 'members', projectId] as const,
+    trash: (projectId: string) => [...QUERY_KEYS.tasks.all, 'trash', projectId] as const,
+    groups: (projectId: string) => [...QUERY_KEYS.tasks.all, 'groups', projectId] as const,
+    subtasks: (taskId: string) => [...QUERY_KEYS.tasks.all, 'subtasks', taskId] as const,
+    comments: (taskId: string) => [...QUERY_KEYS.tasks.all, 'comments', taskId] as const,
+    history: (taskId: string) => [...QUERY_KEYS.tasks.all, 'history', taskId] as const,
+    files: (taskId: string) => [...QUERY_KEYS.tasks.all, 'files', taskId] as const,
   },
   projects: {
     all: ['projects'] as const,
     list: () => [...QUERY_KEYS.projects.all, 'list'] as const,
+    members: (projectId: string) => [...QUERY_KEYS.projects.all, 'members', projectId] as const,
+    settings: (projectId: string) => [...QUERY_KEYS.projects.all, 'settings', projectId] as const,
+  },
+  sprints: {
+    all: ['sprints'] as const,
+    list: (projectId: string) => [...QUERY_KEYS.sprints.all, 'list', projectId] as const,
   },
   taskAnalytics: {
     all: ['task-analytics'] as const,
@@ -22,6 +37,14 @@ export const QUERY_KEYS = {
     allInProject: (projectId: string) => [...QUERY_KEYS.files.all, 'all', projectId] as const,
     access: (fileId: string, mode: 'preview' | 'download') =>
       [...QUERY_KEYS.files.all, 'access', fileId, mode] as const,
+  },
+  notifications: {
+    all: ['notifications'] as const,
+    list: (params: Record<string, unknown>) => [...QUERY_KEYS.notifications.all, 'list', params] as const,
+  },
+  reminders: {
+    all: ['reminders'] as const,
+    sendTask: (taskId: string) => [...QUERY_KEYS.reminders.all, 'tasks', taskId, 'send'] as const,
   },
   auth: {
     me: ['auth', 'me'] as const,

@@ -28,7 +28,7 @@ export interface SaveUserSettingsPayload {
   settings: {
     theme: 'LIGHT' | 'DARK' | 'SYSTEM'
     notificationSettings: Record<string, boolean>
-    preferences: {
+    preferences: Record<string, unknown> & {
       profile: {
         firstName: string
         lastName: string

@@ -5,78 +5,103 @@
   >
     <!-- PAGE HEADER -->
     <div
-      class="flex items-center justify-between shrink-0 gap-2 md:gap-3 px-4 md:px-6 h-14 md:h-[60px]"
-      style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);"
+      class="flex items-center justify-between shrink-0 gap-2 md:gap-3 px-3 md:px-6 h-12 md:h-[60px]"
+      style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);overflow:hidden;"
     >
-      <div class="flex items-center gap-2 md:gap-3.5 min-w-0 relative z-[210]">
-        <h1 class="text-base md:text-lg font-extrabold tracking-tight m-0" style="color:var(--text-heading);">Board</h1>
+      <div class="flex items-center gap-1.5 md:gap-3.5 min-w-0 relative z-[210]">
+        <h1 class="text-sm md:text-lg font-extrabold tracking-tight m-0 shrink-0" style="color:var(--text-heading);">Board</h1>
 
         <!-- Sprint Selector -->
         <div class="relative">
           <button
-            class="flex items-center gap-1 md:gap-1.5 max-w-[120px] md:max-w-none h-[30px] md:h-[34px] px-2 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[12px] md:text-[13px] font-semibold cursor-pointer transition-all overflow-hidden"
+            ref="sprintBtnRef"
+            class="flex items-center gap-1 md:gap-1.5 max-w-[100px] md:max-w-none h-[28px] md:h-[34px] px-1.5 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[13px] font-semibold cursor-pointer transition-all overflow-hidden"
             :class="sprintMenuOpen ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-[var(--border-medium)] bg-[var(--bg-surface)] text-[var(--text-secondary)]'"
-            @click="sprintMenuOpen = !sprintMenuOpen"
+            @click="toggleSprintMenu"
           >
             <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: currentSprint.color }"></span>
             <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ currentSprint.name }}</span>
             <svg class="w-3 h-3 shrink-0 transition-transform duration-200" :class="sprintMenuOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
 
-          <div v-if="sprintMenuOpen" class="sprint-drop absolute top-[calc(100%+6px)] left-0 min-w-[230px] rounded-[14px] border p-1.5 z-[220]" style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 16px 48px rgba(0,0,0,0.14);">
-            <div class="text-[10px] font-bold tracking-widest uppercase px-2.5 pt-1.5 pb-1" style="color:var(--text-subtle);">Sprint</div>
-            <button
-              v-for="s in sprints" :key="s.id"
-              class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[13px] font-semibold cursor-pointer text-left transition-colors"
-              :class="s.id === selectedSprintId ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'"
-              @click="selectSprint(s.id)"
+          <!-- Sprint dropdown teleported to body to escape overflow:hidden -->
+          <Teleport to="body">
+            <div
+              v-if="sprintMenuOpen"
+              class="sprint-drop fixed min-w-[230px] rounded-[14px] border p-1.5 z-[9999]"
+              :style="sprintDropStyle"
+              style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 16px 48px rgba(0,0,0,0.14);"
+              @click.stop
             >
-              <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }"></span>
-              <span class="flex-1">{{ s.name }}</span>
-              <span class="text-[11px] text-[var(--text-muted)]">{{ s.dates }}</span>
-              <svg v-if="s.id === selectedSprintId" class="w-3.5 h-3.5 text-indigo-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>
-            <div class="h-px my-1" style="background:var(--border-base);"></div>
-            <div v-if="!showNewSprintForm" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-[12.5px] font-semibold text-indigo-500 cursor-pointer hover:bg-indigo-50 transition-colors" @click.stop="showNewSprintForm = true">
-              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              New Sprint
+              <div class="text-[10px] font-bold tracking-widest uppercase px-2.5 pt-1.5 pb-1" style="color:var(--text-subtle);">Sprint</div>
+              <button
+                v-for="s in sprints" :key="s.id"
+                class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[13px] font-semibold cursor-pointer text-left transition-colors"
+                :class="s.id === selectedSprintId ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'"
+                @click="selectSprint(s.id)"
+              >
+                <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }"></span>
+                <span class="flex-1">{{ s.name }}</span>
+                <span class="text-[11px] text-[var(--text-muted)]">{{ s.dates }}</span>
+                <svg v-if="s.id === selectedSprintId" class="w-3.5 h-3.5 text-indigo-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </button>
+              <div class="h-px my-1" style="background:var(--border-base);"></div>
+              <div v-if="!showNewSprintForm" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-[12.5px] font-semibold text-indigo-500 cursor-pointer hover:bg-indigo-50 transition-colors" @click.stop="showNewSprintForm = true">
+                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Sprint
+              </div>
+              <div v-else class="flex flex-col gap-2 p-2 pb-1" @click.stop>
+                <input v-model="newSprint.name" class="sprint-inp h-[30px] px-2.5 rounded-lg border-[1.5px] text-[12.5px] outline-none font-[inherit] transition-all" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" placeholder="Sprint name" @keydown.enter="createSprint" @keydown.esc="showNewSprintForm = false" ref="sprintNameInput" maxlength="30"/>
+                <div class="sprint-date-row flex items-center gap-1.5">
+                  <input v-model="newSprint.startDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="Start date"/>
+                  <span class="text-[11px] text-[var(--text-muted)]">→</span>
+                  <input v-model="newSprint.endDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="End date"/>
+                </div>
+                <div class="flex gap-[5px] flex-wrap">
+                  <button v-for="c in sprintColorOptions" :key="c" class="w-5 h-5 rounded-full border-2 cursor-pointer transition-transform hover:scale-110" :class="newSprint.color === c ? 'scale-110 border-white shadow-[0_0_0_2px_#6366f1]' : 'border-transparent'" :style="{ background: c }" @click.stop="newSprint.color = c"></button>
+                </div>
+                <div class="flex gap-1.5 justify-end">
+                  <button class="h-7 px-2.5 rounded-[7px] border-[1.5px] bg-transparent text-[12px] font-semibold cursor-pointer hover:bg-[var(--bg-surface-2)] transition-colors" style="border-color:var(--border-medium);color:var(--text-secondary);" @click.stop="showNewSprintForm = false">Cancel</button>
+                  <button class="flex items-center gap-1 h-7 px-3 rounded-[7px] border-none text-white text-[12px] font-bold cursor-pointer bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="!newSprint.name.trim()" @click.stop="createSprint">
+                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Create
+                  </button>
+                </div>
+              </div>
             </div>
-            <div v-else class="flex flex-col gap-2 p-2 pb-1" @click.stop>
-              <input v-model="newSprint.name" class="sprint-inp h-[30px] px-2.5 rounded-lg border-[1.5px] text-[12.5px] outline-none font-[inherit] transition-all" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" placeholder="Sprint name" @keydown.enter="createSprint" @keydown.esc="showNewSprintForm = false" ref="sprintNameInput" maxlength="30"/>
-              <div class="flex items-center gap-1.5">
-                <input v-model="newSprint.startDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="Start date"/>
-                <span class="text-[11px] text-[var(--text-muted)]">→</span>
-                <input v-model="newSprint.endDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="End date"/>
-              </div>
-              <div class="flex gap-[5px] flex-wrap">
-                <button v-for="c in sprintColorOptions" :key="c" class="w-5 h-5 rounded-full border-2 cursor-pointer transition-transform hover:scale-110" :class="newSprint.color === c ? 'scale-110 border-white shadow-[0_0_0_2px_#6366f1]' : 'border-transparent'" :style="{ background: c }" @click.stop="newSprint.color = c"></button>
-              </div>
-              <div class="flex gap-1.5 justify-end">
-                <button class="h-7 px-2.5 rounded-[7px] border-[1.5px] bg-transparent text-[12px] font-semibold cursor-pointer hover:bg-[var(--bg-surface-2)] transition-colors" style="border-color:var(--border-medium);color:var(--text-secondary);" @click.stop="showNewSprintForm = false">Cancel</button>
-                <button class="flex items-center gap-1 h-7 px-3 rounded-[7px] border-none text-white text-[12px] font-bold cursor-pointer bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed" :disabled="!newSprint.name.trim()" @click.stop="createSprint">
-                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  Create
-                </button>
-              </div>
-            </div>
-          </div>
+          </Teleport>
         </div>
       </div>
 
       <!-- Header right -->
-      <div class="flex items-center gap-1.5 md:gap-2.5 shrink-0">
-        <!-- Group - desktop only -->
+      <div class="flex items-center gap-1 md:gap-2.5 shrink-0">
         <button
-          class="hidden md:flex items-center gap-1.5 h-[34px] px-3 rounded-[10px] border-[1.5px] text-[12.5px] font-semibold cursor-pointer transition-all"
+          class="hidden sm:inline-flex items-center gap-1.5 h-[34px] px-3.5 rounded-[10px] border-none text-[12.5px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
+          style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
+          title="AI Create Task"
+          @click="openAiCreateTask"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M12 3l1.7 4.5L18 9.2l-4.3 1.7L12 16l-1.7-5.1L6 9.2l4.3-1.7L12 3z"/>
+            <path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16z"/>
+          </svg>
+         
+        </button>
+
+        <!-- Group button -->
+        <button
+          class="flex items-center gap-1 md:gap-1.5 h-[28px] md:h-[34px] px-1.5 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[12.5px] font-semibold cursor-pointer transition-all"
           :class="groupByGroup ? 'border-indigo-400 text-indigo-600 bg-indigo-50' : ''"
           :style="!groupByGroup ? 'border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);' : ''"
           @click="groupByGroup = !groupByGroup"
           title="Group tasks"
         >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
-          Group
+          <svg class="w-3 md:w-3.5 h-3 md:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+          <span class="hidden md:inline">Group</span>
         </button>
         <div class="hidden md:block w-px h-7" style="background:var(--border-medium);"></div>
+        <!-- Divider before group on mobile -->
+        <div class="block md:hidden w-px h-5" style="background:var(--border-medium);"></div>
         <!-- Invite / members - desktop only -->
         <div class="hidden md:flex items-center gap-2 relative" ref="memberPickerRef">
           <div class="flex items-center">
@@ -96,6 +121,7 @@
             >+{{ store.members.length - visibleAvatarCount }}</button>
           </div>
           <button
+            ref="memberPickerBtnRef"
             class="flex items-center gap-1.5 h-[34px] px-3.5 rounded-[10px] border-none text-[12.5px] font-bold text-white cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 hover:-translate-y-px"
             :class="{ 'opacity-90 -translate-y-px': memberPickerOpen }"
             style="box-shadow:0 3px 12px rgba(99,102,241,0.3);"
@@ -106,8 +132,23 @@
             Invite
           </button>
 
-          <Transition name="mp-drop">
-            <div v-if="memberPickerOpen" class="mp-dropdown board-mp-dropdown" @click.stop>
+          <Teleport to="body">
+            <Transition name="mp-drop">
+              <div
+                v-if="memberPickerOpen"
+                ref="memberPickerDropRef"
+                class="mp-dropdown board-mp-dropdown"
+                :style="[
+                  memberPickerStyle,
+                  {
+                    background: 'var(--bg-surface)',
+                    border: '1.5px solid var(--border-base)',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.1)',
+                    zIndex: '9999',
+                  },
+                ]"
+                @click.stop
+              >
               <div class="mp-dropdown-head">
                 <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Project Members</span>
                 <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
@@ -123,11 +164,64 @@
                 />
               </div>
 
+              <div class="px-2 pt-1 pb-2">
+                <button
+                  type="button"
+                  class="w-full h-[32px] px-2.5 rounded-[8px] border text-[12px] font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-secondary);"
+                  @click="copyInviteLink"
+                >
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l2.92-2.92a5 5 0 0 0-7.07-7.07L11.8 5"/><path d="M14 11a5 5 0 0 0-7.54-.54L3.54 13.38a5 5 0 0 0 7.07 7.07L12.2 19"/></svg>
+                  Copy invite link
+                </button>
+              </div>
+
               <div class="mp-list">
-                <div v-for="m in filteredPickerMembers" :key="m.id" class="mp-item">
+                <div class="mp-dropdown-head">
+                  <span class="text-[11px] font-bold tracking-wide" style="color:var(--text-heading)">Current Members</span>
+                  <span class="text-[10px]" style="color:var(--text-subtle)">{{ store.members.length }} people</span>
+                </div>
+
+                <div
+                  v-for="m in store.members"
+                  :key="m.id"
+                  class="mp-item w-full text-left"
+                >
                   <div class="mp-item-avatar" :style="{ background: m.color }">{{ m.initials }}</div>
                   <div class="mp-item-info">
                     <span class="mp-item-name">{{ m.name }}</span>
+                    <span class="text-[10px] font-semibold uppercase" style="color:var(--text-subtle)">
+                      {{ (m.role || 'DEVELOPER').toUpperCase() }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <select
+                      v-if="canUpdateMemberRole(m)"
+                      class="h-[24px] px-1.5 rounded-md border text-[10px] font-semibold"
+                      style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-secondary);"
+                      :disabled="updatingRoleMemberId === m.id"
+                      :value="(m.role || 'DEVELOPER').toUpperCase()"
+                      @change="updateMemberRoleFromPicker(m, ($event.target as HTMLSelectElement).value)"
+                    >
+                      <option v-for="role in memberRoleOptions" :key="role" :value="role">{{ role }}</option>
+                    </select>
+                    <button
+                      v-if="canManageProjectMembers && !isProjectOwner(m) && m.id !== authStore.user?.id"
+                      type="button"
+                      class="mp-item-check"
+                      style="color:#ef4444;font-size:11px"
+                      :disabled="removingMemberId === m.id"
+                      @click="removeMemberFromPicker(m)"
+                    >
+                      {{ removingMemberId === m.id ? 'Removing...' : 'Remove' }}
+                    </button>
+                    <span
+                      v-else
+                      class="mp-item-check"
+                      style="color:var(--text-subtle);font-size:10px"
+                    >
+                      {{ isProjectOwner(m) ? 'Owner' : m.id === authStore.user?.id ? 'You' : '' }}
+                    </span>
                   </div>
                 </div>
 
@@ -163,8 +257,8 @@
                   No users available to add
                 </div>
 
-                <div v-else-if="filteredPickerMembers.length === 0" class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
-                  No members found
+                <div v-else class="py-4 text-center text-[12px]" style="color:var(--text-subtle)">
+                  Type a name or email to search users
                 </div>
               </div>
 
@@ -172,69 +266,67 @@
                 <button class="mp-footer-btn mp-footer-btn--ghost" @click="memberSearch = ''">Clear search</button>
                 <button class="mp-footer-btn mp-footer-btn--primary" @click="memberPickerOpen = false">Done</button>
               </div>
-            </div>
-          </Transition>
+              </div>
+            </Transition>
+          </Teleport>
         </div>
         <div class="hidden md:block w-px h-7" style="background:var(--border-medium);"></div>
         <!-- New Status -->
         <button
-          class="flex items-center gap-1.5 h-[30px] md:h-[34px] px-2 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[12.5px] font-semibold cursor-pointer transition-all whitespace-nowrap"
+          class="flex items-center gap-1 md:gap-1.5 h-[28px] md:h-[34px] px-1.5 md:px-3 rounded-lg md:rounded-[10px] border-[1.5px] text-[11px] md:text-[12.5px] font-semibold cursor-pointer transition-all whitespace-nowrap"
           :class="statusPanelOpen ? 'border-violet-400 text-violet-600 bg-violet-50' : ''"
           :style="!statusPanelOpen ? 'border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);' : ''"
           @click="statusPanelOpen = !statusPanelOpen" title="New Status"
         >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          <svg class="w-3 md:w-3.5 h-3 md:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           <span class="hidden md:inline">New Status</span>
         </button>
-        <div class="w-px h-7 hidden md:block" style="background:var(--border-medium);"></div>
+        <div class="w-px h-5 md:h-7 hidden md:block" style="background:var(--border-medium);"></div>
         <!-- Toggle sidebar -->
         <button
-          class="flex items-center justify-center w-[30px] md:w-[34px] h-[30px] md:h-[34px] rounded-lg md:rounded-[10px] border-[1.5px] cursor-pointer transition-all"
+          class="flex items-center justify-center w-[28px] md:w-[34px] h-[28px] md:h-[34px] rounded-lg md:rounded-[10px] border-[1.5px] cursor-pointer transition-all"
           :class="sidebarOpen ? 'border-indigo-400 text-indigo-500 bg-indigo-50' : ''"
           :style="!sidebarOpen ? 'border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);' : ''"
           @click="sidebarOpen = !sidebarOpen" title="Task Groups"
         >
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+          <svg class="w-3.5 md:w-4 h-3.5 md:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
         </button>
       </div>
     </div>
 
-    <!-- SPRINT STATS BAR -->
-    <div class="flex items-center gap-3 md:gap-6 px-4 md:px-6 py-1.5 md:py-2 shrink-0 overflow-x-auto" style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);scrollbar-width:none;">
-      <div v-for="stat in sprintStats" :key="stat.label" class="flex items-center gap-1.5 shrink-0">
-        <span class="text-lg md:text-xl font-extrabold leading-none" :style="{ color: stat.color }">{{ stat.value }}</span>
-        <span class="text-[11px] font-medium whitespace-nowrap" style="color:var(--text-muted);">{{ stat.label }}</span>
+    <!-- SPRINT PROGRESS BAR -->
+    <div class="flex items-center justify-end gap-2 px-4 md:px-6 py-1.5 shrink-0" style="background:var(--bg-surface);border-bottom:1px solid var(--border-base);">
+      <span class="text-[11px] font-semibold whitespace-nowrap" style="color:var(--text-muted);">Sprint progress</span>
+      <div class="w-[80px] md:w-[120px] h-1.5 rounded-full overflow-hidden" style="background:var(--bg-surface-3);">
+        <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-indigo-500 to-emerald-500" :style="{ width: sprintProgress + '%' }"></div>
       </div>
-      <div class="flex items-center gap-2 ml-auto shrink-0">
-        <span class="text-[11px] font-semibold whitespace-nowrap" style="color:var(--text-muted);">Sprint progress</span>
-        <div class="w-[80px] md:w-[120px] h-1.5 rounded-full overflow-hidden" style="background:var(--bg-surface-3);">
-          <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-indigo-500 to-emerald-500" :style="{ width: sprintProgress + '%' }"></div>
-        </div>
-        <span class="text-[12px] font-bold min-w-[36px]" style="color:var(--text-primary);">{{ sprintProgress }}%</span>
-      </div>
+      <span class="text-[12px] font-bold min-w-[36px]" style="color:var(--text-primary);">{{ sprintProgress }}%</span>
     </div>
 
     <!-- BOARD + SIDEBAR WRAPPER -->
     <div class="flex flex-1 overflow-hidden relative">
+    <!-- LEFT SIDEBAR BACKDROP (mobile) -->
+    <Transition name="sidebar-backdrop">
+      <div v-if="sidebarOpen && isMobile" class="fixed left-0 right-0 top-[81px] bottom-0 z-[199] bg-[rgba(15,23,42,0.5)] backdrop-blur-sm" @click="sidebarOpen = false"></div>
+    </Transition>
 
     <!-- LEFT SIDEBAR -->
     <Transition name="sidebar">
       <aside
         v-if="sidebarOpen"
-        class="flex flex-col shrink-0 overflow-hidden"
-        :class="isMobile ? 'fixed z-[200] top-[48px] bottom-[56px] left-0 w-[min(280px,85%)] shadow-[4px_0_32px_rgba(0,0,0,0.22)]' : 'w-[260px] relative z-0'"
+        class="board-sidebar flex flex-col shrink-0 overflow-hidden"
+        :class="isMobile ? 'fixed z-[200] left-0 top-[81px] bottom-0 w-[min(240px,68vw)] shadow-[4px_0_32px_rgba(0,0,0,0.22)]' : 'w-[260px] relative z-0'"
         style="background:var(--bg-surface);border-right:1px solid var(--border-base);"
       >
-        <div v-if="isMobile" class="fixed inset-0 -z-10 bg-[rgba(15,23,42,0.45)] backdrop-blur-sm" @click="sidebarOpen = false"></div>
-        <div class="flex items-center justify-between px-4 py-3.5 pb-3 shrink-0" style="border-bottom:1px solid var(--border-base);">
+        <div class="board-sidebar-head flex items-center justify-between px-4 py-3.5 pb-3 shrink-0" style="border-bottom:1px solid var(--border-base);">
           <span class="text-[13px] font-bold" style="color:var(--text-primary);">Task Groups</span>
           <button class="w-[26px] h-[26px] rounded-[7px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-colors hover:bg-red-50 hover:text-red-500" style="color:var(--text-subtle);" @click="sidebarOpen = false">
             <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <div class="flex-1 overflow-y-auto overflow-x-hidden py-2" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent;">
+        <div class="board-sidebar-body flex-1 overflow-y-auto overflow-x-hidden py-2" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent;">
           <div v-for="group in taskGroups" :key="group.id" class="mb-0.5">
-            <div class="group/sbrow flex items-center gap-1.5 px-3.5 py-2.5 cursor-pointer transition-colors hover:bg-[var(--bg-hover)]" @click="toggleSidebarGroup(group.id)">
+            <div class="board-sidebar-group-row group/sbrow flex items-center gap-1.5 px-3.5 py-2.5 cursor-pointer transition-colors hover:bg-[var(--bg-hover)]" @click="toggleSidebarGroup(group.id)">
               <span class="w-5 h-5 rounded-[6px] flex items-center justify-center text-white text-[12px] font-bold shrink-0" :style="{ background: group.color }">{{ group.expanded ? '−' : '+' }}</span>
               <span class="flex-1 text-[12.5px] font-bold truncate" style="color:var(--text-primary);">{{ group.name }}</span>
               <div class="flex shrink-0">
@@ -246,7 +338,7 @@
             </div>
             <Transition name="sb-tasks">
               <div v-if="group.expanded" class="pb-1">
-                <div v-for="task in group.tasks" :key="task.id" class="flex items-center gap-2 px-3.5 py-1.5 pl-[38px] cursor-pointer transition-colors hover:bg-[var(--bg-hover)]" @click="scrollToTask(task.id)">
+                <div v-for="task in group.tasks" :key="task.id" class="board-sidebar-task-row flex items-center gap-2 px-3.5 py-1.5 pl-[38px] cursor-pointer transition-colors hover:bg-[var(--bg-hover)]" @click="scrollToTask(task.id)">
                   <span class="w-[7px] h-[7px] rounded-full shrink-0" :style="{ background: statusColor(task.status) }"></span>
                   <span class="flex-1 text-[12px] font-medium truncate" style="color:var(--text-muted);">{{ task.name }}</span>
                   <span class="text-[10px] shrink-0 opacity-70" :class="{ 'text-red-500': task.priority==='urgent', 'text-orange-500': task.priority==='high', 'text-amber-500': task.priority==='medium', 'text-indigo-500': task.priority==='low' }">{{ priorityIcon(task.priority) }}</span>
@@ -259,11 +351,11 @@
     </Transition>
 
     <!-- BOARD COLUMNS -->
-    <div ref="boardWrapRef" class="board-columns-wrap flex gap-3 px-3 md:px-6 py-3 md:py-5 flex-1 overflow-x-auto overflow-y-hidden" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);" @click.self="closeAllMenus">
+    <div ref="boardWrapRef" class="flex items-stretch gap-3 px-3 md:px-6 py-3 md:py-5 flex-1 overflow-x-auto overflow-y-hidden" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);" @click.self="closeAllMenus">
       <div
         v-for="col in columns"
         :key="col.id"
-        class="board-col flex flex-col rounded-[18px] overflow-hidden border-[1.5px] transition-all flex-none"
+        class="board-col flex flex-col rounded-[18px] overflow-hidden border-[1.5px] transition-all flex-none min-w-[300px] shrink-0"
         :class="draggingOverCol === col.id ? 'border-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.18)]' : 'border-[var(--border-base)]'"
         :style="{ background: 'var(--bg-surface-2)', ...(colWidth ? { width: colWidth + 'px' } : {}) }"
       >
@@ -312,12 +404,12 @@
                   <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                 </button>
                 <Transition name="cm-drop">
-                  <div v-if="openColMenuId === col.id" class="board-col-menu" @click.stop>
-                    <button class="board-col-menu-item" @click.stop="startColEdit(col)">
+                  <div v-if="openColMenuId === col.id" class="absolute right-0 top-[calc(100%+4px)] z-[200] min-w-[148px] rounded-[12px] border p-1 shadow-[0_12px_36px_rgba(0,0,0,0.16),0_2px_8px_rgba(0,0,0,0.08)]" style="background:var(--bg-surface);border-color:var(--border-medium);" @click.stop>
+                    <button class="flex items-center gap-2 w-full px-[10px] py-[7px] rounded-lg border-none bg-transparent text-[12.5px] font-medium font-[inherit] cursor-pointer text-left transition-[background] duration-[120ms] hover:bg-[var(--bg-hover)]" style="color:var(--text-primary);" @click.stop="startColEdit(col)">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       Edit
                     </button>
-                    <button class="board-col-menu-item board-col-menu-item--danger" @click.stop="startColDelete(col)">
+                    <button class="flex items-center gap-2 w-full px-[10px] py-[7px] rounded-lg border-none bg-transparent text-[12.5px] font-medium font-[inherit] cursor-pointer text-left transition-[background] duration-[120ms] text-red-500 hover:bg-red-500/[0.08]" @click.stop="startColDelete(col)">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                       Delete
                     </button>
@@ -474,7 +566,7 @@
               </div>
               <div>
                 <label class="block text-[11px] font-bold uppercase tracking-[0.06em] mb-1.5" style="color:var(--text-muted);">Move tasks to</label>
-                <select v-model="deleteColMoveTarget" class="modal-select">
+                <select v-model="deleteColMoveTarget" class="w-full rounded-[10px] border-[1.5px] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] appearance-none cursor-pointer transition-[border-color,box-shadow] duration-150 modal-input focus:border-indigo-500 focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]">
                   <option value="" disabled>— Select a status —</option>
                   <option v-for="col in columns.filter(c => c.id !== deleteColTarget?.id)" :key="col.id" :value="col.id">{{ col.title }}</option>
                 </select>
@@ -519,7 +611,7 @@
           <div class="sp-preview flex items-center gap-2 px-3.5 py-2.5 rounded-[12px] border-[1.5px] border-dashed transition-all" style="background:var(--bg-surface-2);border-color:var(--border-medium);">
             <div class="w-2.5 h-2.5 rounded-full shrink-0 transition-colors shadow-[0_0_0_3px_rgba(139,92,246,0.15)]" :style="{ background: newStatus.color }"></div>
             <span class="sp-preview-name flex-1 text-[13px] font-bold flex items-center gap-1.5" style="color:var(--text-primary);">
-              <span v-html="statusIconOptions.find(i => i.value === newStatus.iconId)?.svg" class="sp-status-preview-icon flex items-center" :style="{ color: newStatus.color }"></span>
+              <span v-html="statusIconOptions.find(i => i.value === newStatus.iconId)?.svg" class="sp-status-preview-icon w-[14px] h-[14px] flex items-center" :style="{ color: newStatus.color }"></span>
               {{ newStatus.title || 'Status Name' }}
             </span>
             <span class="text-[11px] font-bold px-1.5 py-0.5 rounded-full" style="background:var(--bg-surface-3);color:var(--text-muted);">0</span>
@@ -528,7 +620,7 @@
           <!-- Status Name -->
           <div class="flex flex-col gap-1.5">
             <label class="text-[11px] font-bold uppercase tracking-[0.06em]" style="color:var(--text-muted);">Status Name</label>
-            <input v-model="newStatus.title" class="sp-input" placeholder="e.g. Review, Blocked..." maxlength="100"/>
+            <input v-model="newStatus.title" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] transition-[border-color,box-shadow] duration-150 sp-input" placeholder="e.g. Review, Blocked..." maxlength="100"/>
           </div>
 
           <!-- Color picker -->
@@ -558,7 +650,7 @@
             <div class="grid grid-cols-8 gap-[5px]">
               <button
                 v-for="ic in statusIconOptions" :key="ic.value"
-                class="sp-icon-option w-8 h-8 rounded-[8px] border-[1.5px] flex items-center justify-center text-[15px] cursor-pointer transition-all hover:scale-110"
+                class="sp-icon-option w-8 h-8 rounded-[8px] border-[1.5px] flex items-center justify-center text-[15px] cursor-pointer transition-all hover:scale-110 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 :class="newStatus.iconId === ic.value ? 'shadow-[0_0_0_2px_rgba(139,92,246,0.25)]' : 'border-[var(--border-base)] bg-[var(--bg-surface-2)] hover:border-violet-400 hover:bg-[var(--bg-hover)]'"
                 :style="newStatus.iconId === ic.value ? { borderColor: newStatus.color, background: `${newStatus.color}18`, color: newStatus.color } : undefined"
                 :title="ic.label"
@@ -615,26 +707,26 @@
             <!-- Title -->
             <div>
               <label class="block text-[11px] font-bold uppercase tracking-[0.06em] mb-1.5" style="color:var(--text-muted);">Title <span style="color:#ef4444">*</span></label>
-              <input v-model="newTask.name" class="modal-input" placeholder="What needs to be done?" @keydown.enter="submitNewTask"/>
+              <input v-model="newTask.name" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] transition-[border-color,box-shadow] duration-150 modal-input" placeholder="What needs to be done?" @keydown.enter="submitNewTask"/>
             </div>
 
             <!-- Description -->
             <div>
               <label class="block text-[11px] font-bold uppercase tracking-[0.06em] mb-1.5" style="color:var(--text-muted);">Description <span class="normal-case font-normal" style="color:var(--text-subtle);">(optional)</span></label>
-              <textarea v-model="newTask.desc" class="modal-textarea" placeholder="Add more context…" rows="2"></textarea>
+              <textarea v-model="newTask.desc" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] transition-[border-color,box-shadow] duration-150 resize-y min-h-[80px] modal-textarea" placeholder="Add more context…" rows="2"></textarea>
             </div>
 
             <!-- Status + Priority -->
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-[11px] font-bold uppercase tracking-[0.06em] mb-1.5" style="color:var(--text-muted);">Status</label>
-                <select v-model="newTask.status" class="modal-select">
+                <select v-model="newTask.status" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] appearance-none cursor-pointer transition-[border-color,box-shadow] duration-150 modal-select">
                   <option v-for="col in columns" :key="col.id" :value="col.id">{{ col.title }}</option>
                 </select>
               </div>
               <div>
                 <label class="block text-[11px] font-bold uppercase tracking-[0.06em] mb-1.5" style="color:var(--text-muted);">Priority</label>
-                <select v-model="newTask.priority" class="modal-select">
+                <select v-model="newTask.priority" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] appearance-none cursor-pointer transition-[border-color,box-shadow] duration-150 modal-select">
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
@@ -652,7 +744,7 @@
                     {{ currentSprint.name }}
                   </span>
                 </div>
-                <select v-model="newTask.sprintId" class="modal-select">
+                <select v-model="newTask.sprintId" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] appearance-none cursor-pointer transition-[border-color,box-shadow] duration-150 modal-select">
                   <option v-for="sp in modalSprintOptions" :key="sp.id || '__backlog'" :value="sp.id">
                     {{ sp.name }}{{ sp.dates ? ' - ' + sp.dates : '' }}
                   </option>
@@ -697,11 +789,11 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-[11px] font-bold uppercase tracking-[0.06em] mb-1.5" style="color:var(--text-muted);">Due Date</label>
-                <input v-model="newTask.due" type="date" class="modal-select"/>
+                <input v-model="newTask.due" type="date" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] appearance-none cursor-pointer transition-[border-color,box-shadow] duration-150 modal-select"/>
               </div>
               <div>
                 <label class="block text-[11px] font-bold uppercase tracking-[0.06em] mb-1.5" style="color:var(--text-muted);">Start Date</label>
-                <input v-model="newTask.startDate" type="date" class="modal-select"/>
+                <input v-model="newTask.startDate" type="date" class="w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit] appearance-none cursor-pointer transition-[border-color,box-shadow] duration-150 modal-select"/>
               </div>
             </div>
 
@@ -778,26 +870,54 @@
     <!-- Global overlay (close menus) -->
     <div v-if="sprintMenuOpen || activeCardMenu" class="fixed inset-0 z-[80]" @click="closeAllMenus"></div>
     <TaskDetailModal v-model="detailOpen" :task-id="selectedTaskId" @deleted="onTaskDeleted"/>
+    <AICreateTaskModal
+      v-model="aiCreateOpen"
+      :project-id="effectiveProjectId"
+      :status-id="aiDefaultStatusId"
+      :sprint-id="selectedModalSprintId"
+      @created="onAiTaskCreated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { createProjectSprint, listProjectSprints, type SprintSummary } from '@/api/sprints'
-import { listProjectGroups, type TaskGroup } from '@/api/tasks'
+import type { TaskGroup } from '@/api/tasks'
+import { useProjectSettingsQuery } from '@/api/projects'
+import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
-import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
+import { fetchProjectGroupsQuery } from '@/features/tasks/composables/useTaskGroupsQuery'
+import {
+  useBoardMembers,
+  type ProjectMember,
+} from '@/features/tasks/composables/useBoardMembers'
+import { useBoardSprints } from '@/features/tasks/composables/useBoardSprints'
+import {
+  useBoardStatuses,
+  type BoardStatusColumn,
+} from '@/features/tasks/composables/useBoardStatuses'
+import { useCreateProjectSprintMutation } from '@/features/tasks/composables/useSprintsQuery'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
-import type { User } from '@/types/user.types'
+import { useAuthStore } from '@/stores/auth.store'
 import { storeToRefs } from 'pinia'
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import draggable from 'vuedraggable'
+import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 import TaskDetailModal from './TaskDetailModal.vue'
 
 const store = useTaskStore()
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
 const { currentProjectId } = storeToRefs(projectStore)
+const createSprintMutation = useCreateProjectSprintMutation()
 const toast = useToast()
+const route = useRoute()
+const routeProjectId = computed(() =>
+  typeof route.params.projectId === 'string' ? route.params.projectId : null
+)
+const effectiveProjectId = computed(() => routeProjectId.value ?? currentProjectId.value)
+const projectSettingsQuery = useProjectSettingsQuery(effectiveProjectId)
 
 /* ── Types ─────────────────────────────────────────────────────── */
 interface Member { initial: string; name: string; color: string }
@@ -816,218 +936,85 @@ interface Task {
   groupId?: string | null
   sprintId?: string
 }
-interface Sprint {
-  id: string
-  name: string
-  color: string
-  dates: string
-  members: Member[]
-}
 
-/* ── Columns (hardcoded 3) ─────────────────────────────────────── */
+/* ── Columns ─────────────────────────────────────────────────────── */
 const columns = [
   { id: 'todo',       title: 'To Do',       color: '#6366f1', emptyIcon: '📋', emptyText: 'No tasks here yet. Add one!' },
   { id: 'inprogress', title: 'In Progress',  color: '#f59e0b', emptyIcon: '🚧', emptyText: 'Nothing in progress. Start a task!' },
   { id: 'done',       title: 'Done',         color: '#10b981', emptyIcon: '🎉', emptyText: 'No completed tasks yet.' },
 ]
+const activeCardMenu = ref<string | null>(null)
+const tasksBySprintId = ref<Record<string, Task[]>>({})
 
-/* ── Members ───────────────────────────────────────────────────── */
-const allMembers: Member[] = [
-  { initial: 'A', name: 'Alice', color: '#6366f1' },
-  { initial: 'B', name: 'Bob',   color: '#ec4899' },
-  { initial: 'C', name: 'Carol', color: '#f59e0b' },
-  { initial: 'D', name: 'David', color: '#10b981' },
-  { initial: 'E', name: 'Eva',   color: '#0ea5e9' },
-]
-
-/* ── Sprints ────────────────────────────────────────────────────── */
-const sprints = ref<Sprint[]>([
-  { id: 's1', name: 'Sprint 1', color: '#10b981', dates: 'Apr 1 – Apr 14',  members: allMembers.slice(0, 3) },
-  { id: 's2', name: 'Sprint 2', color: '#6366f1', dates: 'Apr 15 – Apr 28', members: allMembers.slice(0, 4) },
-  { id: 's3', name: 'Sprint 3', color: '#f59e0b', dates: 'Apr 29 – May 12', members: allMembers },
-  { id: 's4', name: 'Sprint 4', color: '#ec4899', dates: 'May 13 – May 26', members: allMembers.slice(1) },
-  { id: 's5', name: 'Sprint 5', color: '#0ea5e9', dates: 'May 27 – Jun 9',  members: allMembers.slice(0, 5) },
-])
-
-const selectedSprintId = ref('')
-const sprintMenuOpen = ref(false)
-const currentSprint = computed(() => sprints.value.find(s => s.id === selectedSprintId.value) ?? sprints.value[0])
-const SPRINT_SELECTION_KEY_PREFIX = 'board_selected_sprint'
-
-function sprintSelectionKey(projectId: string) {
-  return `${SPRINT_SELECTION_KEY_PREFIX}:${projectId}`
-}
-
-function saveSelectedSprint(id: string) {
-  if (!currentProjectId.value) return
-  localStorage.setItem(sprintSelectionKey(currentProjectId.value), id)
-}
-
-function restoreSelectedSprint(projectId: string) {
-  const savedId = localStorage.getItem(sprintSelectionKey(projectId)) ?? ''
-  selectedSprintId.value = sprints.value.some((sprint) => sprint.id === savedId) ? savedId : ''
-}
-
-const memberPickerOpen = ref(false)
-const memberSearch = ref('')
-const memberPickerRef = ref<HTMLElement | null>(null)
-const memberSearchInput = ref<HTMLInputElement | null>(null)
-const visibleAvatarCount = 4
-const addingMemberId = ref<string | null>(null)
-const assignableUsersQuery = useUsersQuery(memberSearch, {
-  enabled: computed(() => Boolean(memberPickerOpen.value && currentProjectId.value)),
+const {
+  sprints,
+  selectedSprintId,
+  sprintMenuOpen,
+  sprintBtnRef,
+  sprintDropStyle,
+  currentSprint,
+  showNewSprintForm,
+  sprintColorOptions,
+  newSprint,
+  remoteSprintCache,
+  toggleSprintMenu,
+  selectSprint,
+  createSprint,
+  loadProjectSprints,
+  persistSelectedSprint,
+} = useBoardSprints({
+  effectiveProjectId,
+  createSprint: createSprintMutation.mutateAsync,
+  onSprintCreated: (id) => {
+    tasksBySprintId.value[id] = []
+  },
+  toast,
+  activeCardMenu,
 })
 
-const filteredPickerMembers = computed(() => {
-  const q = memberSearch.value.trim().toLowerCase()
-  if (!q) return store.members
-  return store.members.filter((m) => m.name.toLowerCase().includes(q))
+const {
+  memberPickerOpen,
+  memberSearch,
+  memberPickerRef,
+  memberPickerBtnRef,
+  memberPickerDropRef,
+  memberSearchInput,
+  memberPickerStyle,
+  visibleAvatarCount,
+  addingMemberId,
+  removingMemberId,
+  updatingRoleMemberId,
+  memberRoleOptions,
+  assignableUsersQuery,
+  searchedUsers,
+  canManageProjectMembers,
+  canCurrentUserCreateTask,
+  userInitials,
+  userAvatarColor,
+  isProjectOwner,
+  canUpdateMemberRole,
+  updateMemberPickerPos,
+  openMemberPicker,
+  addMemberFromPicker,
+  removeMemberFromPicker,
+  updateMemberRoleFromPicker,
+  onMemberPickerDocClick,
+  copyInviteLink,
+} = useBoardMembers({
+  authUserId: computed(() => authStore.user?.id ?? null),
+  members: computed(() => store.members as ProjectMember[]),
+  effectiveProjectId,
+  projectRolePermissions: computed(() => projectSettingsQuery.data.value?.rolePermissions),
+  sprintMenuOpen,
+  activeCardMenu,
+  syncBoardFromStore,
+  addMemberToProject: store.addMemberToProject,
+  removeMemberFromProject: store.removeMemberFromProject,
+  updateMemberRoleInProject: store.updateMemberRoleInProject,
+  toast,
 })
 
-const selectedProjectMemberIds = computed(() => new Set(store.members.map((member) => member.id)))
-const searchedUsers = computed(() =>
-  (assignableUsersQuery.data.value ?? [])
-    .filter((user) => !selectedProjectMemberIds.value.has(user.id))
-    .slice(0, 8)
-)
-
-function userInitials(user: User) {
-  const raw = (user.fullName || user.email).trim()
-  return raw
-    .split(/\s+/)
-    .map((part) => part.charAt(0))
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
-
-function userAvatarColor(user: User) {
-  const seed = user.id || user.email
-  const palette = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#ef4444', '#f97316']
-  const hash = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  return palette[hash % palette.length]
-}
-
-async function openMemberPicker() {
-  memberPickerOpen.value = true
-  sprintMenuOpen.value = false
-  activeCardMenu.value = null
-  await nextTick()
-  memberSearchInput.value?.focus()
-}
-
-async function addMemberFromPicker(user: User) {
-  if (!currentProjectId.value || addingMemberId.value) return
-
-  addingMemberId.value = user.id
-  try {
-    await store.addMemberToProject(currentProjectId.value, user.id)
-    memberSearch.value = ''
-    syncBoardFromStore()
-    toast.success(`Added ${user.fullName || user.email} to this project`)
-  } catch {
-    toast.error('Cannot add member to this project')
-  } finally {
-    addingMemberId.value = null
-  }
-}
-
-function onMemberPickerDocClick(e: MouseEvent) {
-  if (memberPickerRef.value && !memberPickerRef.value.contains(e.target as Node)) {
-    memberPickerOpen.value = false
-  }
-}
-
-function selectSprint(id: string) {
-  selectedSprintId.value = id
-  saveSelectedSprint(id)
-  sprintMenuOpen.value = false
-  showNewSprintForm.value = false
-}
-
-/* ── New Sprint form ────────────────────────────────────────────── */
-const showNewSprintForm = ref(false)
-const sprintColorOptions = ['#10b981','#6366f1','#f59e0b','#ec4899','#0ea5e9','#ef4444','#8b5cf6','#84cc16']
-
-const newSprint = ref({ name: '', startDate: '', endDate: '', color: '#6366f1' })
-
-function formatSprintDates(start: string, end: string): string {
-  if (!start && !end) return ''
-  const fmt = (d: string) => {
-    if (!d) return ''
-    const dt = new Date(d)
-    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-  if (start && end) return `${fmt(start)} – ${fmt(end)}`
-  if (start) return `From ${fmt(start)}`
-  return `Until ${fmt(end)}`
-}
-
-async function createSprint() {
-  if (!newSprint.value.name.trim() || !currentProjectId.value) return
-
-  try {
-    const created = await createProjectSprint({
-      projectId: currentProjectId.value,
-      name: newSprint.value.name.trim(),
-      startDate: newSprint.value.startDate ? new Date(newSprint.value.startDate).toISOString() : undefined,
-      endDate: newSprint.value.endDate ? new Date(newSprint.value.endDate).toISOString() : undefined,
-    })
-
-    await loadProjectSprints(currentProjectId.value)
-    selectedSprintId.value = created.id
-    saveSelectedSprint(created.id)
-    tasksBySprintId.value[created.id] = []
-    sprintMenuOpen.value = false
-    showNewSprintForm.value = false
-    newSprint.value = { name: '', startDate: '', endDate: '', color: '#6366f1' }
-  } catch {
-    toast.error('Cannot create sprint')
-  }
-}
-
-/* ── Tasks per sprint ───────────────────────────────────────────── */
-function ds(n: number): string {
-  const d = new Date(); d.setDate(d.getDate() + n)
-  return d.toISOString().split('T')[0]
-}
-
-const tasksBySprintId = ref<Record<string, Task[]>>({
-  s1: [
-    { id: 's1-1', name: 'Market Research',     status: 'done',       priority: 'high',   due: ds(-5),  assignees: [allMembers[0]], tags: ['research'], subtasks: { done: 3, total: 3 } },
-    { id: 's1-2', name: 'Competitor Analysis', status: 'done',       priority: 'medium', due: ds(-3),  assignees: [allMembers[1]], tags: ['analysis'] },
-    { id: 's1-3', name: 'User Surveys',        status: 'inprogress', priority: 'high',   due: ds(2),   assignees: [allMembers[0], allMembers[2]], progress: 72, subtasks: { done: 4, total: 6 } },
-    { id: 's1-4', name: 'Persona Creation',    status: 'todo',       priority: 'low',    due: ds(5),   assignees: [allMembers[2]] },
-  ],
-  s2: [
-    { id: 's2-1',  name: 'Profile Design',        status: 'todo',       priority: 'medium', due: ds(3),  assignees: [allMembers[0]], tags: ['design', 'ux'], subtasks: { done: 1, total: 4 } },
-    { id: 's2-2',  name: 'Navigation Menu',        status: 'todo',       priority: 'low',    due: ds(5),  assignees: [allMembers[1]], tags: ['ui'] },
-    { id: 's2-3',  name: 'Login Flow',             status: 'todo',       priority: 'urgent', due: ds(1),  assignees: [allMembers[0], allMembers[2]], subtasks: { done: 0, total: 3 } },
-    { id: 's2-4',  name: 'Draw Sketches',          status: 'todo',       priority: 'high',   due: ds(4),  assignees: [allMembers[1]], tags: ['design'] },
-    { id: 's2-5',  name: 'Settings Page',          status: 'inprogress', priority: 'high',   due: ds(2),  assignees: [allMembers[2], allMembers[0]], tags: ['ui', 'ux'], progress: 65, subtasks: { done: 3, total: 5 } },
-    { id: 's2-6',  name: 'Build Wireframe',        status: 'inprogress', priority: 'urgent', due: ds(0),  assignees: [allMembers[1]], desc: 'Complete all screens for wireframing phase', progress: 40, subtasks: { done: 2, total: 5 } },
-    { id: 's2-7',  name: 'User Interface Design',  status: 'inprogress', priority: 'medium', due: ds(6),  assignees: [allMembers[2], allMembers[1]], tags: ['ui'], progress: 15 },
-    { id: 's2-8',  name: 'Homepage Redesign',      status: 'done',       priority: 'high',   due: ds(-2), assignees: [allMembers[0], allMembers[2]], subtasks: { done: 4, total: 4 } },
-    { id: 's2-9',  name: 'Integrate API Flows',    status: 'done',       priority: 'medium', due: ds(-1), assignees: [allMembers[1]], tags: ['dev'] },
-    { id: 's2-10', name: 'Services Module',        status: 'done',       priority: 'low',    due: ds(-3), assignees: [allMembers[2]], desc: 'Backend service layer complete' },
-  ],
-  s3: [
-    { id: 's3-1', name: 'Backend Architecture', status: 'todo',       priority: 'urgent', due: ds(7),  assignees: [allMembers[0], allMembers[3]], tags: ['dev'] },
-    { id: 's3-2', name: 'API Design',           status: 'inprogress', priority: 'high',   due: ds(4),  assignees: [allMembers[3]], progress: 30, subtasks: { done: 1, total: 5 } },
-    { id: 's3-3', name: 'Database Schema',      status: 'done',       priority: 'high',   due: ds(-1), assignees: [allMembers[0]] },
-  ],
-  s4: [
-    { id: 's4-1', name: 'QA Testing Phase',  status: 'todo',       priority: 'high',   due: ds(10), assignees: [allMembers[1], allMembers[4]] },
-    { id: 's4-2', name: 'Bug Fixing Sprint', status: 'inprogress', priority: 'urgent', due: ds(5),  assignees: [allMembers[0]], progress: 55, subtasks: { done: 3, total: 7 } },
-    { id: 's4-3', name: 'Code Review',       status: 'done',       priority: 'medium', due: ds(-2), assignees: [allMembers[2]] },
-  ],
-  s5: [
-    { id: 's5-1', name: 'Deploy to Production', status: 'todo',       priority: 'urgent', due: ds(14), assignees: allMembers },
-    { id: 's5-2', name: 'Performance Audit',    status: 'inprogress', priority: 'high',   due: ds(8),  assignees: [allMembers[0], allMembers[1]], progress: 20 },
-    { id: 's5-3', name: 'Documentation',        status: 'done',       priority: 'low',    due: ds(-1), assignees: [allMembers[4]] },
-  ],
-})
-
+/* -- Tasks per sprint --------------------------------------------- */
 const projectGroups = ref<TaskGroup[]>([])
 const groupByGroup = ref(false)
 
@@ -1079,8 +1066,6 @@ function syncBoardFromStore() {
     }))
   )
 
-  allMembers.splice(0, allMembers.length, ...store.members.map(toBoardMember))
-
   const nextTasksBySprint: Record<string, Task[]> = {
     '': tasksForSprint('').map(toBoardTask),
   }
@@ -1092,25 +1077,8 @@ function syncBoardFromStore() {
 
   if (!tasksBySprintId.value[selectedSprintId.value]) {
     selectedSprintId.value = ''
-    saveSelectedSprint('')
+    persistSelectedSprint('')
   }
-}
-
-const remoteSprintCache = ref<SprintSummary[]>([])
-
-async function loadProjectSprints(projectId: string) {
-  remoteSprintCache.value = await listProjectSprints(projectId)
-  sprints.value = [
-    { id: '', name: 'Backlog', color: '#64748b', dates: 'No sprint', members: [] },
-    ...remoteSprintCache.value.map((sprint, index) => ({
-      id: sprint.id,
-      name: sprint.name,
-      color: sprintColorOptions[index % sprintColorOptions.length],
-      dates: formatSprintDates(sprint.startDate ?? '', sprint.endDate ?? ''),
-      members: [],
-    })),
-  ]
-  restoreSelectedSprint(projectId)
 }
 
 async function syncProjectBoard(projectId: string | null) {
@@ -1126,13 +1094,13 @@ async function syncProjectBoard(projectId: string | null) {
     store.loadProjectBoard(projectId),
     store.loadProjectTrash(projectId),
     loadProjectSprints(projectId),
-    listProjectGroups(projectId).then((groups) => { projectGroups.value = groups }),
+    fetchProjectGroupsQuery(projectId).then((groups) => { projectGroups.value = groups }),
   ])
   syncBoardFromStore()
 }
 
 watch(
-  currentProjectId,
+  routeProjectId,
   async (projectId) => {
     try {
       await syncProjectBoard(projectId)
@@ -1148,13 +1116,6 @@ watch(
   () => syncBoardFromStore(),
   { deep: true }
 )
-
-/* ── Derived lists per column ───────────────────────────────────── */
-// vuedraggable mutates the array in place on drop,
-// so we use computed arrays that filter by status + search.
-// We hand these arrays directly to <draggable :list="...">
-// and let vuedraggable update them; we reconcile status
-// via the @change event.
 
 function columnList(colId: string): Task[] {
   const all = tasksBySprintId.value[selectedSprintId.value] ?? []
@@ -1203,128 +1164,69 @@ function shouldShowGroupHeader(task: Task, colId: string) {
 /* ── Sprint Stats ───────────────────────────────────────────────── */
 const currentTasks = computed(() => tasksBySprintId.value[selectedSprintId.value] ?? [])
 
-function normalizeStatusName(value: string) {
-  return value.toLowerCase().replace(/[\s_-]+/g, '')
-}
-
-function statusIdsMatching(match: (normalizedTitle: string, normalizedId: string) => boolean) {
-  return new Set(
-    columns
-      .filter((col) => match(normalizeStatusName(col.title), normalizeStatusName(col.id)))
-      .map((col) => col.id)
-  )
-}
-
-const todoStatusIds = computed(() =>
-  statusIdsMatching((title, id) => title === 'todo' || id === 'todo')
-)
-const inProgressStatusIds = computed(() =>
-  statusIdsMatching((title, id) => title.includes('progress') || id.includes('progress'))
-)
-const doneStatusIds = computed(() =>
-  statusIdsMatching((title, id) => title === 'done' || title.includes('complete') || id === 'done' || id.includes('complete'))
-)
-
-const sprintStats = computed(() => {
-  const tasks = currentTasks.value
-  return [
-    { label: 'To Do',       value: tasks.filter(t => todoStatusIds.value.has(t.status)).length,       color: '#6366f1' },
-    { label: 'In Progress', value: tasks.filter(t => inProgressStatusIds.value.has(t.status)).length, color: '#f59e0b' },
-    { label: 'Done',        value: tasks.filter(t => doneStatusIds.value.has(t.status)).length,       color: '#10b981' },
-    { label: 'Urgent',      value: tasks.filter(t => t.priority === 'urgent').length,                 color: '#ef4444' },
-  ]
+const {
+  statusPanelOpen,
+  statusColors,
+  statusIconOptions,
+  newStatus,
+  submittingStatus,
+  resetNewStatus,
+  createStatus,
+  sprintProgress,
+  openColMenuId,
+  colMenuRefs,
+  toggleColMenu,
+  onDocColMenuClick,
+  editingColId,
+  editingColTitle,
+  colEditInputs,
+  startColEdit,
+  cancelColEdit,
+  saveColEdit,
+  deleteColTarget,
+  deleteColMoveTarget,
+  deletingCol,
+  deleteColTaskCount,
+  startColDelete,
+  cancelColDelete,
+  confirmColDelete,
+} = useBoardStatuses<Task>({
+  columns: columns as BoardStatusColumn[],
+  currentTasks,
+  effectiveProjectId,
+  sprintMenuOpen,
+  activeCardMenu,
+  columnList,
+  createStatusInProject: store.createStatusInProject,
+  updateStatusInProject: store.updateStatusInProject,
+  deleteStatusInProject: store.deleteStatusInProject,
+  syncProjectBoard,
+  toast,
+  taskStatus: (task) => task.status,
 })
-const sprintProgress = computed(() => {
-  const tasks = currentTasks.value
-  if (!tasks.length) return 0
-  const doneCount = tasks.filter(t => doneStatusIds.value.has(t.status)).length
-  return Math.round((doneCount / tasks.length) * 100)
-})
-
-/* ── New Status Panel ──────────────────────────────────────────── */
-const statusPanelOpen = ref(false)
-
-const statusColors = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
-  '#f97316', '#f59e0b', '#eab308', '#84cc16',
-  '#10b981', '#14b8a6', '#0ea5e9', '#3b82f6',
-  '#64748b', '#94a3b8', '#1e293b', '#0f172a',
-]
-
-const statusIcons = [
-  { value: '🔵', label: 'Blue Circle' },
-  { value: '🟡', label: 'Yellow Circle' },
-  { value: '🟢', label: 'Green Circle' },
-  { value: '🔴', label: 'Red Circle' },
-
-]
-
-const defaultNewStatus = () => ({ name: '', color: '#6366f1', icon: '⬜', desc: '' })
-type StatusIconOption = { value: string; label: string; svg: string }
-const statusSvg = (path: string) =>
-  `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`
-const statusIconOptions: StatusIconOption[] = [
-  { value: 'list', label: 'List', svg: statusSvg('<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>') },
-  { value: 'check', label: 'Checkmark', svg: statusSvg('<polyline points="20 6 9 17 4 12"/>') },
-  { value: 'circle', label: 'Circle', svg: statusSvg('<circle cx="12" cy="12" r="9"/>') },
-  { value: 'clock', label: 'Clock', svg: statusSvg('<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/>') },
-  { value: 'eye', label: 'Review', svg: statusSvg('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>') },
-  { value: 'flag', label: 'Flag', svg: statusSvg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>') },
-  { value: 'zap', label: 'Zap', svg: statusSvg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>') },
-  { value: 'target', label: 'Target', svg: statusSvg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>') },
-  ...statusIcons.map((icon) => ({
-    value: icon.value,
-    label: icon.label,
-    svg: statusSvg('<circle cx="12" cy="12" r="9"/>'),
-  })),
-]
-
-const newStatus = ref({ ...defaultNewStatus(), title: '', iconId: 'list' })
-const submittingStatus = ref(false)
-
-function resetNewStatus() {
-  newStatus.value = { ...defaultNewStatus(), title: '', iconId: 'list' }
-}
-
-async function createStatus() {
-  if (!newStatus.value.title.trim() || !currentProjectId.value) return
-
-  submittingStatus.value = true
-  try {
-    await store.createStatusInProject({
-      projectId: currentProjectId.value,
-      title: newStatus.value.title.trim(),
-      color: newStatus.value.color,
-      icon: newStatus.value.iconId,
-    })
-    await syncProjectBoard(currentProjectId.value)
-    resetNewStatus()
-    statusPanelOpen.value = false
-    toast.success('Status created successfully')
-  } catch {
-    toast.error('Cannot create status')
-  } finally {
-    submittingStatus.value = false
-  }
-}
 
 /* ── Left Sidebar ──────────────────────────────────────────────── */
 const isMobile = ref(false)
 const sidebarOpen = ref(false)
+function handleBoardWindowResize() {
+  isMobile.value = window.innerWidth < 768
+  if (memberPickerOpen.value) updateMemberPickerPos()
+}
 
 onMounted(() => {
   isMobile.value = window.innerWidth < 768
   sidebarOpen.value = !isMobile.value // open by default on desktop only
   document.addEventListener('click', onMemberPickerDocClick)
   document.addEventListener('click', onDocColMenuClick)
-  window.addEventListener('resize', () => {
-    isMobile.value = window.innerWidth < 768
-  })
+  window.addEventListener('resize', handleBoardWindowResize)
+  window.addEventListener('scroll', updateMemberPickerPos, true)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onMemberPickerDocClick)
   document.removeEventListener('click', onDocColMenuClick)
+  window.removeEventListener('resize', handleBoardWindowResize)
+  window.removeEventListener('scroll', updateMemberPickerPos, true)
 })
 
 // Group definition for sidebar (static per sprint)
@@ -1386,26 +1288,25 @@ function onDragEnd()   { isDragging.value = false; draggingOverCol.value = null 
  * We update the task's status to match the target column.
  */
 async function onColChange(evt: any, colId: string) {
-  if (!evt.added || !currentProjectId.value) return
+  if (!evt.added || !effectiveProjectId.value) return
 
   try {
-    await store.moveTaskToStatus(currentProjectId.value, (evt.added.element as Task).id, colId)
+    await store.moveTaskToStatus(effectiveProjectId.value, (evt.added.element as Task).id, colId)
     syncBoardFromStore()
   } catch {
     toast.error('Cannot update task status')
-    await syncProjectBoard(currentProjectId.value)
+    await syncProjectBoard(effectiveProjectId.value)
   }
 }
 
 /* ── Card menu ──────────────────────────────────────────────────── */
-const activeCardMenu = ref<string | null>(null)
 function toggleCardMenu(id: string) {
   activeCardMenu.value = activeCardMenu.value === id ? null : id
 }
 async function moveTask(task: Task, status: string) {
-  if (!currentProjectId.value) return
+  if (!effectiveProjectId.value) return
   try {
-    await store.moveTaskToStatus(currentProjectId.value, task.id, status)
+    await store.moveTaskToStatus(effectiveProjectId.value, task.id, status)
     syncBoardFromStore()
   } catch {
     toast.error('Cannot update task status')
@@ -1414,8 +1315,8 @@ async function moveTask(task: Task, status: string) {
 }
 async function deleteTask(id: string) {
   try {
-    await store.deleteTaskRemote(id, currentProjectId.value)
-    if (currentProjectId.value) await syncProjectBoard(currentProjectId.value)
+    await store.deleteTaskRemote(id, effectiveProjectId.value)
+    if (effectiveProjectId.value) await syncProjectBoard(effectiveProjectId.value)
   } catch {
     toast.error('Cannot delete task')
   }
@@ -1429,13 +1330,14 @@ function openTask(task: Task) {
 async function onTaskDeleted() {
   selectedTaskId.value = null
   detailOpen.value = false
-  if (currentProjectId.value) await syncProjectBoard(currentProjectId.value)
+  if (effectiveProjectId.value) await syncProjectBoard(effectiveProjectId.value)
 }
 
 /* ── Add task modal ─────────────────────────────────────────────── */
 const showAddModal  = ref(false)
 const detailOpen = ref(false)
 const selectedTaskId = ref<string | null>(null)
+const aiCreateOpen = ref(false)
 const submittingTask = ref(false)
 
 const newTaskDefault = () => ({
@@ -1450,6 +1352,31 @@ const selectedModalSprintId = computed(() => {
     ? selectedSprintId.value
     : ''
 })
+const aiDefaultStatusId = computed(() => store.columns[0]?.id ?? columns[0]?.id ?? null)
+
+function openAiCreateTask() {
+  if (!effectiveProjectId.value) {
+    toast.error('Please select a project first')
+    return
+  }
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
+
+  if (!aiDefaultStatusId.value) {
+    toast.error('Please create a status before creating tasks')
+    return
+  }
+
+  aiCreateOpen.value = true
+}
+
+async function onAiTaskCreated() {
+  if (effectiveProjectId.value) {
+    await syncProjectBoard(effectiveProjectId.value)
+  }
+}
 
 /* label picker for modal */
 const modalLabelPickerOpen = ref(false)
@@ -1491,6 +1418,10 @@ function modalToggleAssignee(id: string) {
 const modalGroupPickerOpen = ref(false)
 
 function addTask(colId: string) {
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
   newTask.value = { ...newTaskDefault(), status: colId,
     sprintId: selectedModalSprintId.value }
   modalLabelPickerOpen.value = false
@@ -1499,7 +1430,11 @@ function addTask(colId: string) {
 }
 
 async function submitNewTask() {
-  if (!newTask.value.name.trim() || !currentProjectId.value) return
+  if (!newTask.value.name.trim() || !effectiveProjectId.value) return
+  if (!canCurrentUserCreateTask.value) {
+    toast.error('Your role is not allowed to create tasks')
+    return
+  }
   if (!newTask.value.status) {
     toast.error('Please select a status for the task')
     return
@@ -1509,7 +1444,7 @@ async function submitNewTask() {
   try {
     const labelStyle = newTask.value.label ? store.labelPresets[newTask.value.label] : undefined
     await store.createTaskInProject({
-      projectId: currentProjectId.value,
+      projectId: effectiveProjectId.value,
       title: newTask.value.name.trim(),
       description: newTask.value.desc.trim(),
       statusId: newTask.value.status,
@@ -1523,10 +1458,10 @@ async function submitNewTask() {
       labelBg: labelStyle?.bg,
       labelColor: labelStyle?.color,
     })
-    await syncProjectBoard(currentProjectId.value)
+    await syncProjectBoard(effectiveProjectId.value)
     showAddModal.value = false
-  } catch {
-    toast.error('Cannot create task')
+  } catch (error) {
+    toast.error(extractApiErrorMessage(error, 'Cannot create task'))
   } finally {
     submittingTask.value = false
   }
@@ -1548,108 +1483,13 @@ function formatDue(due: string): string {
 function closeAllMenus() { sprintMenuOpen.value = false; activeCardMenu.value = null; openColMenuId.value = null }
 
 /* ── Column context menu ──────────────────────────────────────── */
-const openColMenuId = ref<string | null>(null)
-const colMenuRefs: Record<string, HTMLElement> = {}
-
-function toggleColMenu(colId: string) {
-  openColMenuId.value = openColMenuId.value === colId ? null : colId
-  sprintMenuOpen.value = false
-  activeCardMenu.value = null
-}
-
-function onDocColMenuClick(e: MouseEvent) {
-  if (openColMenuId.value) {
-    const menuEl = colMenuRefs[openColMenuId.value]
-    if (!menuEl || !menuEl.contains(e.target as Node)) openColMenuId.value = null
-  }
-}
-
 /* ── Column inline edit ───────────────────────────────────────── */
-const editingColId = ref<string | null>(null)
-const editingColTitle = ref('')
-const colEditInputs: Record<string, HTMLInputElement> = {}
-
-async function startColEdit(col: { id: string; title: string; color: string; emptyIcon?: string; emptyText?: string }) {
-  openColMenuId.value = null
-  editingColId.value = col.id
-  editingColTitle.value = col.title
-  await nextTick()
-  colEditInputs[col.id]?.select()
-}
-
-function cancelColEdit() {
-  editingColId.value = null
-  editingColTitle.value = ''
-}
-
-async function saveColEdit() {
-  const id = editingColId.value
-  const title = editingColTitle.value.trim()
-  if (!id || !title || !currentProjectId.value) { cancelColEdit(); return }
-  cancelColEdit()
-  try {
-    await store.updateStatusInProject(currentProjectId.value, id, { title })
-    await syncProjectBoard(currentProjectId.value)
-    toast.success('Status updated')
-  } catch {
-    toast.error('Cannot update status')
-  }
-}
-
 /* ── Column delete ────────────────────────────────────────────── */
-type BoardCol = { id: string; title: string; color: string; emptyIcon?: string; emptyText?: string }
-const deleteColTarget = ref<BoardCol | null>(null)
-const deleteColMoveTarget = ref('')
-const deletingCol = ref(false)
-
-const deleteColTaskCount = computed(() =>
-  deleteColTarget.value ? columnList(deleteColTarget.value.id).length : 0
-)
-
-function startColDelete(col: BoardCol) {
-  openColMenuId.value = null
-  deleteColTarget.value = col
-  deleteColMoveTarget.value = ''
-}
-
-function cancelColDelete() {
-  deleteColTarget.value = null
-  deleteColMoveTarget.value = ''
-}
-
-async function confirmColDelete() {
-  const col = deleteColTarget.value
-  if (!col || !currentProjectId.value) return
-  if (deleteColTaskCount.value > 0 && !deleteColMoveTarget.value) {
-    toast.error('Please select a status to move tasks to')
-    return
-  }
-  deletingCol.value = true
-  try {
-    await store.deleteStatusInProject(
-      currentProjectId.value,
-      col.id,
-      deleteColMoveTarget.value || undefined
-    )
-    await syncProjectBoard(currentProjectId.value)
-    toast.success(`Status "${col.title}" deleted`)
-    cancelColDelete()
-  } catch {
-    toast.error('Cannot delete status')
-  } finally {
-    deletingCol.value = false
-  }
-}
-
-/* ── Board column width: show exactly 3 cols, scroll for more ───── */
 const boardWrapRef = ref<HTMLElement | null>(null)
 const boardWrapWidth = ref(0)
 const colWidth = computed<number | null>(() => {
   if (window.innerWidth < 768) return null  // let CSS handle mobile
   if (boardWrapWidth.value <= 0) return 340
-  // boardWrapWidth = getBoundingClientRect().width (total including padding)
-  // Board has px-6 padding = 24px*2=48px (desktop)
-  // Gap between 3 cols = 2 gaps * 12px = 24px
   const hPad = 48
   const gaps = 24
   const available = boardWrapWidth.value - hPad - gaps
@@ -1667,21 +1507,30 @@ onMounted(() => {
     boardWrapObserver.observe(boardWrapRef.value)
     boardWrapWidth.value = boardWrapRef.value.getBoundingClientRect().width
   }
-  document.addEventListener('click', onMemberPickerDocClick)
 })
 onUnmounted(() => {
   boardWrapObserver?.disconnect()
-  document.removeEventListener('click', onMemberPickerDocClick)
 })
 </script>
 
 <style scoped>
+/* ── Sidebar transition ── */
+.sidebar-enter-active { animation: sbIn 0.22s cubic-bezier(0.22,1,0.36,1); }
+.sidebar-leave-active { animation: sbOut 0.18s ease forwards; }
+@keyframes sbIn  { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes sbOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-20px); } }
+
+/* ── Sidebar backdrop transition ── */
+.sidebar-backdrop-enter-active { transition: opacity 0.22s ease; }
+.sidebar-backdrop-leave-active { transition: opacity 0.18s ease; }
+.sidebar-backdrop-enter-from, .sidebar-backdrop-leave-to { opacity: 0; }
+
 * { box-sizing: border-box; }
 
 /* ── Sprint/card dropdown animation ── */
 .sprint-drop, .card-drop { animation: dropIn 0.18s ease; }
 @keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
-.board-mp-dropdown { z-index: 90; }
+
 
 /* ── Sprint form input focus ── */
 .sprint-inp:focus { border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
@@ -1706,11 +1555,6 @@ onUnmounted(() => {
   cursor: grabbing !important;
 }
 
-/* ── Sidebar transition ── */
-.sidebar-enter-active { animation: sbIn 0.22s cubic-bezier(0.22,1,0.36,1); }
-.sidebar-leave-active { animation: sbOut 0.18s ease forwards; }
-@keyframes sbIn  { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes sbOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-20px); } }
 
 /* ── Sidebar task list transition ── */
 .sb-tasks-enter-active { animation: sbTasksIn 0.2s ease; }
@@ -1735,22 +1579,12 @@ onUnmounted(() => {
 /* ── Status panel sp-preview :has() ── */
 .sp-preview:has(.sp-preview-name:not(:empty)) { border-color: #8b5cf6; border-style: solid; }
 
-.sp-status-preview-icon {
-  width: 14px;
-  height: 14px;
-}
 .sp-status-preview-icon :deep(svg),
 .sp-icon-option :deep(svg) {
   width: 15px;
   height: 15px;
   color: inherit;
   stroke: currentColor;
-}
-.sp-icon-option {
-  color: var(--text-secondary);
-}
-.sp-icon-option:hover {
-  color: var(--text-primary);
 }
 
 /* ── Custom color swatch (conic-gradient) ── */
@@ -1764,90 +1598,86 @@ onUnmounted(() => {
 }
 .sp-color-custom svg { width: 12px; height: 12px; stroke: #fff; position: relative; z-index: 1; }
 
-/* ── sp-input / sp-textarea focus ── */
+/* ── sp-input focus ring ── */
 .sp-input:focus, .sp-textarea:focus {
   border-color: #8b5cf6 !important;
   box-shadow: 0 0 0 3px rgba(139,92,246,0.15);
   outline: none;
 }
-.sp-input, .sp-textarea {
-  width: 100%; border-radius: 10px;
-  border: 1.5px solid var(--border-medium);
-  background: var(--bg-surface-2); color: var(--text-primary);
-  font-size: 13px; padding: 9px 12px; outline: none; font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.sp-textarea { resize: vertical; min-height: 60px; }
-
-/* ── modal input/select ── */
-.modal-input, .modal-textarea, .modal-select {
-  width: 100%; border-radius: 10px; border: 1.5px solid var(--border-medium);
-  background: var(--bg-surface-2); color: var(--text-primary);
-  font-size: 13px; padding: 9px 12px; outline: none; font-family: inherit;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
+/* ── modal input focus ring ── */
 .modal-input:focus, .modal-textarea:focus, .modal-select:focus {
-  border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  outline: none;
 }
-.modal-textarea { resize: vertical; min-height: 80px; }
-.modal-select { appearance: none; cursor: pointer; }
 
-/* ── Board columns: show 3 columns, scroll x for more ── */
-.board-columns-wrap {
-  align-items: stretch;
-}
-.board-col {
-  /* Width is controlled by Vue :style binding (ResizeObserver-computed).
-     These are fallback / minimum constraints only. */
-  min-width: 300px;
-  flex-shrink: 0;
-}
+/* ── Board col mobile override ── */
 @media (max-width: 767px) {
-  .board-col {
-    /* On mobile override with viewport-based width */
-    width: calc(100vw - 48px) !important;
-    min-width: 260px;
-    max-width: 100%;
+  .sprint-drop {
+    width: min(260px, calc(100vw - 24px));
+    min-width: 0 !important;
+    max-width: calc(100vw - 24px);
   }
-}
-/* ── Column 3-dot dropdown menu ────────────────────────────────── */
-.board-col-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 200;
-  min-width: 148px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-medium);
-  border-radius: 12px;
-  padding: 4px;
-  box-shadow: 0 12px 36px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
-}
-.board-col-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 12.5px;
-  font-family: inherit;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s;
-}
-.board-col-menu-item:hover {
-  background: var(--bg-hover);
-}
-.board-col-menu-item--danger {
-  color: #ef4444;
-}
-.board-col-menu-item--danger:hover {
-  background: rgba(239,68,68,0.08);
+
+  .sprint-date-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sprint-date-row > span {
+    display: none;
+  }
+
+  .sprint-date-row .sprint-inp {
+    width: 100%;
+  }
+
+  .board-sidebar {
+    max-width: 240px;
+  }
+
+  .board-sidebar-head {
+    padding: 10px 12px 9px;
+  }
+
+  .board-sidebar-body {
+    padding-top: 6px;
+  }
+
+  .board-sidebar-group-row {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .board-sidebar-group-row > span:first-child {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    font-size: 11px;
+  }
+
+  .board-sidebar-group-row > span:nth-child(2) {
+    font-size: 12px;
+  }
+
+  .board-sidebar-group-row > button {
+    display: none;
+  }
+
+  .board-sidebar-task-row {
+    gap: 7px;
+    padding: 5px 10px 5px 30px;
+  }
+
+  .board-sidebar-task-row > span:nth-child(2) {
+    font-size: 11px;
+  }
+
+  .board-col {
+    width: calc(100vw - 32px) !important;
+    min-width: 240px;
+    max-width: calc(100vw - 32px);
+  }
 }
 
 /* ── cm-drop animation ───────────────────────────────────────────── */
@@ -1857,3 +1687,8 @@ onUnmounted(() => {
 @keyframes cmDropOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-4px) scale(0.96); } }
 
 </style>
+
+
+
+
+

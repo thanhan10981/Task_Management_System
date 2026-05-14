@@ -195,6 +195,7 @@
 import { ref, computed } from 'vue'
 import { useApiError } from '@/composables/useApiError'
 import { useAuthStore } from '@/stores/auth.store'
+import { useProjectStore } from '@/stores/project.store'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import { useRouter } from 'vue-router'
@@ -203,6 +204,7 @@ import { registerSchema } from '../schemas/auth.schema'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const projectStore = useProjectStore()
 const { apiError, handleError, clearError } = useApiError()
 const registerMutation = useRegisterMutation()
 
@@ -240,7 +242,8 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     const response = await registerMutation.mutateAsync(values)
     authStore.setAuth(null, response.data.user)
-    router.push({ name: 'dashboard' })
+    projectStore.resetProjectContext({ clearStoredLastProject: true })
+    router.push({ name: 'create-project' })
   } catch (err) {
     handleError(err)
   }

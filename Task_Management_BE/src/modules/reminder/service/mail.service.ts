@@ -29,7 +29,7 @@ export class MailService {
       thresholdMinutes: dto.thresholdMinutes,
     });
 
-    this.mailJobQueueService.enqueue({
+    await this.mailJobQueueService.enqueue({
       to: dto.to,
       from: fromAddress,
       subject: mail.subject,
@@ -37,6 +37,6 @@ export class MailService {
       html: mail.html,
     });
 
-    this.logger.log(`Reminder email sent to ${dto.to} for task "${dto.taskTitle}"`);
+    this.logger.log(`Reminder email queued for ${dto.to} for task "${dto.taskTitle}"`);
   }
 }

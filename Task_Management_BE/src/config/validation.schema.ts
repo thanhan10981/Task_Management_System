@@ -21,6 +21,13 @@ export interface EnvVariables {
   MAIL_PUBLIC_FROM_ADDRESS?: string;
   REMINDER_THRESHOLDS_MINUTES?: string;
   RESET_PASSWORD_CODE_EXPIRES_MINUTES?: number;
+  GEMINI_API_KEY?: string;
+  GEMINI_FALLBACK_MODEL?: string;
+  REDIS_HOST: string;
+  REDIS_PORT: number;
+  REDIS_PASSWORD?: string;
+  REDIS_DB: number;
+  MAIL_QUEUE_NAME: string;
 }
 
 function parseEmailAddress(value?: string): string | undefined {
@@ -71,6 +78,14 @@ function readNumber(config: RawConfig, key: string, fallback: number): number {
   return value;
 }
 
+function readRequiredNumber(config: RawConfig, key: string): number {
+  if (config[key] == null || config[key] === '') {
+    throw new Error(`Environment variable ${key} is required`);
+  }
+
+  return readNumber(config, key, 0);
+}
+
 export function validate(config: RawConfig): EnvVariables {
   const nodeEnv = readString(config, 'NODE_ENV', 'development');
 
@@ -107,7 +122,31 @@ export function validate(config: RawConfig): EnvVariables {
   if (isSmtpConfigured && (!smtpHost || !smtpUser || !smtpPass)) {
     throw new Error('SMTP_HOST, SMTP_USER, SMTP_PASS must all be provided together');
   }
+//deploy production checks for SMTP_USER to prevent common misconfigurations that lead to email delivery failure and sender leakage. These checks are only enforced in production to allow flexibility during development and testing, where developers may use personal email accounts or different sender addresses without the same risks.
+  // if (nodeEnv === 'production' && smtpUserEmail) {
+  //   if (isPersonalMailbox(smtpUserEmail)) {
+  //     throw new Error(
+  //       'SMTP_USER must not be a personal mailbox in production. Use a dedicated no-reply mailbox.',
+  //     );
+  //   }
 
+  //   if (publicFromEmail && smtpUserEmail !== publicFromEmail) {
+  //     throw new Error(
+  //       'MAIL_PUBLIC_FROM_ADDRESS must match SMTP_USER in production to prevent provider rewrite and sender leakage.',
+  //     );
+  //   }
+  // }
+
+  const redisHost = readString(config, 'REDIS_HOST');
+  const mailQueueName = readString(config, 'MAIL_QUEUE_NAME');
+
+  if (!redisHost) {
+    throw new Error('REDIS_HOST is required');
+  }
+
+  if (!mailQueueName) {
+    throw new Error('MAIL_QUEUE_NAME is required');
+  }
   //if (nodeEnv === 'production' && smtpUserEmail) {
   //   if (isPersonalMailbox(smtpUserEmail)) {
   //     throw new Error(
@@ -146,5 +185,12 @@ export function validate(config: RawConfig): EnvVariables {
     RESET_PASSWORD_CODE_EXPIRES_MINUTES: config.RESET_PASSWORD_CODE_EXPIRES_MINUTES
       ? readNumber(config, 'RESET_PASSWORD_CODE_EXPIRES_MINUTES', 15)
       : undefined,
+    GEMINI_API_KEY: readString(config, 'GEMINI_API_KEY') || undefined,
+    GEMINI_FALLBACK_MODEL: readString(config, 'GEMINI_FALLBACK_MODEL') || undefined,
+    REDIS_HOST: redisHost,
+    REDIS_PORT: readRequiredNumber(config, 'REDIS_PORT'),
+    REDIS_PASSWORD: readString(config, 'REDIS_PASSWORD') || undefined,
+    REDIS_DB: readRequiredNumber(config, 'REDIS_DB'),
+    MAIL_QUEUE_NAME: mailQueueName,
   };
 }

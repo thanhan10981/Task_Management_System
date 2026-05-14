@@ -43,6 +43,19 @@ export class CloudinaryFileManagerService {
     return this.cloudinaryAccessHelper.uploadProjectTaskFile(input);
   }
 
+  createSignedUploadParams(input: {
+    originalFilename: string;
+    mimeType: string;
+    projectId: string;
+    folderPath?: string;
+  }) {
+    return this.cloudinaryAccessHelper.createSignedUploadParams(input);
+  }
+
+  resolveSupportedFileKind(originalFilename: string, mimeType: string) {
+    return this.cloudinaryAccessHelper.resolveSupportedFileKind(originalFilename, mimeType);
+  }
+
   getDefaultAuthenticatedUrlTtlSeconds() {
     return this.cloudinaryAccessHelper.getDefaultAuthenticatedUrlTtlSeconds();
   }

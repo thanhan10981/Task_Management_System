@@ -4,6 +4,7 @@ import type {
   CloudinaryFolderMetadata,
   CloudinaryUploadResult,
   SaveFileMetadataPayload,
+  SignedUploadParams,
   UploadProgressEvent,
 } from '@/types/cloudinary.types'
 import apiClient from './client'
@@ -14,6 +15,7 @@ export type {
   CloudinaryFolderMetadata,
   CloudinaryUploadResult,
   SaveFileMetadataPayload,
+  SignedUploadParams,
   UploadProgressEvent,
 } from '@/types/cloudinary.types'
 
@@ -50,6 +52,23 @@ interface BackendUploadResponse {
   projectId: string
   taskId?: string
   secureUrl: string
+  bytes?: number | string
+  folderPath?: string
+  uploadedBy?: string | null
+  uploader?: CloudinaryUploadResult['uploader']
+}
+
+interface CloudinaryDirectUploadResponse {
+  public_id: string
+  url: string
+  secure_url: string
+  format: string
+  resource_type: string
+  bytes: number
+  width?: number
+  height?: number
+  folder?: string
+  original_filename?: string
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -267,6 +286,112 @@ export async function uploadProjectFileToBackend(
     folder: payload.publicId.split('/').slice(0, -1).join('/'),
     originalFilename: payload.originalFilename,
   }
+}
+
+export async function uploadProjectFileWithSignature(
+  projectId: string,
+  file: File,
+  options?: { taskId?: string; commentId?: string; folderPath?: string; onProgress?: (event: UploadProgressEvent) => void },
+): Promise<CloudinaryUploadResult> {
+  const normalizedFolderPath = normalizeFolderPath(options?.folderPath)
+  const signature = await post<SignedUploadParams | ApiEnvelope<SignedUploadParams>>('/files/upload-signature', {
+    projectId,
+    taskId: options?.taskId,
+    commentId: options?.commentId,
+    folderPath: normalizedFolderPath || undefined,
+    fileName: file.name,
+    mimeType: file.type || 'application/octet-stream',
+    sizeBytes: file.size,
+  })
+  const signedPayload = unwrapApiPayload(signature)
+  const cloudinaryResult = await uploadSignedFileToCloudinary(file, signedPayload, options?.onProgress)
+  const finalizeResponse = await post<BackendUploadResponse | ApiEnvelope<BackendUploadResponse>>('/files/upload-finalize', {
+    uploadId: signedPayload.uploadId,
+    projectId,
+    commentId: options?.commentId,
+    publicId: cloudinaryResult.public_id,
+    secureUrl: cloudinaryResult.secure_url,
+    originalFilename: file.name,
+    format: cloudinaryResult.format,
+    resourceType: cloudinaryResult.resource_type,
+    folder: cloudinaryResult.folder,
+    bytes: cloudinaryResult.bytes,
+  })
+  const finalized = unwrapApiPayload(finalizeResponse)
+
+  return {
+    id: finalized.id,
+    publicId: finalized.publicId,
+    url: finalized.secureUrl,
+    secureUrl: finalized.secureUrl,
+    format: finalized.format,
+    resourceType: finalized.resourceType,
+    bytes: typeof finalized.bytes === 'number' ? finalized.bytes : Number(finalized.bytes) || file.size,
+    folder: finalized.folderPath || normalizedFolderPath || cloudinaryResult.folder,
+    originalFilename: finalized.originalFilename || file.name,
+    uploadedBy: finalized.uploadedBy,
+    uploader: finalized.uploader,
+  }
+}
+
+function uploadSignedFileToCloudinary(
+  file: File,
+  signature: SignedUploadParams,
+  onProgress?: (event: UploadProgressEvent) => void,
+): Promise<CloudinaryDirectUploadResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+  for (const [key, value] of Object.entries(signature.uploadParams)) {
+    formData.append(key, String(value))
+  }
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', signature.uploadUrl)
+
+    if (onProgress) {
+      xhr.upload.addEventListener('loadstart', () => {
+        onProgress({ loaded: 0, total: file.size || 1, percentage: 1 })
+      })
+
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          onProgress({
+            loaded: event.loaded,
+            total: event.total,
+            percentage: Math.round((event.loaded / event.total) * 100),
+          })
+        }
+      })
+    }
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (onProgress) {
+          onProgress({ loaded: file.size || 1, total: file.size || 1, percentage: 100 })
+        }
+
+        try {
+          resolve(JSON.parse(xhr.responseText) as CloudinaryDirectUploadResponse)
+        } catch {
+          reject(new Error(`Failed to parse Cloudinary response (status ${xhr.status})`))
+        }
+        return
+      }
+
+      try {
+        const errData = JSON.parse(xhr.responseText)
+        const message = errData?.error?.message ?? errData?.message ?? 'Upload failed'
+        reject(new Error(`Cloudinary upload failed (${xhr.status}): ${message}`))
+      } catch {
+        reject(new Error(`Upload failed with status ${xhr.status}`))
+      }
+    })
+
+    xhr.addEventListener('error', () => reject(new Error('Network error during Cloudinary upload')))
+    xhr.addEventListener('abort', () => reject(new Error('Upload aborted')))
+    xhr.send(formData)
+  })
 }
 
 function isAxiosTimeoutError(error: unknown): boolean {

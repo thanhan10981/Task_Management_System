@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ProjectAccessModule } from '../../common/access/project-access.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../../common/prisma/prisma.module';
+import { NotificationPreferencesModule } from '../../common/notifications/notification-preferences.module';
 import { CommentsController } from './controller/comments.controller';
 import { CommentsRepository } from './repository/comments.repository';
 import { CommentsService } from './service/comments.service';
 
 @Module({
-  imports: [PrismaModule, ProjectAccessModule],
+  imports: [PrismaModule, ProjectAccessModule, NotificationsModule, NotificationPreferencesModule],
   controllers: [CommentsController],
   providers: [CommentsService, CommentsRepository],
 })

@@ -68,3 +68,4 @@ docker-compose.override.yml
 uploads/
 tmp/
 temp/
+copilot-instructions.md

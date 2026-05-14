@@ -210,8 +210,6 @@ export class AuthController {
     description: 'User profile retrieved successfully',
   })
   getProfile(@Request() req: any) {
-    return {
-      data: req.user,
-    };
+    return req.user;
   }
 }

@@ -4,7 +4,10 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
+import { NOTIFICATION_PREFERENCE_KEYS } from '../../../common/notifications/notification-preferences.constants';
+import { NotificationPreferencesService } from '../../../common/notifications/notification-preferences.service';
 import {
   createPaginatedResponse,
   createPaginationOptions,
@@ -15,6 +18,7 @@ import {
   UpdateCommentDto,
 } from '../dto/comment.dto';
 import { CommentsRepository } from '../repository/comments.repository';
+import { NotificationsRepository } from '../../notifications/repository/notifications.repository';
 import { TASK_HISTORY_ACTIONS } from '../../tasks/constants/task-actions.constants';
 import { buildTaskHistoryMetadata } from '../../tasks/utils/task-history.util';
 
@@ -25,6 +29,8 @@ export class CommentsService {
   constructor(
     private readonly commentsRepository: CommentsRepository,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly notificationsRepository: NotificationsRepository,
+    private readonly notificationPreferencesService: NotificationPreferencesService,
   ) {}
 
   async listByTask(userId: string, taskId: string, queryDto: CommentQueryDto) {
@@ -48,10 +54,9 @@ export class CommentsService {
 
     await this.projectAccessService.ensureProjectMember(userId, task.projectId);
 
+    let parentComment: Awaited<ReturnType<CommentsRepository['findCommentById']>> = null;
     if (dto.parentCommentId) {
-      const parentComment = await this.commentsRepository.findCommentById(
-        dto.parentCommentId,
-      );
+      parentComment = await this.commentsRepository.findCommentById(dto.parentCommentId);
 
       if (!parentComment || parentComment.taskId !== taskId) {
         throw new ForbiddenException('Parent comment must belong to same task');
@@ -59,7 +64,7 @@ export class CommentsService {
     }
 
     const createdComment = await this.commentsRepository.createComment({
-      content: dto.content,
+      content: dto.content ?? '',
       task: { connect: { id: taskId } },
       user: { connect: { id: userId } },
       parentComment: dto.parentCommentId
@@ -67,22 +72,65 @@ export class CommentsService {
         : undefined,
     });
 
-    await Promise.all([
-      this.commentsRepository.createTaskHistory({
-        task: { connect: { id: taskId } },
-        user: { connect: { id: userId } },
-        actionType: TASK_HISTORY_ACTIONS.COMMENTED,
-        metadata: buildTaskHistoryMetadata({
-          comment: {
-            old: null,
-            new: {
-              commentId: createdComment.id,
-              content: createdComment.content,
-            },
+    const historyPromise = this.commentsRepository.createTaskHistory({
+      task: { connect: { id: taskId } },
+      user: { connect: { id: userId } },
+      actionType: TASK_HISTORY_ACTIONS.COMMENTED,
+      metadata: buildTaskHistoryMetadata({
+        comment: {
+          old: null,
+          new: {
+            commentId: createdComment.id,
+            content: createdComment.content,
           },
-        }),
+        },
       }),
-    ]);
+    });
+
+    const mentionedUserIds =
+      await this.notificationPreferencesService.filterEnabledUserIds(
+        (dto.mentionIds || []).filter((mentionId) => mentionId !== userId),
+        NOTIFICATION_PREFERENCE_KEYS.mentions,
+      );
+    const notificationPromises = mentionedUserIds.map((mentionId) =>
+      this.notificationsRepository.create({
+        type: NotificationType.TASK_COMMENTED,
+        title: 'You were mentioned in a comment',
+        content: dto.content,
+        data: { taskId, commentId: createdComment.id, authorId: userId },
+        userId: mentionId,
+        projectId: task.projectId,
+      }),
+    );
+
+    const shouldNotifyParentAuthor =
+      parentComment &&
+      parentComment.userId !== userId &&
+      !mentionedUserIds.includes(parentComment.userId) &&
+      (await this.notificationPreferencesService.isEnabled(
+        parentComment.userId,
+        NOTIFICATION_PREFERENCE_KEYS.comments,
+      ));
+
+    if (shouldNotifyParentAuthor) {
+      notificationPromises.push(
+        this.notificationsRepository.create({
+          type: NotificationType.TASK_COMMENTED,
+          title: 'Someone replied to your comment',
+          content: dto.content,
+          data: {
+            taskId,
+            commentId: createdComment.id,
+            parentCommentId: parentComment.id,
+            authorId: userId,
+          },
+          userId: parentComment.userId,
+          projectId: task.projectId,
+        }),
+      );
+    }
+
+    await Promise.all([historyPromise, ...notificationPromises]);
 
     this.logger.log(`Comment ${createdComment.id} created by user ${userId}`);
     return createdComment;

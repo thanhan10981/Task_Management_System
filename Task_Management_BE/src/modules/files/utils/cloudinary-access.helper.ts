@@ -19,6 +19,23 @@ interface CreateSignedUrlParams {
   expiresInSeconds?: number;
 }
 
+interface CreateSignedUploadParams {
+  originalFilename: string;
+  mimeType: string;
+  projectId: string;
+  folderPath?: string;
+}
+
+export interface SignedUploadParams {
+  apiKey: string;
+  cloudName: string;
+  uploadUrl: string;
+  uploadParams: Record<string, string | number | boolean>;
+  resourceType: 'image' | 'video' | 'raw';
+  folder: string;
+  expiresAt: number;
+}
+
 @Injectable()
 export class CloudinaryAccessHelper {
   private readonly hasCredentials: boolean;
@@ -102,7 +119,53 @@ export class CloudinaryAccessHelper {
     return this.defaultAuthenticatedUrlTtlSeconds;
   }
 
-  private resolveSupportedFileKind(originalFilename: string, mimeType: string): { resourceType: 'image' | 'video' | 'raw'; enforcedFormat: 'pdf' | undefined } {
+  createSignedUploadParams(params: CreateSignedUploadParams): SignedUploadParams {
+    this.ensureConfigured();
+
+    const fileKind = this.resolveSupportedFileKind(params.originalFilename, params.mimeType);
+    const normalizedLogicalPath = this.normalizeFolderPath(params.folderPath) || 'tasks';
+    const targetFolder = `projects/${params.projectId}/${normalizedLogicalPath}`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const expiresAt = timestamp + 10 * 60;
+    const apiKey = this.configService.get<string>('cloudinary.apiKey') ?? process.env.CLOUDINARY_API_KEY;
+    const apiSecret = this.configService.get<string>('cloudinary.apiSecret') ?? process.env.CLOUDINARY_API_SECRET;
+    const cloudName = this.configService.get<string>('cloudinary.cloudName') ?? process.env.CLOUDINARY_CLOUD_NAME;
+
+    if (!apiKey || !apiSecret || !cloudName) {
+      throw new InternalServerErrorException('Cloudinary credentials are not configured on the server');
+    }
+
+    const paramsToSign: Record<string, string | number | boolean> = {
+      folder: targetFolder,
+      overwrite: false,
+      timestamp,
+      type: 'authenticated',
+      unique_filename: true,
+      use_filename: false,
+    };
+
+    if (fileKind.enforcedFormat) {
+      paramsToSign.format = fileKind.enforcedFormat;
+    }
+
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
+
+    return {
+      apiKey,
+      cloudName,
+      uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${fileKind.resourceType}/upload`,
+      uploadParams: {
+        ...paramsToSign,
+        api_key: apiKey,
+        signature,
+      },
+      resourceType: fileKind.resourceType,
+      folder: targetFolder,
+      expiresAt,
+    };
+  }
+
+  resolveSupportedFileKind(originalFilename: string, mimeType: string): { resourceType: 'image' | 'video' | 'raw'; enforcedFormat: 'pdf' | undefined } {
     const normalizedName = originalFilename.toLowerCase();
     const normalizedMime = mimeType.toLowerCase();
 

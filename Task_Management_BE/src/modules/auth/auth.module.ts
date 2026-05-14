@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MailerModule } from '@nestjs-modules/mailer';
-import { buildMailFrom } from '../../common/helpers/mail-from.helper';
-import { MailJobQueueService } from '../../common/mail/services/mail-job-queue.service';
+import { MailModule } from '../../common/mail/mail.module';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { AuthService } from './service/auth.service';
 import { AuthController } from './controller/auth.controller';
@@ -23,49 +21,10 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
         },
       }),
     }),
-    MailerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const host = configService.get<string>('SMTP_HOST');
-        const user = configService.get<string>('SMTP_USER');
-        const pass = configService.get<string>('SMTP_PASS');
-        const port = Number(configService.get<string>('SMTP_PORT') ?? 587);
-        const fromAddress = buildMailFrom(
-          configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-          configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
-        );
-
-        if (!host || !user || !pass) {
-          return {
-            transport: {
-              jsonTransport: true,
-            },
-            defaults: {
-              from: fromAddress,
-            },
-          };
-        }
-
-        return {
-          transport: {
-            host,
-            port,
-            secure: port === 465,
-            auth: {
-              user,
-              pass,
-            },
-          },
-          defaults: {
-            from: fromAddress,
-          },
-        };
-      },
-    }),
+    MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, MailJobQueueService],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

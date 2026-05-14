@@ -19,6 +19,8 @@ export const taskService = {
     return Array.isArray(payload) ? payload : []
   },
   createTask: (data: Record<string, unknown>) => post(BASE, data),
+  createProjectTask: (projectId: string, data: Record<string, unknown>) =>
+    post(`/projects/${projectId}/tasks`, data),
   createProjectStatus: (projectId: string, data: Record<string, unknown>) =>
     post(`${BASE}/projects/${projectId}/statuses`, data),
   updateProjectStatus: (projectId: string, statusId: string, data: Record<string, unknown>) =>

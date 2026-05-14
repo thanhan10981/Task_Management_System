@@ -20,7 +20,9 @@ import {
 import {
   AddProjectMemberDto,
   CreateProjectDto,
+  JoinProjectDto,
   ProjectQueryDto,
+  UpdateProjectSettingsDto,
   UpdateProjectDto,
   UpdateProjectMemberRoleDto,
 } from '../dto/project.dto';
@@ -97,6 +99,70 @@ export class ProjectsController {
   @ApiResponse({ status: 404, description: 'Project not found' })
   listMembers(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.projectsService.listMembers(req.user.id, id);
+  }
+
+  @Get(':id/settings')
+  @ApiOperation({ summary: 'Get project settings' })
+  @ApiResponse({ status: 200, description: 'Project settings fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  getSettings(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.projectsService.getSettings(req.user.id, id);
+  }
+
+  @Patch(':id/settings')
+  @ApiOperation({ summary: 'Update project settings (owner/admin only)' })
+  @ApiBody({ type: UpdateProjectSettingsDto })
+  @ApiResponse({ status: 200, description: 'Project settings updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  updateSettings(
+    @Request() req,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() updateProjectSettingsDto: UpdateProjectSettingsDto,
+  ) {
+    return this.projectsService.updateSettings(
+      req.user.id,
+      id,
+      updateProjectSettingsDto,
+    );
+  }
+
+  @Post(':id/join')
+  @ApiOperation({ summary: 'Join project via invite link' })
+  @ApiBody({ type: JoinProjectDto })
+  @ApiResponse({ status: 201, description: 'Joined project successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Invalid invite token' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  joinProject(
+    @Request() req,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() joinProjectDto: JoinProjectDto,
+  ) {
+    return this.projectsService.joinProject(req.user.id, id, joinProjectDto);
+  }
+
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Leave project as current user' })
+  @ApiResponse({ status: 201, description: 'Left project successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Project owner cannot leave project' })
+  @ApiResponse({ status: 404, description: 'Project or member not found' })
+  leaveProject(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.projectsService.leaveProject(req.user.id, id);
+  }
+
+  @Post(':id/invite')
+  @ApiOperation({ summary: 'Create or fetch project invite token (owner/admin only)' })
+  @ApiResponse({ status: 201, description: 'Invite token created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  createInviteToken(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.projectsService.createInviteToken(req.user.id, id);
   }
 
   @Post(':id/members')

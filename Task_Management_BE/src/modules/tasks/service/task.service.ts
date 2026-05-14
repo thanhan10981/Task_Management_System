@@ -4,7 +4,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { NotificationType, Prisma, TaskPriority } from '@prisma/client';
+import { NOTIFICATION_PREFERENCE_KEYS } from '../../../common/notifications/notification-preferences.constants';
+import { NotificationPreferencesService } from '../../../common/notifications/notification-preferences.service';
 import {
   createPaginatedResponse,
   createPaginationOptions,
@@ -30,10 +32,11 @@ export class TaskService {
   constructor(
     private readonly tasksRepository: TasksRepository,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly notificationPreferencesService: NotificationPreferencesService,
   ) {}
 
   async create(userId: string, createTaskDto: CreateTaskDto) {
-    await this.projectAccessService.ensureProjectMember(userId, createTaskDto.projectId);
+    await this.projectAccessService.ensureCanCreateTask(userId, createTaskDto.projectId);
 
     const status = await this.tasksRepository.findStatusById(createTaskDto.statusId);
     if (!status || status.projectId !== createTaskDto.projectId) {
@@ -44,6 +47,15 @@ export class TaskService {
       const group = await this.tasksRepository.findGroupById(createTaskDto.groupId);
       if (!group || group.projectId !== createTaskDto.projectId) {
         throw new NotFoundException('Task group not found in project');
+      }
+    }
+
+    if (createTaskDto.parentTaskId) {
+      const parentTask = await this.tasksRepository.findTaskBasicById(
+        createTaskDto.parentTaskId,
+      );
+      if (!parentTask || parentTask.projectId !== createTaskDto.projectId) {
+        throw new NotFoundException('Parent task not found in project');
       }
     }
 
@@ -118,15 +130,102 @@ export class TaskService {
       for (const assigneeId of assigneeIds) {
         await this.tasksRepository.assignUser(createdTask.id, assigneeId, userId, tx);
 
+        await Promise.all([
+          this.recordHistoryAndActivity(
+            tx,
+            createdTask.id,
+            userId,
+            TASK_HISTORY_ACTIONS.ASSIGNED,
+            buildTaskHistoryMetadata({
+              assignee: {
+                old: null,
+                new: assigneeId,
+              },
+            }),
+          ),
+          ...(assigneeId !== userId &&
+          (await this.notificationPreferencesService.isEnabled(
+            assigneeId,
+            NOTIFICATION_PREFERENCE_KEYS.taskAssigned,
+          ))
+            ? [
+                this.tasksRepository.createNotification(
+                  {
+                    user: { connect: { id: assigneeId } },
+                    project: { connect: { id: createTaskDto.projectId } },
+                    type: NotificationType.TASK_ASSIGNED,
+                    title: 'You were assigned to a task',
+                    content: `You have been assigned to task "${createdTask.title}".`,
+                    data: {
+                      taskId: createdTask.id,
+                      projectId: createTaskDto.projectId,
+                      assignedBy: userId,
+                      action: TASK_HISTORY_ACTIONS.ASSIGNED,
+                    },
+                  },
+                  tx,
+                ),
+              ]
+            : []),
+        ]);
+      }
+
+      const suggestedSubtasks = (createTaskDto.suggestedSubtasks ?? [])
+        .map((subtask) => ({
+          title: subtask.title.trim(),
+          description: subtask.description?.trim() || undefined,
+        }))
+        .filter((subtask) => subtask.title);
+
+      for (const subtask of suggestedSubtasks) {
+        const createdSubtask = await this.tasksRepository.createTask(
+          {
+            title: subtask.title,
+            description: subtask.description,
+            priority: createdTask.priority,
+            project: { connect: { id: createTaskDto.projectId } },
+            status: { connect: { id: createTaskDto.statusId } },
+            group: createTaskDto.groupId
+              ? { connect: { id: createTaskDto.groupId } }
+              : undefined,
+            sprint: createTaskDto.sprintId
+              ? { connect: { id: createTaskDto.sprintId } }
+              : undefined,
+            parentTask: { connect: { id: createdTask.id } },
+            createdByUser: { connect: { id: userId } },
+          } as any,
+          tx,
+        );
+
         await this.recordHistoryAndActivity(
           tx,
-          createdTask.id,
+          createdSubtask.id,
+          userId,
+          TASK_HISTORY_ACTIONS.CREATED,
+          buildTaskHistoryMetadata({
+            task: {
+              old: null,
+              new: {
+                title: createdSubtask.title,
+                description: createdSubtask.description,
+                status: status.name,
+                priority: createdSubtask.priority,
+                parentTaskId: createdTask.id,
+              },
+            },
+          }),
+        );
+
+        await this.tasksRepository.assignUser(createdSubtask.id, userId, userId, tx);
+        await this.recordHistoryAndActivity(
+          tx,
+          createdSubtask.id,
           userId,
           TASK_HISTORY_ACTIONS.ASSIGNED,
           buildTaskHistoryMetadata({
             assignee: {
               old: null,
-              new: assigneeId,
+              new: userId,
             },
           }),
         );
@@ -177,11 +276,9 @@ export class TaskService {
       where.priority = queryDto.priority;
     }
 
-    if (queryDto.search) {
-      where.OR = [
-        { title: { contains: queryDto.search, mode: 'insensitive' } },
-        { description: { contains: queryDto.search, mode: 'insensitive' } },
-      ];
+    const searchTerm = queryDto.search?.trim();
+    if (searchTerm) {
+      where.OR = buildTaskSearchFilters(searchTerm);
     }
 
     const [tasks, total] = await Promise.all([
@@ -221,11 +318,9 @@ export class TaskService {
       (where as any).groupId = queryDto.groupId;
     }
 
-    if (queryDto.search) {
-      where.OR = [
-        { title: { contains: queryDto.search, mode: 'insensitive' } },
-        { description: { contains: queryDto.search, mode: 'insensitive' } },
-      ];
+    const searchTerm = queryDto.search?.trim();
+    if (searchTerm) {
+      where.OR = buildTaskSearchFilters(searchTerm);
     }
 
     const [tasks, total] = await Promise.all([
@@ -437,19 +532,85 @@ export class TaskService {
           }
 
           await this.tasksRepository.assignUser(id, assigneeId, userId, tx);
-          await this.recordHistoryAndActivity(
-            tx,
-            id,
-            userId,
-            TASK_HISTORY_ACTIONS.ASSIGNED,
-            buildTaskHistoryMetadata({
-              assignee: {
-                old: null,
-                new: assigneeId,
-              },
-            }),
-          );
+          await Promise.all([
+            this.recordHistoryAndActivity(
+              tx,
+              id,
+              userId,
+              TASK_HISTORY_ACTIONS.ASSIGNED,
+              buildTaskHistoryMetadata({
+                assignee: {
+                  old: null,
+                  new: assigneeId,
+                },
+              }),
+            ),
+            ...(assigneeId !== userId &&
+            (await this.notificationPreferencesService.isEnabled(
+              assigneeId,
+              NOTIFICATION_PREFERENCE_KEYS.taskAssigned,
+            ))
+              ? [
+                  this.tasksRepository.createNotification(
+                    {
+                      user: { connect: { id: assigneeId } },
+                      project: { connect: { id: existingTask.projectId } },
+                      type: NotificationType.TASK_ASSIGNED,
+                      title: 'You were assigned to a task',
+                      content: `You have been assigned to task "${task.title}".`,
+                      data: {
+                        taskId: id,
+                        projectId: existingTask.projectId,
+                        assignedBy: userId,
+                        action: TASK_HISTORY_ACTIONS.ASSIGNED,
+                      },
+                    },
+                    tx,
+                  ),
+                ]
+              : []),
+          ]);
         }
+      }
+
+      const shouldNotifyTeamActivity =
+        Object.keys(updateChanges).length > 0 ||
+        Boolean(
+          nextStatus &&
+            taskPatch.statusId &&
+            taskPatch.statusId !== existingTask.statusId,
+        );
+
+      if (shouldNotifyTeamActivity) {
+        const assignees = await this.tasksRepository.listAssignees(id, tx);
+        const notificationUserIds =
+          await this.notificationPreferencesService.filterEnabledUserIds(
+            assignees
+              .map((assignee) => assignee.userId)
+              .filter((assigneeId) => assigneeId !== userId),
+            NOTIFICATION_PREFERENCE_KEYS.teamActivity,
+          );
+
+        await Promise.all(
+          notificationUserIds.map((assigneeId) =>
+            this.tasksRepository.createNotification(
+              {
+                user: { connect: { id: assigneeId } },
+                project: { connect: { id: existingTask.projectId } },
+                type: NotificationType.TASK_UPDATED,
+                title: 'Task updated',
+                content: `Task "${task.title}" was updated.`,
+                data: {
+                  taskId: id,
+                  projectId: existingTask.projectId,
+                  updatedBy: userId,
+                  action: TASK_HISTORY_ACTIONS.UPDATED,
+                },
+              },
+              tx,
+            ),
+          ),
+        );
       }
 
       return task;
@@ -601,3 +762,13 @@ export class TaskService {
     );
   }
 }
+
+function buildTaskSearchFilters(searchTerm: string): Prisma.TaskWhereInput[] {
+  const normalized = searchTerm.trim();
+  if (!normalized) return [];
+
+  return [
+    { title: { contains: normalized, mode: 'insensitive' } },
+  ];
+}
+

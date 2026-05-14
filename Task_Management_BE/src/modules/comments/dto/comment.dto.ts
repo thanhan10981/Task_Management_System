@@ -3,15 +3,20 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateCommentDto {
-  @ApiProperty({ example: 'Need to update acceptance criteria for this ticket.' })
+  @ApiPropertyOptional({ example: 'Need to update acceptance criteria for this ticket.' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Content is required' })
-  content: string;
+  content?: string;
 
   @ApiPropertyOptional({ example: '67a8d68f-bf4d-46df-b46e-012dd94324c4' })
   @IsOptional()
   @IsUUID()
   parentCommentId?: string;
+
+  @ApiPropertyOptional({ example: ['67a8d68f-bf4d-46df-b46e-012dd94324c4'] })
+  @IsOptional()
+  @IsUUID('4', { each: true })
+  mentionIds?: string[];
 }
 
 export class UpdateCommentDto {

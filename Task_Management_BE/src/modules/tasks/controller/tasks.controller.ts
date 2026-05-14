@@ -27,10 +27,12 @@ import {
   TaskQueryDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
+import { GenerateTaskDescriptionDto } from '../dto/ai-task.dto';
 import {
   CreateTaskStatusDto,
   UpdateTaskStatusDto,
 } from '../dto/task-status.dto';
+import { AiTaskService } from '../service/ai-task.service';
 import { TaskService } from '../service/task.service';
 import { TaskAssigneeService } from '../service/task-assignee.service';
 import { TaskStatusService } from '../service/task-status.service';
@@ -44,7 +46,18 @@ export class TasksController {
     private readonly taskService: TaskService,
     private readonly taskAssigneeService: TaskAssigneeService,
     private readonly taskStatusService: TaskStatusService,
+    private readonly aiTaskService: AiTaskService,
   ) {}
+
+  @Post('ai/generate-description')
+  @ApiOperation({ summary: 'Generate markdown for a task description editor' })
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'Description generated successfully' })
+  generateDescription(@Body() dto: GenerateTaskDescriptionDto) {
+    return this.aiTaskService.generateTaskDescription(
+      dto.title,
+      dto.description ?? '',
+    );
+  }
 
   @Post()
   @ApiOperation({ summary: 'Create a new task' })
@@ -62,6 +75,7 @@ export class TasksController {
   @ApiQuery({ name: 'status', required: false, type: String, example: 'TODO' })
   @ApiQuery({ name: 'priority', required: false, type: String, example: 'HIGH' })
   @ApiQuery({ name: 'search', required: false, type: String, example: 'api integration' })
+  @ApiQuery({ name: 'projectId', required: false, type: String, example: '11111111-1111-1111-1111-111111111111' })
   @ApiQuery({ name: 'groupId', required: false, type: String, example: '33333333-3333-3333-3333-333333333333' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Tasks retrieved successfully' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Unauthorized' })

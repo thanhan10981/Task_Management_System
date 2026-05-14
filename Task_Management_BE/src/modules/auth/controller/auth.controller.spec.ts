@@ -1,0 +1,217 @@
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Request,
+  Response,
+  HttpStatus,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { AuthService } from '../service/auth.service';
+import { RegisterDto } from '../dto/register.dto';
+import { LoginDto } from '../dto/login.dto';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
+import { Public } from '../decorators/public.decorator';
+
+@ApiTags('Auth')
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  private getCookieOptions(maxAge: number) {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: '/',
+      maxAge,
+    };
+  }
+
+  private getClearCookieOptions() {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    return {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? ('none' as const) : ('lax' as const),
+      path: '/',
+    };
+  }
+
+  @Public()
+  @Post('register')
+  @ApiOperation({ summary: 'Register a new user account' })
+  @ApiBody({ type: RegisterDto })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'User created successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  async register(@Body() registerDto: RegisterDto, @Response() res: any) {
+    const data = await this.authService.register(registerDto);
+
+    res.cookie(
+      'accessToken',
+      data.accessToken,
+      this.getCookieOptions(60 * 60 * 1000), // 1 hour
+    );
+
+    res.cookie(
+      'refreshToken',
+      data.refreshToken,
+      this.getCookieOptions(14 * 24 * 60 * 60 * 1000), // 14 days
+    );
+
+    return res.status(HttpStatus.CREATED).json({
+      data: { user: data.user },
+      message: 'Registration successful',
+    });
+  }
+
+  @Public()
+  @Post('login')
+  @ApiOperation({ summary: 'Login and receive auth cookies' })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Login successful',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid credentials',
+  })
+  async login(@Body() loginDto: LoginDto, @Response() res: any) {
+    const data = await this.authService.login(loginDto);
+
+    res.cookie(
+      'accessToken',
+      data.accessToken,
+      this.getCookieOptions(60 * 60 * 1000), // 1 hour
+    );
+
+    res.cookie(
+      'refreshToken',
+      data.refreshToken,
+      this.getCookieOptions(14 * 24 * 60 * 60 * 1000), // 14 days
+    );
+
+    return res.status(HttpStatus.CREATED).json({
+      data: { user: data.user },
+      message: 'Login successful',
+    });
+  }
+
+  @Public()
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token using refreshToken cookie' })
+  @ApiCookieAuth('accessToken')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Token refreshed successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid refresh token',
+  })
+  async refresh(@Request() req: any, @Response() res: any) {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      throw new BadRequestException('Refresh token is required');
+    }
+
+    const data = await this.authService.refreshToken(refreshToken);
+
+    res.cookie(
+      'accessToken',
+      data.accessToken,
+      this.getCookieOptions(60 * 60 * 1000), // 1 hour
+    );
+
+    return res.status(HttpStatus.OK).json({
+      message: 'Token refreshed successfully',
+    });
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset email' })
+  @ApiBody({ type: ForgotPasswordDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'If email exists, reset link is sent',
+  })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(forgotPasswordDto);
+
+    return {
+      message: 'If your email is registered, a reset link has been sent',
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password using reset token' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Password has been reset successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid reset token or payload',
+  })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    await this.authService.resetPassword(resetPasswordDto);
+
+    return {
+      message: 'Password has been reset successfully',
+    };
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Logout current user and clear cookies' })
+  @ApiCookieAuth('accessToken')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Logout successful',
+  })
+  async logout(@Request() req: any, @Response() res: any) {
+    await this.authService.logout(req.user.id);
+
+    res.clearCookie('accessToken', this.getClearCookieOptions());
+    res.clearCookie('refreshToken', this.getClearCookieOptions());
+
+    return res.status(HttpStatus.OK).json({
+      message: 'Logged out successfully',
+    });
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'Get current authenticated user profile' })
+  @ApiCookieAuth('accessToken')
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'User profile retrieved successfully',
+  })
+  getProfile(@Request() req: any) {
+    return {
+      data: req.user,
+    };
+  }
+}

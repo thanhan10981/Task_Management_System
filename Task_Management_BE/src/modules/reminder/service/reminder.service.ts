@@ -8,6 +8,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
+import { NOTIFICATION_PREFERENCE_KEYS } from '../../../common/notifications/notification-preferences.constants';
+import { NotificationPreferencesService } from '../../../common/notifications/notification-preferences.service';
 import { formatDateTimeVietnam, getVietnamTimeZone } from '../../../common/utils/datetime.helper';
 import { TaskRepository } from '../repository/task.repository';
 import { MailService } from './mail.service';
@@ -21,6 +23,7 @@ export class ReminderService {
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly notificationPreferencesService: NotificationPreferencesService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES, {
@@ -63,6 +66,15 @@ export class ReminderService {
     let skippedCount = 0;
 
     for (const assignee of task.assignees) {
+      const remindersEnabled = await this.notificationPreferencesService.isEnabled(
+        assignee.userId,
+        NOTIFICATION_PREFERENCE_KEYS.reminders,
+      );
+      if (!remindersEnabled) {
+        skippedCount += 1;
+        continue;
+      }
+
       const reminderKey = `manual:${this.buildReminderKey(
         task.taskId,
         assignee.userId,
@@ -138,6 +150,15 @@ export class ReminderService {
 
     for (const task of tasks) {
       for (const assignee of task.assignees) {
+        const remindersEnabled = await this.notificationPreferencesService.isEnabled(
+          assignee.userId,
+          NOTIFICATION_PREFERENCE_KEYS.reminders,
+        );
+        if (!remindersEnabled) {
+          skippedCount += 1;
+          continue;
+        }
+
         const reminderKey = this.buildReminderKey(
           task.taskId,
           assignee.userId,

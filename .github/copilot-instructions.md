@@ -146,6 +146,7 @@ Generate modern, clean, production-ready SaaS dashboard UI similar to:
 * Use Composition API (`<script setup lang="ts">`)
 * Use `ref` and `computed`
 * Separate UI and logic
+* Use TanStack Query for data fetching and mutations
 
 ---
 

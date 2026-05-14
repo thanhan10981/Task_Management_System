@@ -1,6 +1,7 @@
-import { SendMailOptions } from 'nodemailer';
-
 export type MailJob = {
-  options: SendMailOptions;
-  attempts: number;
+  to: string;
+  from?: string;
+  subject: string;
+  text?: string;
+  html?: string;
 };

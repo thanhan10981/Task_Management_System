@@ -3,12 +3,26 @@ import { useProjectStore } from '@/stores/project.store'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+function readStoredUser(): User | null {
+  const rawUser = localStorage.getItem('auth_user')
+  if (!rawUser) return null
+
+  try {
+    const parsedUser = JSON.parse(rawUser) as Partial<User>
+    if (typeof parsedUser.id === 'string') {
+      return parsedUser as User
+    }
+
+    localStorage.removeItem('auth_user')
+    return null
+  } catch {
+    localStorage.removeItem('auth_user')
+    return null
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<User | null>(
-    localStorage.getItem('auth_user')
-      ? (JSON.parse(localStorage.getItem('auth_user') as string) as User)
-      : null
-  )
+  const user = ref<User | null>(readStoredUser())
   const accessToken = ref<string | null>(localStorage.getItem('access_token'))
 
   const isAuthenticated = computed(() => !!user.value || !!accessToken.value)

@@ -125,23 +125,25 @@ export class CloudinaryResourceService {
       : CLOUDINARY_RESOURCE_TYPES;
 
     for (const type of candidateTypes) {
-      try {
-        const resource = await cloudinary.api.resource(normalizedPublicId, {
-          resource_type: type,
-          type: 'upload',
-        });
+      for (const deliveryType of ['authenticated', 'upload'] as const) {
+        try {
+          const resource = await cloudinary.api.resource(normalizedPublicId, {
+            resource_type: type,
+            type: deliveryType,
+          });
 
-        return mapCloudinaryResource(resource as CloudinaryResourcePayload);
-      } catch (error) {
-        if (isNotFoundError(error)) {
-          continue;
+          return mapCloudinaryResource(resource as CloudinaryResourcePayload);
+        } catch (error) {
+          if (isNotFoundError(error)) {
+            continue;
+          }
+
+          this.logger.error(
+            `Failed to resolve Cloudinary asset for publicId=${normalizedPublicId}, resourceType=${type}, type=${deliveryType}`,
+            error instanceof Error ? error.stack : undefined,
+          );
+          throw new InternalServerErrorException('Failed to resolve Cloudinary asset');
         }
-
-        this.logger.error(
-          `Failed to resolve Cloudinary asset for publicId=${normalizedPublicId}, resourceType=${type}`,
-          error instanceof Error ? error.stack : undefined,
-        );
-        throw new InternalServerErrorException('Failed to resolve Cloudinary asset');
       }
     }
 

@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MailerModule } from '@nestjs-modules/mailer';
+import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ProjectAccessModule } from '../../common/access/project-access.module';
-import { buildMailFrom } from '../../common/helpers/mail-from.helper';
-import { MailJobQueueService } from '../../common/mail/services/mail-job-queue.service';
+import { MailModule } from '../../common/mail/mail.module';
+import { NotificationPreferencesModule } from '../../common/notifications/notification-preferences.module';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { ReminderController } from './controller/reminder.controller';
 import { TaskRepository } from './repository/task.repository';
@@ -16,50 +15,12 @@ import { ReminderService } from './service/reminder.service';
     ConfigModule,
     PrismaModule,
     ProjectAccessModule,
+    NotificationPreferencesModule,
     ScheduleModule.forRoot(),
-    MailerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const host = configService.get<string>('SMTP_HOST');
-        const user = configService.get<string>('SMTP_USER');
-        const pass = configService.get<string>('SMTP_PASS');
-        const port = Number(configService.get<string>('SMTP_PORT') ?? 587);
-        const fromAddress = buildMailFrom(
-          configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-          configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
-        );
-
-        if (!host || !user || !pass) {
-          return {
-            transport: {
-              jsonTransport: true,
-            },
-            defaults: {
-              from: fromAddress,
-            },
-          };
-        }
-
-        return {
-          transport: {
-            host,
-            port,
-            secure: port === 465,
-            auth: {
-              user,
-              pass,
-            },
-          },
-          defaults: {
-            from: fromAddress,
-          },
-        };
-      },
-    }),
+    MailModule,
   ],
   controllers: [ReminderController],
-  providers: [TaskRepository, MailService, ReminderService, MailJobQueueService],
+  providers: [TaskRepository, MailService, ReminderService],
   exports: [ReminderService],
 })
 export class ReminderModule {}

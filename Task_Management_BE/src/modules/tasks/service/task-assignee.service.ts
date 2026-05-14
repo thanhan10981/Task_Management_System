@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { NotificationType, Prisma } from '@prisma/client';
+import { NOTIFICATION_PREFERENCE_KEYS } from '../../../common/notifications/notification-preferences.constants';
+import { NotificationPreferencesService } from '../../../common/notifications/notification-preferences.service';
 import { ProjectAccessService } from '../../../common/access/project-access.service';
 import { AssignTaskUserDto } from '../dto/task.dto';
 import {
@@ -20,6 +22,7 @@ export class TaskAssigneeService {
   constructor(
     private readonly tasksRepository: TasksRepository,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly notificationPreferencesService: NotificationPreferencesService,
   ) {}
 
   async listAssignees(userId: string, taskId: string) {
@@ -73,7 +76,11 @@ export class TaskAssigneeService {
             },
             tx,
           ),
-          ...(dto.userId !== userId
+          ...(dto.userId !== userId &&
+          (await this.notificationPreferencesService.isEnabled(
+            dto.userId,
+            NOTIFICATION_PREFERENCE_KEYS.taskAssigned,
+          ))
             ? [
                 this.tasksRepository.createNotification(
                   {

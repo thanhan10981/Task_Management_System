@@ -1,0 +1,2 @@
+ALTER TYPE "project_member_role" RENAME VALUE 'MEMBER' TO 'DEVELOPER';
+ALTER TYPE "project_member_role" RENAME VALUE 'GUEST' TO 'VIEWER';

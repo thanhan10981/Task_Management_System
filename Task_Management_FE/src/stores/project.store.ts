@@ -10,9 +10,7 @@ const LEGACY_PROJECT_STORAGE_KEY = 'current_project_id'
 
 export const useProjectStore = defineStore('project', () => {
   const projects = ref<ProjectSummary[]>([])
-  const currentProjectId = ref<string | null>(
-    localStorage.getItem(LAST_PROJECT_STORAGE_KEY) || localStorage.getItem(LEGACY_PROJECT_STORAGE_KEY),
-  )
+  const currentProjectId = ref<string | null>(null)
   const loadingProjects = ref(false)
   const initialized = ref(false)
   const projectContextResolved = ref(false)
@@ -24,35 +22,29 @@ export const useProjectStore = defineStore('project', () => {
   )
   const hasCurrentProject = computed(() => Boolean(currentProject.value))
 
-  function setCurrentProjectId(projectId: string | null) {
+  function getStoredLastProjectId() {
+    return (
+      localStorage.getItem(LAST_PROJECT_STORAGE_KEY) ||
+      localStorage.getItem(LEGACY_PROJECT_STORAGE_KEY)
+    )
+  }
+
+  function setCurrentProjectId(
+    projectId: string | null,
+    options?: { persist?: boolean; clearStored?: boolean }
+  ) {
     currentProjectId.value = projectId
-    if (projectId) {
+
+    if (projectId && options?.persist) {
       localStorage.setItem(LAST_PROJECT_STORAGE_KEY, projectId)
       localStorage.setItem(LEGACY_PROJECT_STORAGE_KEY, projectId)
       return
     }
 
-    localStorage.removeItem(LAST_PROJECT_STORAGE_KEY)
-    localStorage.removeItem(LEGACY_PROJECT_STORAGE_KEY)
-  }
-
-  function ensureCurrentProjectSelection() {
-    if (!projects.value.length) {
-      setCurrentProjectId(null)
-      return
+    if (options?.clearStored) {
+      localStorage.removeItem(LAST_PROJECT_STORAGE_KEY)
+      localStorage.removeItem(LEGACY_PROJECT_STORAGE_KEY)
     }
-
-    const currentStillExists = projects.value.some((project) => project.id === currentProjectId.value)
-    if (currentStillExists) {
-      return
-    }
-
-    if (projects.value.length === 1) {
-      setCurrentProjectId(projects.value[0].id)
-      return
-    }
-
-    setCurrentProjectId(null)
   }
 
   async function loadProjects() {
@@ -62,7 +54,21 @@ export const useProjectStore = defineStore('project', () => {
         queryKey: QUERY_KEYS.projects.list(),
         queryFn: () => listUserProjects(),
       })
-      ensureCurrentProjectSelection()
+
+      const storedProjectId = getStoredLastProjectId()
+      const currentIdExists = projects.value.some((project) => project.id === currentProjectId.value)
+      const storedIdExists = projects.value.some((project) => project.id === storedProjectId)
+
+      if (currentProjectId.value && currentIdExists) {
+        return
+      }
+
+      if (storedProjectId && storedIdExists) {
+        setCurrentProjectId(storedProjectId)
+        return
+      }
+
+      setCurrentProjectId(null, { clearStored: Boolean(storedProjectId || currentProjectId.value) })
     } finally {
       loadingProjects.value = false
       projectContextResolved.value = true
@@ -77,6 +83,10 @@ export const useProjectStore = defineStore('project', () => {
     if (!forceReload && initializePromise) {
       await initializePromise
       return
+    }
+
+    if (forceReload) {
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.list() })
     }
 
     projectContextResolved.value = false
@@ -99,7 +109,7 @@ export const useProjectStore = defineStore('project', () => {
     await initializeAfterAuth(true)
 
     if (created?.id) {
-      setCurrentProjectId(created.id)
+      setCurrentProjectId(created.id, { persist: true })
     }
 
     return created
@@ -114,7 +124,7 @@ export const useProjectStore = defineStore('project', () => {
     initializePromise = null
 
     if (shouldClearStoredLastProject) {
-      setCurrentProjectId(null)
+      setCurrentProjectId(null, { clearStored: true })
       return
     }
 
@@ -130,6 +140,7 @@ export const useProjectStore = defineStore('project', () => {
     hasProjects,
     currentProject,
     hasCurrentProject,
+    getStoredLastProjectId,
     setCurrentProjectId,
     loadProjects,
     initializeAfterAuth,

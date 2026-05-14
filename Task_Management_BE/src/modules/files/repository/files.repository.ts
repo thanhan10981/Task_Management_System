@@ -13,6 +13,7 @@ export const FILE_SELECT = Prisma.validator<Prisma.FileSelect>()({
   sizeBytes: true,
   projectId: true,
   taskId: true,
+  commentId: true,
   uploadedBy: true,
   isDeleted: true,
   createdAt: true,
@@ -64,14 +65,14 @@ export class FilesRepository {
     }
   }
 
-  async findActiveFileById(fileId: string, userId: string): Promise<SerializedFileRecord | null> {
+  async findActiveFileById(fileId: string, _userId: string): Promise<SerializedFileRecord | null> {
     try {
       const file = await this.prisma.file.findUnique({
         where: { id: fileId },
         select: FILE_SELECT,
       });
 
-      if (!file || file.isDeleted || file.uploadedBy !== userId) {
+      if (!file || file.isDeleted) {
         return null;
       }
 

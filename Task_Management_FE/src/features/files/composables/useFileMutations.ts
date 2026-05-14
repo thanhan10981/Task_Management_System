@@ -26,7 +26,8 @@ export function useCreateCloudinaryFolderMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ projectId, folderPath }: CreateFolderInput) => createCloudinaryFolder(projectId, folderPath),
+    mutationFn: ({ projectId, folderPath }: CreateFolderInput) =>
+      createCloudinaryFolder(projectId, folderPath),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all }),
   })
 }
@@ -42,7 +43,14 @@ export function useSignedFileUploadMutation() {
         folderPath,
         onProgress,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all }),
+    onSuccess: async (_data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.all }),
+        ...(variables.taskId
+          ? [queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.files(variables.taskId) })]
+          : []),
+      ])
+    },
   })
 }
 

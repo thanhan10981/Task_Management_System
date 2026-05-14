@@ -51,6 +51,7 @@ interface BackendUploadResponse {
   format: string
   projectId: string
   taskId?: string
+  commentId?: string | null
   secureUrl: string
   bytes?: number | string
   folderPath?: string
@@ -114,7 +115,7 @@ function isNotFoundError(error: unknown): boolean {
   return (
     message.includes('not found') ||
     message.includes('does not exist') ||
-    message.includes('doesn\'t exist') ||
+    message.includes("doesn't exist") ||
     message.includes('failed to list cloudinary folders recursively')
   )
 }
@@ -141,12 +142,20 @@ function extractFilesFromPayload(payload: unknown): CloudinaryFileMetadata[] | n
 }
 
 export function normalizeFolderPath(path?: string | null): string {
-  return (path ?? '').trim().replace(/^\/+|\/+$/g, '').toLowerCase()
+  return (path ?? '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .toLowerCase()
 }
 
-export function buildProjectScopedFolderPath(projectId: string, folderPath?: string | null): string {
+export function buildProjectScopedFolderPath(
+  projectId: string,
+  folderPath?: string | null
+): string {
   const normalizedFolderPath = normalizeFolderPath(folderPath)
-  return normalizedFolderPath ? `projects/${projectId}/${normalizedFolderPath}` : `projects/${projectId}`
+  return normalizedFolderPath
+    ? `projects/${projectId}/${normalizedFolderPath}`
+    : `projects/${projectId}`
 }
 
 function unwrapApiPayload<T>(response: T | ApiEnvelope<T>): T {
@@ -283,7 +292,7 @@ export async function saveUploadedFileMetadata(payload: SaveFileMetadataPayload)
 export async function uploadProjectFileToBackend(
   projectId: string,
   file: File,
-  options?: { taskId?: string; folderPath?: string },
+  options?: { taskId?: string; folderPath?: string }
 ): Promise<CloudinaryUploadResult> {
   const formData = new FormData()
   formData.append('projectId', projectId)
@@ -299,12 +308,16 @@ export async function uploadProjectFileToBackend(
 
   let response
   try {
-    response = await apiClient.post<BackendUploadResponse | ApiEnvelope<BackendUploadResponse>>('/files/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: 60000,
-    })
+    response = await apiClient.post<BackendUploadResponse | ApiEnvelope<BackendUploadResponse>>(
+      '/files/upload',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000,
+      }
+    )
   } catch (error) {
     if (isAxiosTimeoutError(error)) {
       throw new Error('Upload request timed out. File may still be uploaded. Refreshing list...')
@@ -331,31 +344,29 @@ export async function uploadProjectFileToBackend(
 export async function uploadProfileImageToBackend(
   file: File,
   kind: 'avatar' | 'cover',
-  onProgress?: (event: UploadProgressEvent) => void,
+  onProgress?: (event: UploadProgressEvent) => void
 ): Promise<ProfileImageUploadResponse> {
   const formData = new FormData()
   formData.append('kind', kind)
   formData.append('file', file)
 
-  const response = await apiClient.post<ProfileImageUploadResponse | ApiEnvelope<ProfileImageUploadResponse>>(
-    '/files/profile-image',
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: 60000,
-      onUploadProgress: (event) => {
-        if (!onProgress) return
-        const total = event.total ?? file.size ?? 1
-        onProgress({
-          loaded: event.loaded,
-          total,
-          percentage: Math.max(1, Math.round((event.loaded / total) * 100)),
-        })
-      },
+  const response = await apiClient.post<
+    ProfileImageUploadResponse | ApiEnvelope<ProfileImageUploadResponse>
+  >('/files/profile-image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
     },
-  )
+    timeout: 60000,
+    onUploadProgress: (event) => {
+      if (!onProgress) return
+      const total = event.total ?? file.size ?? 1
+      onProgress({
+        loaded: event.loaded,
+        total,
+        percentage: Math.max(1, Math.round((event.loaded / total) * 100)),
+      })
+    },
+  })
 
   return unwrapApiPayload(response.data)
 }
@@ -363,32 +374,47 @@ export async function uploadProfileImageToBackend(
 export async function uploadProjectFileWithSignature(
   projectId: string,
   file: File,
-  options?: { taskId?: string; commentId?: string; folderPath?: string; onProgress?: (event: UploadProgressEvent) => void },
+  options?: {
+    taskId?: string
+    commentId?: string
+    folderPath?: string
+    onProgress?: (event: UploadProgressEvent) => void
+  }
 ): Promise<CloudinaryUploadResult> {
   const normalizedFolderPath = normalizeFolderPath(options?.folderPath)
-  const signature = await post<SignedUploadParams | ApiEnvelope<SignedUploadParams>>('/files/upload-signature', {
-    projectId,
-    taskId: options?.taskId,
-    commentId: options?.commentId,
-    folderPath: normalizedFolderPath || undefined,
-    fileName: file.name,
-    mimeType: file.type || 'application/octet-stream',
-    sizeBytes: file.size,
-  })
+  const signature = await post<SignedUploadParams | ApiEnvelope<SignedUploadParams>>(
+    '/files/upload-signature',
+    {
+      projectId,
+      taskId: options?.taskId,
+      commentId: options?.commentId,
+      folderPath: normalizedFolderPath || undefined,
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      sizeBytes: file.size,
+    }
+  )
   const signedPayload = unwrapApiPayload(signature)
-  const cloudinaryResult = await uploadSignedFileToCloudinary(file, signedPayload, options?.onProgress)
-  const finalizeResponse = await post<BackendUploadResponse | ApiEnvelope<BackendUploadResponse>>('/files/upload-finalize', {
-    uploadId: signedPayload.uploadId,
-    projectId,
-    commentId: options?.commentId,
-    publicId: cloudinaryResult.public_id,
-    secureUrl: cloudinaryResult.secure_url,
-    originalFilename: file.name,
-    format: cloudinaryResult.format,
-    resourceType: cloudinaryResult.resource_type,
-    folder: cloudinaryResult.folder,
-    bytes: cloudinaryResult.bytes,
-  })
+  const cloudinaryResult = await uploadSignedFileToCloudinary(
+    file,
+    signedPayload,
+    options?.onProgress
+  )
+  const finalizeResponse = await post<BackendUploadResponse | ApiEnvelope<BackendUploadResponse>>(
+    '/files/upload-finalize',
+    {
+      uploadId: signedPayload.uploadId,
+      projectId,
+      commentId: options?.commentId,
+      publicId: cloudinaryResult.public_id,
+      secureUrl: cloudinaryResult.secure_url,
+      originalFilename: file.name,
+      format: cloudinaryResult.format,
+      resourceType: cloudinaryResult.resource_type,
+      folder: cloudinaryResult.folder,
+      bytes: cloudinaryResult.bytes,
+    }
+  )
   const finalized = unwrapApiPayload(finalizeResponse)
 
   return {
@@ -398,9 +424,11 @@ export async function uploadProjectFileWithSignature(
     secureUrl: finalized.secureUrl,
     format: finalized.format,
     resourceType: finalized.resourceType,
-    bytes: typeof finalized.bytes === 'number' ? finalized.bytes : Number(finalized.bytes) || file.size,
+    bytes:
+      typeof finalized.bytes === 'number' ? finalized.bytes : Number(finalized.bytes) || file.size,
     folder: finalized.folderPath || normalizedFolderPath || cloudinaryResult.folder,
     originalFilename: finalized.originalFilename || file.name,
+    commentId: finalized.commentId ?? options?.commentId ?? null,
     uploadedBy: finalized.uploadedBy,
     uploader: finalized.uploader,
   }
@@ -409,7 +437,7 @@ export async function uploadProjectFileWithSignature(
 function uploadSignedFileToCloudinary(
   file: File,
   signature: SignedUploadParams,
-  onProgress?: (event: UploadProgressEvent) => void,
+  onProgress?: (event: UploadProgressEvent) => void
 ): Promise<CloudinaryDirectUploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
@@ -472,13 +500,15 @@ function isAxiosTimeoutError(error: unknown): boolean {
   }
 
   const payload = error as { code?: string; message?: string }
-  return payload.code === 'ECONNABORTED' || payload.message?.toLowerCase().includes('timeout') === true
+  return (
+    payload.code === 'ECONNABORTED' || payload.message?.toLowerCase().includes('timeout') === true
+  )
 }
 
 export async function getUploadedFileMetadata(
   projectId: string,
   folderPath?: string,
-  includeDescendants = true,
+  includeDescendants = true
 ): Promise<CloudinaryFileMetadata[]> {
   const normalizedFolderPath = normalizeFolderPath(folderPath)
   const params = {
@@ -523,7 +553,7 @@ export async function getUploadedFileMetadata(
 
 export async function getTaskFileMetadata(
   projectId: string,
-  taskId: string,
+  taskId: string
 ): Promise<CloudinaryFileMetadata[]> {
   const response = await get<unknown>('/files', {
     params: {
@@ -548,7 +578,9 @@ export async function getFolderMetadata(projectId: string): Promise<CloudinaryFo
     params: { projectId, recursive: true },
   })
 
-  let response: { folders: CloudinaryFolderMetadata[] } | { data: { folders: CloudinaryFolderMetadata[] } }
+  let response:
+    | { folders: CloudinaryFolderMetadata[] }
+    | { data: { folders: CloudinaryFolderMetadata[] } }
   try {
     response = await get<
       { folders: CloudinaryFolderMetadata[] } | { data: { folders: CloudinaryFolderMetadata[] } }
@@ -584,7 +616,9 @@ export async function deleteFileMetadata(fileId: string): Promise<void> {
 }
 
 export async function getFilePreviewUrl(fileId: string): Promise<string> {
-  const response = await get<SignedFileAccessPayload | ApiEnvelope<SignedFileAccessPayload>>(`/files/${fileId}/view`)
+  const response = await get<SignedFileAccessPayload | ApiEnvelope<SignedFileAccessPayload>>(
+    `/files/${fileId}/view`
+  )
   const payload = unwrapApiPayload(response)
 
   if (!payload?.previewUrl) {
@@ -595,7 +629,9 @@ export async function getFilePreviewUrl(fileId: string): Promise<string> {
 }
 
 export async function getFileDownloadUrl(fileId: string): Promise<SignedDownloadAccess> {
-  const response = await get<SignedFileAccessPayload | ApiEnvelope<SignedFileAccessPayload>>(`/files/${fileId}/download`)
+  const response = await get<SignedFileAccessPayload | ApiEnvelope<SignedFileAccessPayload>>(
+    `/files/${fileId}/download`
+  )
   const payload = unwrapApiPayload(response)
 
   if (!payload?.downloadUrl) {

@@ -10,6 +10,7 @@ export interface CloudinaryUploadResult {
   height?: number
   folder?: string
   originalFilename: string
+  commentId?: string | null
   uploadedBy?: string | null
   uploader?: SharedMember | null
 }

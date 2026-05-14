@@ -123,16 +123,16 @@ export class CloudinaryAccessHelper {
   async createPreviewUrl(params: CreateSignedUrlParams): Promise<string> {
     this.ensureConfigured();
 
-    if (params.resourceType === 'video') {
+    const expiresAt = this.toExpiresAt(params.expiresInSeconds ?? this.defaultAuthenticatedUrlTtlSeconds);
+
+    if (params.resourceType === 'image' || params.resourceType === 'video') {
       return cloudinary.url(params.publicId, {
         secure: true,
-        resource_type: 'video',
+        resource_type: params.resourceType,
         type: 'authenticated',
         sign_url: true,
       });
     }
-
-    const expiresAt = this.toExpiresAt(params.expiresInSeconds ?? this.defaultAuthenticatedUrlTtlSeconds);
 
     return cloudinary.utils.private_download_url(params.publicId, params.format ?? 'pdf', {
       resource_type: params.resourceType,

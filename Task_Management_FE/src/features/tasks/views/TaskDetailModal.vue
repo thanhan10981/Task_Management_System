@@ -337,12 +337,19 @@
                                 <span class="td-comment-spinner" aria-label="Loading image" />
                               </div>
                               <img
-                                :src="att.url"
+                                v-if="getCommentImageUrl(att)"
+                                :src="getCommentImageUrl(att)"
                                 :alt="att.name"
                                 class="td-comment-media-img"
                                 @load="markCommentImageLoaded(att.id)"
                                 @error="markCommentImageFailed(att.id)"
                               />
+                              <div
+                                v-else-if="!isCommentImageLoading(att.id)"
+                                class="td-comment-media-file"
+                              >
+                                <span class="text-xs truncate max-w-full px-1">{{ att.name }}</span>
+                              </div>
                             </div>
                             <div v-else class="td-comment-media-file">
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
@@ -380,12 +387,19 @@
                                       <span class="td-comment-spinner" aria-label="Loading image" />
                                     </div>
                                     <img
-                                      :src="att.url"
+                                      v-if="getCommentImageUrl(att)"
+                                      :src="getCommentImageUrl(att)"
                                       :alt="att.name"
                                       class="td-comment-media-img"
                                       @load="markCommentImageLoaded(att.id)"
                                       @error="markCommentImageFailed(att.id)"
                                     />
+                                    <div
+                                      v-else-if="!isCommentImageLoading(att.id)"
+                                      class="td-comment-media-file"
+                                    >
+                                      <span class="text-xs truncate max-w-full px-1">{{ att.name }}</span>
+                                    </div>
                                   </div>
                                   <div v-else class="td-comment-media-file">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
@@ -807,9 +821,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  getFilePreviewUrl,
-} from '@/api/cloudinary'
+import { getFilePreviewUrl } from '@/api/cloudinary'
 import { useToast } from '@/composables/useToast'
 import { generateAiTaskDescription } from '@/features/tasks/services/ai-task.service'
 import {
@@ -856,7 +868,9 @@ const deleteFileMutation = useDeleteFileMutation()
 
 // ── Task ref ──────────────────────────────────────────────────────────────────
 const task = computed(() => (props.taskId ? store.getTask(props.taskId) : null))
-const detailProjectId = computed(() => currentProjectId.value ?? store.loadedProjectId)
+const detailProjectId = computed(
+  () => currentProjectId.value ?? task.value?.projectId ?? store.loadedProjectId
+)
 const shortTaskCode = computed(() => `T-${task.value?.id?.slice(-5) ?? ''}`)
 const showDeleteConfirm = ref(false)
 const deletingTask = ref(false)
@@ -870,7 +884,11 @@ const sortedSubtasks = computed(() => {
   const all = store.subtasksByTask(props.taskId)
   return [...all.filter((s) => !s.completed), ...all.filter((s) => s.completed)]
 })
-const taskAttachments = computed(() => (props.taskId ? store.attachmentsByTaskOnly(props.taskId) : []))
+const taskAttachments = computed(() =>
+  props.taskId ? store.attachmentsByTaskOnly(props.taskId) : []
+)
+const commentImagePreviewUrls = ref<Record<string, string>>({})
+const commentImagePreviewLoading = ref<Record<string, boolean>>({})
 const commentThreads = computed(() => {
   if (!props.taskId) return []
   const all = store.commentsByTask(props.taskId)
@@ -921,6 +939,43 @@ watch(
     showDeleteConfirm.value = false
     deleteTaskError.value = ''
     await store.loadTaskDetail(id)
+  },
+  { immediate: true }
+)
+
+watch(
+  () =>
+    store.attachments
+      .filter(
+        (attachment) => attachment.commentId && attachment.type === 'image' && attachment.fileId
+      )
+      .map((attachment) => attachment.fileId as string),
+  (fileIds) => {
+    fileIds.forEach((fileId) => {
+      if (commentImagePreviewUrls.value[fileId] || commentImagePreviewLoading.value[fileId]) return
+
+      commentImagePreviewLoading.value = {
+        ...commentImagePreviewLoading.value,
+        [fileId]: true,
+      }
+
+      void getFilePreviewUrl(fileId)
+        .then((url) => {
+          commentImagePreviewUrls.value = {
+            ...commentImagePreviewUrls.value,
+            [fileId]: url,
+          }
+        })
+        .catch(() => {
+          store.attachments
+            .filter((attachment) => attachment.fileId === fileId)
+            .forEach((attachment) => markCommentImageFailed(attachment.id))
+        })
+        .finally(() => {
+          const { [fileId]: _done, ...rest } = commentImagePreviewLoading.value
+          commentImagePreviewLoading.value = rest
+        })
+    })
   },
   { immediate: true }
 )
@@ -1057,10 +1112,7 @@ async function generateInlineDescription() {
   generatingDescription.value = true
   try {
     const currentDescription = normalizeEditorText(descRef.value.innerText || '')
-    const generatedMarkdown = await generateAiTaskDescription(
-      task.value.title,
-      currentDescription
-    )
+    const generatedMarkdown = await generateAiTaskDescription(task.value.title, currentDescription)
     const mergedMarkdown = mergeInlineAiMarkdown(currentDescription, generatedMarkdown)
     descRef.value.innerHTML = renderDescriptionForEditor(mergedMarkdown)
     descHtml.value = descRef.value.innerHTML
@@ -1240,9 +1292,7 @@ async function createSuggestedSubtasksFromMarkdown(markdown: string) {
 
 function extractSuggestedSubtaskTitles(markdown: string) {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
-  const headingIndex = lines.findIndex((line) =>
-    /^##\s+Suggested Subtasks\s*$/i.test(line.trim())
-  )
+  const headingIndex = lines.findIndex((line) => /^##\s+Suggested Subtasks\s*$/i.test(line.trim()))
 
   if (headingIndex < 0) return []
 
@@ -1253,7 +1303,13 @@ function extractSuggestedSubtaskTitles(markdown: string) {
   }
 
   return sectionLines
-    .map((line) => line.trim().match(/^[-*]\s+(.+)$/)?.[1]?.trim() ?? '')
+    .map(
+      (line) =>
+        line
+          .trim()
+          .match(/^[-*]\s+(.+)$/)?.[1]
+          ?.trim() ?? ''
+    )
     .map((title) => title.replace(/\s+/g, ' ').slice(0, 255))
     .filter(Boolean)
 }
@@ -1278,7 +1334,8 @@ function findFirstAiSectionIndex(markdown: string) {
 }
 
 function extractInlineAiError(error: unknown) {
-  const message = (error as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
+  const message = (error as { response?: { data?: { message?: string | string[] } } })?.response
+    ?.data?.message
   if (Array.isArray(message)) return message.join(', ')
   return message || (error instanceof Error ? error.message : 'Cannot generate description')
 }
@@ -1385,14 +1442,14 @@ const mentionSelectedIndex = ref(0)
 
 const filteredMentionMembers = computed(() => {
   const q = mentionState.value.query.toLowerCase()
-  return store.members.filter(m => m.name.toLowerCase().includes(q))
+  return store.members.filter((m) => m.name.toLowerCase().includes(q))
 })
 
 function onCommentInput(e: Event, target: 'comment' | 'reply') {
   const el = e.target as HTMLTextAreaElement
   const val = el.value
   const cursor = el.selectionStart
-  
+
   const lastAtIdx = val.lastIndexOf('@', cursor - 1)
   if (lastAtIdx >= 0) {
     if (lastAtIdx === 0 || /[\s\n]/.test(val[lastAtIdx - 1])) {
@@ -1403,7 +1460,7 @@ function onCommentInput(e: Event, target: 'comment' | 'reply') {
           query,
           target,
           cursorPos: cursor,
-          startIdx: lastAtIdx
+          startIdx: lastAtIdx,
         }
         mentionSelectedIndex.value = 0
         return
@@ -1415,13 +1472,16 @@ function onCommentInput(e: Event, target: 'comment' | 'reply') {
 
 function onCommentKeydown(e: KeyboardEvent, target: 'comment' | 'reply') {
   if (!mentionState.value.active || mentionState.value.target !== target) return
-  
+
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    mentionSelectedIndex.value = (mentionSelectedIndex.value + 1) % filteredMentionMembers.value.length
+    mentionSelectedIndex.value =
+      (mentionSelectedIndex.value + 1) % filteredMentionMembers.value.length
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
-    mentionSelectedIndex.value = (mentionSelectedIndex.value - 1 + filteredMentionMembers.value.length) % filteredMentionMembers.value.length
+    mentionSelectedIndex.value =
+      (mentionSelectedIndex.value - 1 + filteredMentionMembers.value.length) %
+      filteredMentionMembers.value.length
   } else if (e.key === 'Enter') {
     e.preventDefault()
     const member = filteredMentionMembers.value[mentionSelectedIndex.value]
@@ -1434,7 +1494,7 @@ function onCommentKeydown(e: KeyboardEvent, target: 'comment' | 'reply') {
 function insertMention(member: Member) {
   const { target, startIdx, cursorPos } = mentionState.value
   const replacement = `@${member.name} `
-  
+
   if (target === 'comment') {
     const text = newComment.value
     newComment.value = text.slice(0, startIdx) + replacement + text.slice(cursorPos)
@@ -1442,7 +1502,7 @@ function insertMention(member: Member) {
     const text = replyText.value
     replyText.value = text.slice(0, startIdx) + replacement + text.slice(cursorPos)
   }
-  
+
   mentionState.value.active = false
 }
 
@@ -1482,12 +1542,17 @@ function removePendingCommentFile(idx: number) {
 
 async function submitComment() {
   if (!task.value || (!newComment.value.trim() && pendingCommentFiles.value.length === 0)) return
-  const text = newComment.value.trim()
-  const projectId = currentProjectId.value ?? detailProjectId.value
+  const text =
+    newComment.value.trim() || (pendingCommentFiles.value.length > 0 ? 'Attached an image' : '')
+  const projectId = detailProjectId.value
+  if (pendingCommentFiles.value.length > 0 && !projectId) {
+    toast.error('Please select a project before uploading comment images.')
+    return
+  }
   const mentionIds = store.members
     .filter((m) => new RegExp(`@${m.name}(?:\\s|$)`).test(text))
     .map((m) => m.id)
-    
+
   uploadingCommentFiles.value = true
   try {
     const created = await store.addCommentRemote(task.value.id, text, undefined, mentionIds)
@@ -1510,7 +1575,7 @@ async function submitComment() {
             format: result.format,
             resourceType: result.resourceType,
             size: formatFileSize(result.bytes || file.size),
-            commentId: created.id,
+            commentId: result.commentId ?? created.id,
           })
         })
       )
@@ -1527,12 +1592,17 @@ async function submitComment() {
 
 async function submitReply(commentId: string) {
   if (!task.value || (!replyText.value.trim() && pendingReplyFiles.value.length === 0)) return
-  const text = replyText.value.trim()
-  const projectId = currentProjectId.value ?? detailProjectId.value
+  const text =
+    replyText.value.trim() || (pendingReplyFiles.value.length > 0 ? 'Attached an image' : '')
+  const projectId = detailProjectId.value
+  if (pendingReplyFiles.value.length > 0 && !projectId) {
+    toast.error('Please select a project before uploading reply images.')
+    return
+  }
   const mentionIds = store.members
     .filter((m) => new RegExp(`@${m.name}(?:\\s|$)`).test(text))
     .map((m) => m.id)
-    
+
   uploadingReplyFiles.value = true
   try {
     const created = await store.addCommentRemote(task.value.id, text, commentId, mentionIds)
@@ -1555,7 +1625,7 @@ async function submitReply(commentId: string) {
             format: result.format,
             resourceType: result.resourceType,
             size: formatFileSize(result.bytes || file.size),
-            commentId: created.id,
+            commentId: result.commentId ?? created.id,
           })
         })
       )
@@ -1589,7 +1659,11 @@ function canRemoveComment(authorId: string) {
 }
 
 function getCommentAttachments(commentId: string) {
-  return store.attachments.filter(a => a.commentId === commentId)
+  return store.attachments.filter((a) => a.commentId === commentId)
+}
+
+function getCommentImageUrl(attachment: Attachment) {
+  return attachment.fileId ? commentImagePreviewUrls.value[attachment.fileId] : attachment.url
 }
 
 // ── File upload ───────────────────────────────────────────────────────────────
@@ -1606,7 +1680,8 @@ async function onFileUpload(e: Event) {
   const files = input.files
   if (!files) return
 
-  if (!currentProjectId.value) {
+  const projectId = detailProjectId.value
+  if (!projectId) {
     attachmentUploadError.value = 'Please select a project before uploading attachments.'
     input.value = ''
     return
@@ -1620,7 +1695,7 @@ async function onFileUpload(e: Event) {
     const uploadedFiles = await Promise.all(
       Array.from(files).map(async (file) => {
         const result = await signedFileUploadMutation.mutateAsync({
-          projectId: currentProjectId.value!,
+          projectId,
           file,
           taskId: task.value!.id,
           folderPath,
@@ -1683,9 +1758,12 @@ async function openAttachmentPreview(attachment: Attachment) {
   previewAttachment.value = attachment
   previewUrl.value = attachment.url
 
-  if (attachment.fileId && attachment.type !== 'image') {
+  if (attachment.fileId) {
     try {
-      previewUrl.value = await getFilePreviewUrl(attachment.fileId)
+      previewUrl.value =
+        attachment.type === 'image' && commentImagePreviewUrls.value[attachment.fileId]
+          ? commentImagePreviewUrls.value[attachment.fileId]
+          : await getFilePreviewUrl(attachment.fileId)
     } catch {
       previewUrl.value = attachment.url
     }

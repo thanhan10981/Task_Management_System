@@ -140,29 +140,23 @@ export class FilesService {
       await this.ensureProjectAccess(userId, pendingUpload.projectId);
       await this.ensureTaskBelongsToProject(userId, pendingUpload.taskId, pendingUpload.projectId);
 
-      const cloudinaryAsset = await this.cloudinaryFileManagerService.getResource(dto.publicId, dto.resourceType ?? pendingUpload.resourceType);
-      if (!cloudinaryAsset?.public_id) {
-        throw new BadRequestException('Cloudinary asset does not exist or is not accessible');
-      }
-
-      this.verifyFinalizedAsset(pendingUpload, cloudinaryAsset, dto);
+      this.verifyFinalizedUploadPayload(pendingUpload, dto);
 
       const fileRecord = await this.filesRepository.createFileMetadata({
-        fileName: pendingUpload.fileName || dto.originalFilename || this.cloudinaryFileManagerService.extractFileName(cloudinaryAsset.public_id),
-        fileUrl: cloudinaryAsset.secure_url ?? dto.secureUrl,
-        fileType: cloudinaryAsset.format
-          ?? dto.format
+        fileName: pendingUpload.fileName || dto.originalFilename || this.cloudinaryFileManagerService.extractFileName(dto.publicId),
+        fileUrl: dto.secureUrl,
+        fileType: dto.format
           ?? pendingUpload.enforcedFormat
           ?? this.cloudinaryFileManagerService.extractFileExtension(pendingUpload.fileName)
-          ?? this.cloudinaryFileManagerService.extractFileExtension(cloudinaryAsset.public_id),
-        fileCategory: cloudinaryAsset.resource_type ?? pendingUpload.resourceType,
-        storageKey: cloudinaryAsset.public_id,
+          ?? this.cloudinaryFileManagerService.extractFileExtension(dto.publicId),
+        fileCategory: dto.resourceType ?? pendingUpload.resourceType,
+        storageKey: dto.publicId,
         folderPath: this.cloudinaryFileManagerService.resolveLogicalFolderPath(
           pendingUpload.projectId,
           pendingUpload.folderPath,
-          cloudinaryAsset.public_id,
+          dto.publicId,
         ),
-        sizeBytes: typeof cloudinaryAsset.bytes === 'number' ? BigInt(cloudinaryAsset.bytes) : BigInt(pendingUpload.sizeBytes),
+        sizeBytes: typeof dto.bytes === 'number' ? BigInt(dto.bytes) : BigInt(pendingUpload.sizeBytes),
         projectId: pendingUpload.projectId,
         taskId: pendingUpload.taskId,
         commentId: dto.commentId,
@@ -188,6 +182,7 @@ export class FilesService {
         ) ?? '',
         projectId: fileRecord.projectId,
         taskId: fileRecord.taskId,
+        commentId: fileRecord.commentId,
         secureUrl: fileRecord.fileUrl,
         bytes: this.serializeSizeBytes(fileRecord.sizeBytes),
         folderPath: fileRecord.folderPath,
@@ -261,6 +256,7 @@ export class FilesService {
         file.fileType,
       ),
       folderPath: file.folderPath,
+      commentId: file.commentId,
       sizeBytes: this.serializeSizeBytes(file.sizeBytes),
       createdAt: file.createdAt,
       uploadedBy: userId,
@@ -703,6 +699,9 @@ export class FilesService {
     }
 
     await this.ensureProjectAccess(userId, file.projectId);
+    if (file.uploadedBy !== userId) {
+      throw new ForbiddenException('You can only delete files you uploaded');
+    }
 
     let cloudinaryDeleted = false;
 
@@ -889,35 +888,29 @@ export class FilesService {
     return pendingUpload;
   }
 
-  private verifyFinalizedAsset(
+  private verifyFinalizedUploadPayload(
     pendingUpload: PendingUpload,
-    cloudinaryAsset: { public_id: string; resource_type?: string; bytes?: number; secure_url?: string; format?: string },
     dto: FinalizeUploadDto,
   ) {
-    if (cloudinaryAsset.public_id !== dto.publicId) {
-      throw new BadRequestException('Cloudinary asset public ID mismatch');
-    }
-
-    if (!cloudinaryAsset.public_id.startsWith(`${pendingUpload.scopedFolder}/`)) {
+    if (!dto.publicId.startsWith(`${pendingUpload.scopedFolder}/`)) {
       throw new BadRequestException('Cloudinary asset is outside the signed upload folder');
     }
 
-    const actualResourceType = this.cloudinaryFileManagerService.toAllowedResourceType(cloudinaryAsset.resource_type ?? dto.resourceType);
+    const actualResourceType = this.cloudinaryFileManagerService.toAllowedResourceType(dto.resourceType);
     if (actualResourceType !== pendingUpload.resourceType) {
       throw new BadRequestException('Cloudinary asset resource type mismatch');
     }
 
-    if (pendingUpload.enforcedFormat && (cloudinaryAsset.format ?? dto.format)?.toLowerCase() !== pendingUpload.enforcedFormat) {
+    if (pendingUpload.enforcedFormat && dto.format?.toLowerCase() !== pendingUpload.enforcedFormat) {
       throw new BadRequestException('Cloudinary asset format mismatch');
     }
 
-    const actualBytes = typeof cloudinaryAsset.bytes === 'number' ? cloudinaryAsset.bytes : dto.bytes;
-    if (typeof actualBytes === 'number') {
-      if (actualBytes <= 0 || actualBytes > MAX_UPLOAD_FILE_SIZE_BYTES) {
+    if (typeof dto.bytes === 'number') {
+      if (dto.bytes <= 0 || dto.bytes > MAX_UPLOAD_FILE_SIZE_BYTES) {
         throw new BadRequestException('Cloudinary asset size is invalid');
       }
 
-      if (actualBytes > pendingUpload.sizeBytes) {
+      if (dto.bytes > pendingUpload.sizeBytes) {
         throw new BadRequestException('Cloudinary asset size does not match the signed upload');
       }
     }

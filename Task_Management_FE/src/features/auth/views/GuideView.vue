@@ -9,7 +9,19 @@
         </p>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="group flex h-10 items-center gap-2 rounded-xl border border-sky-300/30 bg-gradient-to-r from-sky-500 to-indigo-600 px-4 text-sm font-bold text-white shadow-lg shadow-sky-950/30 transition-all hover:-translate-y-0.5 hover:from-sky-400 hover:to-indigo-500 hover:shadow-sky-900/40 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+          @click="downloadVietnameseGuide"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-y-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.3">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 19h14" />
+          </svg>
+          Tải file Word
+        </button>
+
         <div class="flex rounded-xl border border-white/10 bg-white/5 p-1">
           <button
             v-for="option in languageOptions"
@@ -114,6 +126,14 @@
 import { computed, ref, watch } from 'vue'
 
 type Language = 'vi' | 'en'
+
+type DownloadGuideSection = {
+  title: string
+  description: string
+  steps: string[]
+  tip: string
+  note: string
+}
 
 const languageOptions: Array<{ label: string; value: Language }> = [
   { label: 'VI', value: 'vi' },
@@ -438,4 +458,266 @@ watch(language, () => {
     activeSectionId.value = guideSections.value[0].id
   }
 })
+
+const vietnameseGuideDocument: {
+  title: string
+  subtitle: string
+  quickStart: Array<{ title: string; text: string }>
+  sections: DownloadGuideSection[]
+} = {
+  title: 'Hướng dẫn sử dụng OCTOM',
+  subtitle:
+    'Tài liệu này giúp người dùng nắm được toàn bộ quy trình sử dụng website OCTOM: từ đăng ký tài khoản, đăng nhập, tạo dự án, mời thành viên, quản lý công việc, theo dõi tiến độ, làm việc với tệp và phối hợp hằng ngày trong nhóm.',
+  quickStart: [
+    {
+      title: 'Bắt đầu với tài khoản',
+      text: 'Tạo tài khoản, đăng nhập, đăng xuất, đặt lại mật khẩu và bảo vệ thông tin truy cập.',
+    },
+    {
+      title: 'Tổ chức dự án',
+      text: 'Tạo project, chọn project đang làm việc, mời thành viên và quản lý vai trò trong nhóm.',
+    },
+    {
+      title: 'Theo dõi tiến độ',
+      text: 'Sử dụng Dashboard, Tasks, Board, Task Detail, Files và Settings để quản lý công việc xuyên suốt.',
+    },
+  ],
+  sections: [
+    {
+      title: '1. Tài khoản và bảo mật',
+      description:
+        'Phần này dành cho người mới bắt đầu sử dụng hệ thống, bao gồm tạo tài khoản, đăng nhập, đăng xuất và xử lý khi quên mật khẩu.',
+      steps: [
+        'Tại màn hình đăng nhập, nếu chưa có tài khoản, bấm Create an account để chuyển sang màn hình đăng ký.',
+        'Nhập họ tên hoặc tên nhóm dễ nhận diện, email đang sử dụng và mật khẩu đủ mạnh. Nên dùng mật khẩu có chữ hoa, chữ thường, số và ký tự đặc biệt.',
+        'Sau khi đăng ký thành công, hệ thống sẽ tự đăng nhập và đưa bạn đến bước tạo project đầu tiên.',
+        'Khi đã có tài khoản, quay lại màn hình Sign in, nhập email và mật khẩu để vào hệ thống.',
+        'Nếu quên mật khẩu, bấm Forgot password, nhập đúng email đã đăng ký rồi kiểm tra hộp thư để mở liên kết đặt lại mật khẩu.',
+        'Sau khi đặt lại mật khẩu, quay về màn hình đăng nhập và đăng nhập bằng mật khẩu mới.',
+        'Khi không còn làm việc, dùng nút đăng xuất để kết thúc phiên đăng nhập và tránh người khác sử dụng tài khoản của bạn.',
+      ],
+      tip: 'Nên dùng email làm việc thật để nhận được lời mời dự án, thông báo và liên kết đặt lại mật khẩu.',
+      note: 'Nếu không thấy email đặt lại mật khẩu, hãy kiểm tra thư mục spam hoặc chắc chắn rằng email nhập vào trùng với email đã đăng ký.',
+    },
+    {
+      title: '2. Dự án',
+      description:
+        'Project là không gian làm việc chính, nơi chứa task, board, files, thành viên và các thiết lập của nhóm.',
+      steps: [
+        'Sau khi đăng nhập lần đầu, nếu chưa có project, hệ thống sẽ đưa bạn đến màn hình Create Project.',
+        'Khi tạo project, đặt tên rõ ràng theo nhóm, sản phẩm hoặc giai đoạn làm việc để dễ phân biệt về sau.',
+        'Vào Projects để xem toàn bộ dự án bạn đang tham gia và chọn dự án cần làm việc.',
+        'Khi một project được chọn, các trang Tasks, Board, Files và Settings sẽ hoạt động theo project đó.',
+        'Khi mời người mới, tạo invite link trong hệ thống và gửi cho đúng người cần tham gia.',
+        'Người mở invite link phải đăng nhập trước. Sau khi đăng nhập, hệ thống sẽ hỏi xác nhận trước khi tham gia project.',
+        'Nếu làm nhiều dự án cùng lúc, hãy kiểm tra project hiện tại trước khi tạo task hoặc tải file để tránh đưa dữ liệu nhầm nơi.',
+      ],
+      tip: 'Với nhóm lớn, nên thống nhất quy tắc đặt tên project, ví dụ “Tên sản phẩm - Giai đoạn”, để mọi người tìm nhanh hơn.',
+      note: 'Một số chức năng phụ thuộc quyền của bạn trong project. Nếu không thấy nút thao tác, hãy kiểm tra vai trò với quản trị viên dự án.',
+    },
+    {
+      title: '3. Dashboard',
+      description:
+        'Dashboard là màn hình tổng quan giúp bạn nắm tình hình dự án trước khi đi vào từng công việc cụ thể.',
+      steps: [
+        'Mở Dashboard sau khi đăng nhập để xem nhanh dự án hiện tại đang có bao nhiêu công việc và tiến độ tổng thể ra sao.',
+        'Quan sát các chỉ số tổng quan như task đang mở, task hoàn thành, task trễ hạn hoặc các biểu đồ tiến độ nếu có.',
+        'Dùng Dashboard như màn kiểm tra đầu ngày để xác định việc nào gấp, việc nào đang chậm và ai đang phụ trách.',
+        'Nếu số liệu không đúng project mong muốn, hãy đổi project hiện tại rồi quay lại Dashboard.',
+        'Sau khi xác định điểm cần xử lý, chuyển sang Tasks hoặc Board để cập nhật chi tiết từng task.',
+      ],
+      tip: 'Mỗi buổi sáng, hãy mở Dashboard trước khi vào Board để ưu tiên việc quan trọng thay vì xử lý task theo cảm tính.',
+      note: 'Dashboard chỉ hữu ích khi task được cập nhật đều. Nếu nhóm không cập nhật trạng thái, số liệu tổng quan sẽ không phản ánh đúng thực tế.',
+    },
+    {
+      title: '4. Công việc và Kanban Board',
+      description:
+        'Tasks dùng để quản lý danh sách công việc; Board dùng để nhìn tiến độ theo cột trạng thái và kéo thả nhanh.',
+      steps: [
+        'Vào Tasks để xem toàn bộ công việc của project dưới dạng danh sách, phù hợp khi cần tìm kiếm, lọc hoặc kiểm tra chi tiết.',
+        'Khi tạo task mới, nhập tiêu đề ngắn gọn theo hành động cần làm, ví dụ “Thiết kế màn đăng nhập” thay vì “Đăng nhập”.',
+        'Bổ sung mô tả, deadline, priority, label, sprint và assignee để người nhận task hiểu rõ việc cần làm và mức độ ưu tiên.',
+        'Dùng bộ lọc hoặc tìm kiếm để nhanh chóng tìm task theo trạng thái, người phụ trách, mức độ ưu tiên hoặc từ khóa.',
+        'Vào Board để xem task theo các cột trạng thái. Khi tiến độ thay đổi, kéo task sang cột tương ứng để cả nhóm nhìn thấy ngay.',
+        'Nếu task quá lớn, mở chi tiết task và chia thành checklist hoặc subtask để dễ theo dõi.',
+      ],
+      tip: 'Một task tốt nên trả lời được bốn câu hỏi: làm gì, ai làm, khi nào xong và mức độ ưu tiên là gì.',
+      note: 'Đừng tạo task quá chung chung. Task mơ hồ khiến người phụ trách khó bắt đầu và làm Dashboard mất độ chính xác.',
+    },
+    {
+      title: '5. Chi tiết task',
+      description:
+        'Màn chi tiết task là nơi cập nhật toàn bộ thông tin sâu hơn: mô tả, trạng thái, người phụ trách, checklist, comment, file và lịch sử.',
+      steps: [
+        'Bấm vào một task trong danh sách hoặc Board để mở màn hình chi tiết.',
+        'Kiểm tra tiêu đề và mô tả trước tiên để chắc chắn mọi người hiểu cùng một phạm vi công việc.',
+        'Cập nhật trạng thái, priority, deadline, assignee và label khi có thay đổi để dữ liệu toàn hệ thống luôn mới.',
+        'Dùng checklist hoặc subtask để chia nhỏ việc lớn thành các bước có thể hoàn thành từng phần.',
+        'Dùng comment để trao đổi ngay trong task. Khi ai đó đọc lại, họ thấy đầy đủ ngữ cảnh thay vì phải tìm trong tin nhắn ngoài.',
+        'Đính kèm file, ảnh hoặc tài liệu liên quan để người thực hiện không phải hỏi lại nguồn thông tin.',
+        'Theo dõi activity log để biết ai đã thay đổi nội dung nào và thời điểm thay đổi.',
+      ],
+      tip: 'Khi giao việc, hãy ghi rõ tiêu chí hoàn thành trong mô tả hoặc checklist để giảm vòng hỏi lại.',
+      note: 'Nếu thay đổi deadline hoặc người phụ trách, nên để lại comment ngắn nêu lý do để các thành viên khác hiểu bối cảnh.',
+    },
+    {
+      title: '6. Tệp và thư mục',
+      description:
+        'Files giúp lưu trữ tài liệu theo project, tránh thất lạc file và giúp cả nhóm dùng chung một nguồn dữ liệu.',
+      steps: [
+        'Vào Files trong project hiện tại để xem các file và thư mục đã được tải lên.',
+        'Tạo thư mục theo module, sprint, khách hàng hoặc loại tài liệu để cấu trúc file dễ tìm.',
+        'Trước khi tải file, kiểm tra bạn đang ở đúng project và đúng thư mục.',
+        'Tải file lên, sau đó đặt tên file rõ ràng nếu cần để người khác hiểu nội dung trước khi mở.',
+        'Dùng chức năng mở hoặc xem trước để kiểm tra nhanh tài liệu mà không phải tải xuống thủ công.',
+        'Khi file liên quan trực tiếp đến task, hãy đính kèm hoặc nhắc đến trong comment của task để nối đúng ngữ cảnh.',
+      ],
+      tip: 'Nên đặt tên file có phiên bản hoặc ngày tháng, ví dụ “API-spec-v2” hoặc “Bao-cao-sprint-05”, để tránh nhầm file cũ với file mới.',
+      note: 'File nằm trong project nào thì nên phục vụ project đó. Không nên dùng Files làm kho lưu trữ chung cho tài liệu không liên quan.',
+    },
+    {
+      title: '7. Cài đặt và thành viên',
+      description:
+        'Settings là nơi quản lý thông tin dự án, thành viên, vai trò và một số tùy chỉnh cá nhân hoặc dự án.',
+      steps: [
+        'Vào Settings khi cần cập nhật tên, mô tả hoặc cấu hình của project.',
+        'Kiểm tra danh sách thành viên để biết ai đang tham gia project và vai trò của từng người.',
+        'Khi mời người mới, tạo hoặc gửi invite theo luồng của hệ thống để họ vào đúng project.',
+        'Gán vai trò phù hợp với trách nhiệm: người quản lý cần quyền cấu hình, thành viên thực hiện chỉ cần quyền thao tác task liên quan.',
+        'Nếu bạn không thể sửa hoặc xóa một nội dung, hãy kiểm tra quyền hiện tại của tài khoản trong project.',
+        'Ở phần cá nhân, cập nhật thông tin người dùng, theme hoặc thông báo để trải nghiệm làm việc phù hợp hơn.',
+      ],
+      tip: 'Hãy cấp quyền theo nguyên tắc vừa đủ. Người nào cần thao tác nào thì cấp quyền thao tác đó, tránh mở quyền quá rộng.',
+      note: 'Thay đổi vai trò thành viên có thể ảnh hưởng trực tiếp đến khả năng tạo, sửa, xóa hoặc cấu hình dữ liệu trong project.',
+    },
+    {
+      title: '8. Quy trình làm việc đề xuất',
+      description:
+        'Phần này gợi ý cách dùng OCTOM hằng ngày để nhóm làm việc rõ ràng, ít bỏ sót và dễ nhìn lại tiến độ.',
+      steps: [
+        'Đầu ngày: mở Dashboard để xem tổng quan, sau đó vào Board để xác định các task cần ưu tiên.',
+        'Khi nhận task: đọc mô tả, deadline, priority và checklist. Nếu thiếu thông tin, hỏi ngay trong comment của task.',
+        'Khi bắt đầu làm: chuyển task sang trạng thái đang xử lý để nhóm biết bạn đã nhận việc.',
+        'Trong lúc làm: cập nhật checklist, comment tiến độ hoặc đính kèm file khi có thay đổi quan trọng.',
+        'Khi hoàn thành: kiểm tra lại tiêu chí hoàn thành, cập nhật trạng thái sang hoàn tất và để lại ghi chú nếu cần.',
+        'Cuối ngày hoặc cuối sprint: dùng Dashboard và Board để rà soát task trễ hạn, task chưa có người phụ trách và task bị kẹt lâu.',
+      ],
+      tip: 'Càng cập nhật đều, công cụ càng hữu ích. Mỗi lần thay đổi trạng thái hoặc phạm vi công việc, hãy cập nhật ngay trong OCTOM.',
+      note: 'Tránh trao đổi quyết định quan trọng chỉ ở bên ngoài hệ thống. Nếu quyết định ảnh hưởng đến task, hãy ghi lại trong comment để không mất dấu.',
+    },
+  ],
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function renderSteps(steps: string[]) {
+  return steps.map((step) => `<li>${escapeHtml(step)}</li>`).join('')
+}
+
+function downloadVietnameseGuide() {
+  const sectionHtml = vietnameseGuideDocument.sections
+    .map(
+      (section) => `
+        <section>
+          <h2>${escapeHtml(section.title)}</h2>
+          <p>${escapeHtml(section.description)}</p>
+          <ol>${renderSteps(section.steps)}</ol>
+          <p class="callout"><strong>Mẹo sử dụng:</strong> ${escapeHtml(section.tip)}</p>
+          <p class="note"><strong>Lưu ý:</strong> ${escapeHtml(section.note)}</p>
+        </section>
+      `
+    )
+    .join('')
+
+  const quickStartHtml = vietnameseGuideDocument.quickStart
+    .map((item) => `<li><strong>${escapeHtml(item.title)}:</strong> ${escapeHtml(item.text)}</li>`)
+    .join('')
+
+  const documentHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(vietnameseGuideDocument.title)}</title>
+        <style>
+          body {
+            font-family: "Times New Roman", serif;
+            color: #111827;
+            line-height: 1.55;
+            font-size: 12pt;
+          }
+          h1 {
+            color: #0f172a;
+            font-size: 24pt;
+            margin-bottom: 8px;
+          }
+          h2 {
+            color: #075985;
+            font-size: 16pt;
+            margin-top: 26px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #bae6fd;
+            padding-bottom: 4px;
+          }
+          p {
+            margin: 8px 0;
+          }
+          ol, ul {
+            margin-top: 8px;
+            margin-bottom: 12px;
+          }
+          li {
+            margin-bottom: 6px;
+          }
+          .subtitle {
+            color: #334155;
+            font-size: 12.5pt;
+          }
+          .meta {
+            color: #64748b;
+            font-size: 10.5pt;
+            margin-bottom: 20px;
+          }
+          .callout {
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 8px 10px;
+          }
+          .note {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 8px 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(vietnameseGuideDocument.title)}</h1>
+        <p class="subtitle">${escapeHtml(vietnameseGuideDocument.subtitle)}</p>
+        <p class="meta">Tài liệu tiếng Việt dành cho người dùng OCTOM.</p>
+        <h2>Tổng quan nhanh</h2>
+        <ul>${quickStartHtml}</ul>
+        ${sectionHtml}
+      </body>
+    </html>
+  `
+
+  const blob = new Blob(['\ufeff', documentHtml], {
+    type: 'application/msword;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'Huong-dan-su-dung-OCTOM.doc'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 </script>

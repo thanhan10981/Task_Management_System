@@ -7,12 +7,18 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProjectMemberRole, ProjectStatus } from '@prisma/client';
+import { Transform } from 'class-transformer';
+import { ProjectStatus } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
+import {
+  PROJECT_ROLE_NAME_PATTERN,
+  normalizeProjectRoleName,
+} from '../constants/project-role-permissions.constants';
 
 export class CreateProjectDto {
   @ApiProperty({ description: 'Project name', example: 'Task Management Platform' })
@@ -133,17 +139,21 @@ export class AddProjectMemberDto {
   @IsUUID()
   userId: string;
 
-  @ApiPropertyOptional({ description: 'Role for member', enum: ProjectMemberRole, example: 'DEVELOPER' })
+  @ApiPropertyOptional({ description: 'Role for member', example: 'DEVELOPER' })
   @IsOptional()
-  @IsEnum(ProjectMemberRole)
-  role?: ProjectMemberRole;
+  @Transform(({ value }) => normalizeProjectRoleName(value) ?? value)
+  @IsString()
+  @Matches(PROJECT_ROLE_NAME_PATTERN, { message: 'Role must be 2-40 uppercase letters, numbers, or underscores' })
+  role?: string;
 }
 
 export class UpdateProjectMemberRoleDto {
-  @ApiProperty({ description: 'Updated role for member', enum: ProjectMemberRole, example: 'ADMIN' })
+  @ApiProperty({ description: 'Updated role for member', example: 'QA_LEAD' })
   @IsNotEmpty({ message: 'Role is required' })
-  @IsEnum(ProjectMemberRole)
-  role: ProjectMemberRole;
+  @Transform(({ value }) => normalizeProjectRoleName(value) ?? value)
+  @IsString()
+  @Matches(PROJECT_ROLE_NAME_PATTERN, { message: 'Role must be 2-40 uppercase letters, numbers, or underscores' })
+  role: string;
 }
 
 export class UpdateProjectSettingsDto {

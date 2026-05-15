@@ -7,7 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { NotificationType, Prisma, ProjectMemberRole } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import Redis from 'ioredis';
 import { PrismaService } from '../../../common/prisma/prisma.service';
@@ -36,7 +36,12 @@ import {
   INVITE_TOKEN_PREFIX,
   INVITE_TOKEN_TTL_SECONDS,
 } from '../constants/invite.constants';
-import { normalizeProjectRolePermissions } from '../constants/project-role-permissions.constants';
+import {
+  DEFAULT_PROJECT_MEMBER_ROLE,
+  ProjectMemberRole,
+  normalizeProjectRolePermissions,
+  normalizeProjectRoleName,
+} from '../constants/project-role-permissions.constants';
 
 @Injectable()
 export class ProjectsService {
@@ -91,7 +96,7 @@ export class ProjectsService {
               },
               ...requestedMemberIds.map((memberId) => ({
                 userId: memberId,
-                role: ProjectMemberRole.DEVELOPER,
+                role: DEFAULT_PROJECT_MEMBER_ROLE,
                 addedBy: userId,
               })),
             ],
@@ -266,7 +271,7 @@ export class ProjectsService {
           data: newMemberIds.map((memberId) => ({
             projectId: id,
             userId: memberId,
-            role: ProjectMemberRole.DEVELOPER,
+            role: DEFAULT_PROJECT_MEMBER_ROLE,
             addedBy: userId,
           })),
           skipDuplicates: true,
@@ -381,7 +386,7 @@ export class ProjectsService {
     const member = await this.projectsRepository.addProjectMember(
       projectId,
       userId,
-      ProjectMemberRole.DEVELOPER,
+      DEFAULT_PROJECT_MEMBER_ROLE,
       userId,
     );
 
@@ -451,11 +456,13 @@ export class ProjectsService {
       throw new ConflictException('User is already a member of this project');
     }
 
+    const memberRole = normalizeProjectRoleName(dto.role) ?? DEFAULT_PROJECT_MEMBER_ROLE;
+
     const createdMember = await this.projectsRepository.withTransaction(async (tx) => {
       const member = await this.projectsRepository.addProjectMember(
         projectId,
         dto.userId,
-        dto.role || ProjectMemberRole.DEVELOPER,
+        memberRole,
         userId,
         tx,
       );
@@ -474,11 +481,11 @@ export class ProjectsService {
             project: { connect: { id: projectId } },
             type: NotificationType.SYSTEM,
             title: 'You were added to a project',
-            content: `You have been added to project "${project.name}" as ${dto.role || ProjectMemberRole.DEVELOPER}.`,
+            content: `You have been added to project "${project.name}" as ${memberRole}.`,
             data: {
               action: 'PROJECT_MEMBER_ADDED',
               projectId,
-              role: dto.role || ProjectMemberRole.DEVELOPER,
+              role: memberRole,
               addedBy: userId,
             },
           },
@@ -490,7 +497,7 @@ export class ProjectsService {
     });
 
     this.logger.log(
-      `User ${dto.userId} added to project ${projectId} by ${userId} as ${dto.role || ProjectMemberRole.DEVELOPER}`,
+      `User ${dto.userId} added to project ${projectId} by ${userId} as ${memberRole}`,
     );
 
     return createdMember;
@@ -517,18 +524,23 @@ export class ProjectsService {
       throw new NotFoundException('Project member not found');
     }
 
-    if (project.createdBy === memberUserId && dto.role !== ProjectMemberRole.OWNER) {
+    const nextRole = normalizeProjectRoleName(dto.role);
+    if (!nextRole) {
+      throw new BadRequestException('Invalid member role');
+    }
+
+    if (project.createdBy === memberUserId && nextRole !== ProjectMemberRole.OWNER) {
       throw new ForbiddenException('Project owner role cannot be downgraded');
     }
 
     const updatedMember = await this.projectsRepository.updateProjectMemberRole(
       projectId,
       memberUserId,
-      dto.role,
+      nextRole,
     );
 
     this.logger.log(
-      `User ${memberUserId} role updated in project ${projectId} by ${userId} to ${dto.role}`,
+      `User ${memberUserId} role updated in project ${projectId} by ${userId} to ${nextRole}`,
     );
 
     return updatedMember;

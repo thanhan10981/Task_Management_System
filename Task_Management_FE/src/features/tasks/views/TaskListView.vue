@@ -1348,7 +1348,7 @@ const visibleAvatarCount = 4
 const addingMemberId = ref<string | null>(null)
 const removingMemberId = ref<string | null>(null)
 const updatingRoleMemberId = ref<string | null>(null)
-const memberRoleOptions = ['ADMIN', 'DEVELOPER', 'VIEWER'] as const
+const fixedRoleOptions = ['ADMIN', 'DEVELOPER', 'VIEWER']
 
 const assignableUsersQuery = useUsersQuery(memberSearch, {
   enabled: computed(() =>
@@ -1415,9 +1415,20 @@ const canManageProjectMembers = computed(() => {
 const defaultRolePermissions: ProjectRolePermissionMatrix = {
   OWNER: { canCreateTask: true },
   ADMIN: { canCreateTask: true },
+  MANAGER: { canCreateTask: true },
   DEVELOPER: { canCreateTask: true },
+  QA: { canCreateTask: true },
+  DESIGNER: { canCreateTask: true },
   VIEWER: { canCreateTask: false },
 }
+
+const memberRoleOptions = computed(() => {
+  const rolePermissions = projectSettingsQuery.data.value?.rolePermissions ?? defaultRolePermissions
+  const roles = Object.keys(rolePermissions)
+    .map((role) => role.trim().toUpperCase())
+    .filter((role) => role && role !== 'OWNER')
+  return [...new Set([...fixedRoleOptions, ...roles])]
+})
 
 const canCurrentUserCreateTask = computed(() => {
   const role = (currentUserProjectMember.value?.role || 'DEVELOPER').toUpperCase()
@@ -1520,9 +1531,9 @@ async function removeMemberFromPicker(member: ProjectMember) {
 async function updateMemberRoleFromPicker(member: ProjectMember, role: string) {
   const nextRole = role.trim().toUpperCase()
   const currentRole = (member.role || 'DEVELOPER').toUpperCase()
-  const allowedRoles = new Set(memberRoleOptions)
+  const allowedRoles = new Set(memberRoleOptions.value)
   if (!effectiveProjectId.value || updatingRoleMemberId.value) return
-  if (!allowedRoles.has(nextRole as (typeof memberRoleOptions)[number])) return
+  if (!allowedRoles.has(nextRole)) return
   if (!canUpdateMemberRole(member) || nextRole === currentRole) return
   updatingRoleMemberId.value = member.id
   try {

@@ -170,7 +170,10 @@ export function useProjectSettingsQuery(projectId: MaybeRef<string | null | unde
           rolePermissions: {
             OWNER: { canCreateTask: true },
             ADMIN: { canCreateTask: true },
+            MANAGER: { canCreateTask: true },
             DEVELOPER: { canCreateTask: true },
+            QA: { canCreateTask: true },
+            DESIGNER: { canCreateTask: true },
             VIEWER: { canCreateTask: false },
           },
           updatedAt: null,

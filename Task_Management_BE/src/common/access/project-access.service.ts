@@ -3,14 +3,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ProjectMemberRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { normalizeProjectRolePermissions } from '../../modules/projects/constants/project-role-permissions.constants';
+import {
+  ProjectMemberRole,
+  normalizeProjectRolePermissions,
+} from '../../modules/projects/constants/project-role-permissions.constants';
 
 interface ProjectAccessContext {
   projectId: string;
   isOwner: boolean;
-  role: ProjectMemberRole | null;
+  role: string | null;
 }
 
 @Injectable()

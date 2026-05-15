@@ -22,15 +22,6 @@ enum ProjectStatus {
   @@map("project_status")
 }
 
-enum ProjectMemberRole {
-  OWNER
-  ADMIN
-  DEVELOPER
-  VIEWER
-
-  @@map("project_member_role")
-}
-
 enum TaskPriority {
   LOW
   MEDIUM
@@ -179,7 +170,7 @@ model ProjectMember {
   id        String            @id @default(uuid())
   projectId String
   userId    String
-  role      ProjectMemberRole @default(DEVELOPER)
+  role      String            @default("DEVELOPER") @db.VarChar(40)
   joinedAt  DateTime          @default(now()) @db.Timestamptz(6)
   addedBy   String?
 

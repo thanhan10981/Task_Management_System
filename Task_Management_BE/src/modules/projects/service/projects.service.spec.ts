@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ProjectMemberRole } from '@prisma/client';
+import { ProjectMemberRole } from '../constants/project-role-permissions.constants';
 import { ProjectsService } from './projects.service';
 
 describe('ProjectsService', () => {

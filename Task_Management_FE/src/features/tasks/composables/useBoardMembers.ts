@@ -44,7 +44,7 @@ export function useBoardMembers(deps: BoardMembersDeps) {
   const addingMemberId = ref<string | null>(null)
   const removingMemberId = ref<string | null>(null)
   const updatingRoleMemberId = ref<string | null>(null)
-  const memberRoleOptions = ['ADMIN', 'DEVELOPER', 'VIEWER'] as const
+  const fixedRoleOptions = ['ADMIN', 'DEVELOPER', 'VIEWER']
 
   const assignableUsersQuery = useUsersQuery(memberSearch, {
     enabled: computed(() =>
@@ -116,7 +116,10 @@ export function useBoardMembers(deps: BoardMembersDeps) {
   const defaultRolePermissions: RolePermissionMatrix = {
     OWNER: { canCreateTask: true },
     ADMIN: { canCreateTask: true },
+    MANAGER: { canCreateTask: true },
     DEVELOPER: { canCreateTask: true },
+    QA: { canCreateTask: true },
+    DESIGNER: { canCreateTask: true },
     VIEWER: { canCreateTask: false },
   }
 
@@ -133,6 +136,13 @@ export function useBoardMembers(deps: BoardMembersDeps) {
       }
     }
     return safe
+  })
+
+  const memberRoleOptions = computed(() => {
+    const roles = Object.keys(rolePermissions.value)
+      .map((role) => role.trim().toUpperCase())
+      .filter((role) => role && role !== 'OWNER')
+    return [...new Set([...fixedRoleOptions, ...roles])]
   })
 
   const canCurrentUserCreateTask = computed(() => {
@@ -246,9 +256,9 @@ export function useBoardMembers(deps: BoardMembersDeps) {
   async function updateMemberRoleFromPicker(member: ProjectMember, role: string) {
     const nextRole = role.trim().toUpperCase()
     const currentRole = (member.role || 'DEVELOPER').toUpperCase()
-    const allowedRoles = new Set(memberRoleOptions)
+    const allowedRoles = new Set(memberRoleOptions.value)
     if (!deps.effectiveProjectId.value || updatingRoleMemberId.value) return
-    if (!allowedRoles.has(nextRole as (typeof memberRoleOptions)[number])) return
+    if (!allowedRoles.has(nextRole)) return
     if (!canUpdateMemberRole(member) || nextRole === currentRole) return
 
     updatingRoleMemberId.value = member.id

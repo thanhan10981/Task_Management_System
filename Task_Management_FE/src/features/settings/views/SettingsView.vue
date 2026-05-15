@@ -256,9 +256,27 @@
             </div>
 
             <div class="mt-5">
-              <h4 class="text-[0.95rem] font-bold m-0" style="color: var(--text-heading);">Role permissions</h4>
+              <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h4 class="text-[0.95rem] font-bold m-0" style="color: var(--text-heading);">Role permissions</h4>
+                <div class="flex items-center gap-2" v-if="canManageRolePermissions">
+                  <input
+                    v-model="newRoleName"
+                    class="sp-input h-8 w-[160px] px-2.5 py-1 text-xs"
+                    style="background: var(--input-bg); border-color: var(--input-border); color: var(--text-primary);"
+                    placeholder="QA_LEAD"
+                    maxlength="40"
+                    @keydown.enter.prevent="addRolePermission"
+                  >
+                  <button
+                    type="button"
+                    class="sp-btn-secondary h-8 px-3 text-xs"
+                    style="border-color: var(--border-medium); background: var(--bg-surface); color: var(--text-muted);"
+                    @click="addRolePermission"
+                  >Add role</button>
+                </div>
+              </div>
               <p class="text-[0.8rem] mt-1 mb-2" style="color: var(--text-subtle);">
-                Owner/Admin can decide who can create tasks in this project.
+                Owner/Admin can add project roles and decide who can create tasks.
               </p>
               <div class="flex flex-col gap-0 rounded-xl overflow-hidden border-[1.5px]" style="border-color: var(--border-base);">
                 <div
@@ -270,17 +288,26 @@
                     <span class="text-sm font-semibold" style="color: var(--text-primary);">{{ perm.role }}</span>
                     <span class="text-[0.8rem]" style="color: var(--text-subtle);">Allow this role to create tasks.</span>
                   </div>
-                  <label class="relative inline-flex cursor-pointer flex-shrink-0" :class="{ 'opacity-50 cursor-not-allowed': !canManageRolePermissions }">
-                    <input
-                      v-model="perm.canCreateTask"
-                      type="checkbox"
-                      class="toggle-input absolute opacity-0 w-0 h-0"
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <label class="relative inline-flex cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': !canManageRolePermissions }">
+                      <input
+                        v-model="perm.canCreateTask"
+                        type="checkbox"
+                        class="toggle-input absolute opacity-0 w-0 h-0"
+                        :disabled="!canManageRolePermissions"
+                      >
+                      <span class="toggle-track block w-11 h-6 rounded-full relative transition-colors duration-[220ms]">
+                        <span class="toggle-thumb absolute top-[3px] left-[3px] w-[18px] h-[18px] rounded-full bg-white transition-transform duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]" style="box-shadow: 0 1px 4px rgba(0,0,0,0.20);" />
+                      </span>
+                    </label>
+                    <button
+                      v-if="canRemoveRole(perm.role)"
+                      type="button"
+                      class="text-[11px] font-bold text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       :disabled="!canManageRolePermissions"
-                    >
-                    <span class="toggle-track block w-11 h-6 rounded-full relative transition-colors duration-[220ms]">
-                      <span class="toggle-thumb absolute top-[3px] left-[3px] w-[18px] h-[18px] rounded-full bg-white transition-transform duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]" style="box-shadow: 0 1px 4px rgba(0,0,0,0.20);" />
-                    </span>
-                  </label>
+                      @click="removeRolePermission(perm.role)"
+                    >Remove</button>
+                  </div>
                 </div>
               </div>
               <p v-if="!canManageRolePermissions" class="text-[0.78rem] mt-2 mb-0" style="color: var(--text-subtle);">
@@ -375,7 +402,7 @@ interface PasswordForm { current: string; newPw: string; confirm: string }
 interface ProfilePreview extends ProfileForm { fullName: string }
 interface Notification { id: string; title: string; desc: string; enabled: boolean }
 interface ThemeOption { value: UserSettings['theme']; label: string; icon: string }
-interface RolePermission { role: 'DEVELOPER' | 'VIEWER'; canCreateTask: boolean }
+interface RolePermission { role: string; canCreateTask: boolean }
 interface SettingsSnapshot {
   form: ProfileForm; settings: UserSettings; pwForm: PasswordForm
   notifications: Array<{ id: string; enabled: boolean }>
@@ -431,9 +458,14 @@ const notifications = reactive<Notification[]>([
   { id: 'mentions', title: 'Mentions', desc: 'When someone mentions you in a comment.', enabled: true },
 ])
 const rolePermissions = reactive<RolePermission[]>([
+  { role: 'MANAGER', canCreateTask: true },
   { role: 'DEVELOPER', canCreateTask: true },
+  { role: 'QA', canCreateTask: true },
+  { role: 'DESIGNER', canCreateTask: true },
   { role: 'VIEWER', canCreateTask: false },
 ])
+const protectedRoleNames = new Set(['OWNER', 'ADMIN'])
+const newRoleName = ref('')
 const currentProjectRole = computed(() => {
   const me = taskStore.members.find((member) => member.id === authStore.user?.id)
   return (me?.role || '').toUpperCase()
@@ -441,6 +473,30 @@ const currentProjectRole = computed(() => {
 const canManageRolePermissions = computed(() =>
   currentProjectRole.value === 'OWNER' || currentProjectRole.value === 'ADMIN'
 )
+
+function normalizeRoleName(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, '_')
+}
+
+function canRemoveRole(role: string) {
+  return canManageRolePermissions.value && !protectedRoleNames.has(role.toUpperCase())
+}
+
+function addRolePermission() {
+  if (!canManageRolePermissions.value) return
+  const role = normalizeRoleName(newRoleName.value)
+  if (!/^[A-Z][A-Z0-9_]{1,39}$/.test(role)) return
+  if (!rolePermissions.some((item) => item.role === role)) {
+    rolePermissions.push({ role, canCreateTask: true })
+  }
+  newRoleName.value = ''
+}
+
+function removeRolePermission(role: string) {
+  if (!canRemoveRole(role)) return
+  const index = rolePermissions.findIndex((item) => item.role === role)
+  if (index >= 0) rolePermissions.splice(index, 1)
+}
 
 function buildSnapshot(): SettingsSnapshot {
   return {
@@ -623,12 +679,14 @@ function applyLoadedUserSettings(payload?: UserSettingsApiData) {
 function applyLoadedProjectSettings(rolePermissionsPayload?: ProjectRolePermissionMatrix | null) {
   if (!rolePermissionsPayload) return
 
-  for (const item of rolePermissions) {
-    const maybeRole = rolePermissionsPayload[item.role]
-    if (maybeRole && typeof maybeRole.canCreateTask === 'boolean') {
-      item.canCreateTask = maybeRole.canCreateTask
-    }
-  }
+  const nextRoles = Object.entries(rolePermissionsPayload)
+    .map(([role, value]) => ({
+      role: normalizeRoleName(role),
+      canCreateTask: Boolean(value?.canCreateTask),
+    }))
+    .filter((item) => item.role && !protectedRoleNames.has(item.role))
+
+  rolePermissions.splice(0, rolePermissions.length, ...nextRoles)
 
   originalSnapshot.value = buildSnapshot()
 }
@@ -692,10 +750,8 @@ function handleCancel() {
   Object.assign(pwForm, { ...originalSnapshot.value.pwForm })
   setTheme(originalSnapshot.value.settings.theme)
   for (const n of notifications) { const saved = originalSnapshot.value.notifications.find((s) => s.id === n.id); if (saved) n.enabled = saved.enabled }
-  for (const p of rolePermissions) {
-    const saved = originalSnapshot.value.rolePermissions.find((s) => s.role === p.role)
-    if (saved) p.canCreateTask = saved.canCreateTask
-  }
+  rolePermissions.splice(0, rolePermissions.length, ...originalSnapshot.value.rolePermissions.map((item) => ({ ...item })))
+  newRoleName.value = ''
 }
 
 function applyTheme(theme: UserSettings['theme']) { settings.theme = theme; setTheme(theme) }

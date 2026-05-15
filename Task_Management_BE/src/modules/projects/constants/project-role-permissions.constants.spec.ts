@@ -1,5 +1,5 @@
-import { ProjectMemberRole } from '@prisma/client';
 import {
+  ProjectMemberRole,
   DEFAULT_PROJECT_ROLE_PERMISSIONS,
   normalizeProjectRolePermissions,
 } from './project-role-permissions.constants';

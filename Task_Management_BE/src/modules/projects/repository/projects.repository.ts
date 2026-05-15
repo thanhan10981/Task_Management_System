@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { Prisma, PrismaClient, ProjectMemberRole, ProjectStatus } from '@prisma/client';
+import { Prisma, PrismaClient, ProjectStatus } from '@prisma/client';
+import { ProjectMemberRole } from '../constants/project-role-permissions.constants';
 
 export type TxClient = Omit<
   PrismaClient,
@@ -158,7 +159,7 @@ export class ProjectsRepository {
   async addProjectMember(
     projectId: string,
     userId: string,
-    role: ProjectMemberRole,
+    role: string,
     addedBy: string,
     tx?: TxClient,
   ) {
@@ -181,7 +182,7 @@ export class ProjectsRepository {
     return client.notification.create({ data });
   }
 
-  async updateProjectMemberRole(projectId: string, userId: string, role: ProjectMemberRole) {
+  async updateProjectMemberRole(projectId: string, userId: string, role: string) {
     return this.prisma.projectMember.update({
       where: {
         projectId_userId: {

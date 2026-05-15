@@ -1000,11 +1000,6 @@ async function confirmDeleteTask() {
   }
 }
 
-function openAiCreateTask() {
-  if (!detailProjectId.value || !task.value?.status) return
-  aiCreateOpen.value = true
-}
-
 async function onAiTaskCreated() {
   if (detailProjectId.value) {
     await store.loadProjectBoard(detailProjectId.value)

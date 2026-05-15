@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { Queue } from 'bullmq';
@@ -59,8 +59,18 @@ import { MailWorkerService } from './services/mail-worker.service';
     {
       provide: MAIL_QUEUE,
       inject: [ConfigService, REDIS_CONNECTION_OPTIONS],
-      useFactory: (configService: ConfigService, connection) =>
-        new Queue<MailJob>(configService.get<string>('MAIL_QUEUE_NAME'), { connection }),
+      useFactory: (configService: ConfigService, connection) => {
+        const queue = new Queue<MailJob>(configService.get<string>('MAIL_QUEUE_NAME'), {
+          connection,
+        });
+        const logger = new Logger('MailQueue');
+
+        queue.on('error', (error) => {
+          logger.warn(`Mail queue connection error: ${error.message}`);
+        });
+
+        return queue;
+      },
     },
     MailJobQueueService,
     MailWorkerService,

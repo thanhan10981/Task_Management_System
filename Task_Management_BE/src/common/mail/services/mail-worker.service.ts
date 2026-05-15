@@ -42,7 +42,14 @@ export class MailWorkerService implements OnModuleInit, OnModuleDestroy {
       );
     });
 
-    this.worker.on('error', (error) => {
+    this.worker.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ECONNRESET') {
+        this.logger.warn(
+          `Mail worker Redis connection was reset and will reconnect: ${error.message}`,
+        );
+        return;
+      }
+
       this.logger.error(`Mail worker error: ${error.message}`, error.stack);
     });
   }

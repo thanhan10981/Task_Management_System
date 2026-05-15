@@ -1,4 +1,4 @@
-import { Global, Module, OnModuleDestroy, Inject } from '@nestjs/common';
+import { Global, Module, OnModuleDestroy, Inject, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis, { RedisOptions } from 'ioredis';
 import { REDIS_CLIENT, REDIS_CONNECTION_OPTIONS } from './redis.constants';
@@ -16,7 +16,16 @@ import { buildRedisConnectionOptions } from './redis.config';
     {
       provide: REDIS_CLIENT,
       inject: [REDIS_CONNECTION_OPTIONS],
-      useFactory: (connectionOptions: RedisOptions) => new Redis(connectionOptions),
+      useFactory: (connectionOptions: RedisOptions) => {
+        const logger = new Logger('RedisClient');
+        const redis = new Redis(connectionOptions);
+
+        redis.on('error', (error) => {
+          logger.warn(`Redis connection error: ${error.message}`);
+        });
+
+        return redis;
+      },
     },
   ],
   exports: [REDIS_CONNECTION_OPTIONS, REDIS_CLIENT],

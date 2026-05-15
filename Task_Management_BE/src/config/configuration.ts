@@ -28,6 +28,7 @@ export default () => ({
   clientUrl: process?.env?.CLIENT_URL || process?.env?.FRONTEND_URL || 'http://localhost:5173',
 
   redis: {
+    url: process?.env?.REDIS_URL,
     host: process?.env?.REDIS_HOST,
     port: process?.env?.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : undefined,
     password: process?.env?.REDIS_PASSWORD,

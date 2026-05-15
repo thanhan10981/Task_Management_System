@@ -23,11 +23,7 @@ export interface EnvVariables {
   RESET_PASSWORD_CODE_EXPIRES_MINUTES?: number;
   GEMINI_API_KEY?: string;
   GEMINI_FALLBACK_MODEL?: string;
-  REDIS_URL?: string;
-  REDIS_HOST?: string;
-  REDIS_PORT?: number;
-  REDIS_PASSWORD?: string;
-  REDIS_DB?: number;
+  REDIS_URL: string;
   MAIL_QUEUE_NAME: string;
 }
 
@@ -77,14 +73,6 @@ function readNumber(config: RawConfig, key: string, fallback: number): number {
   }
 
   return value;
-}
-
-function readRequiredNumber(config: RawConfig, key: string): number {
-  if (config[key] == null || config[key] === '') {
-    throw new Error(`Environment variable ${key} is required`);
-  }
-
-  return readNumber(config, key, 0);
 }
 
 export function validate(config: RawConfig): EnvVariables {
@@ -138,12 +126,11 @@ export function validate(config: RawConfig): EnvVariables {
   //   }
   // }
 
-  const redisUrl = readString(config, 'REDIS_URL') || undefined;
-  const redisHost = readString(config, 'REDIS_HOST') || undefined;
+  const redisUrl = readString(config, 'REDIS_URL');
   const mailQueueName = readString(config, 'MAIL_QUEUE_NAME');
 
-  if (!redisUrl && !redisHost) {
-    throw new Error('REDIS_URL or REDIS_HOST is required');
+  if (!redisUrl) {
+    throw new Error('REDIS_URL is required');
   }
 
   if (!mailQueueName) {
@@ -190,14 +177,6 @@ export function validate(config: RawConfig): EnvVariables {
     GEMINI_API_KEY: readString(config, 'GEMINI_API_KEY') || undefined,
     GEMINI_FALLBACK_MODEL: readString(config, 'GEMINI_FALLBACK_MODEL') || undefined,
     REDIS_URL: redisUrl,
-    REDIS_HOST: redisHost,
-    REDIS_PORT: redisUrl ? undefined : readRequiredNumber(config, 'REDIS_PORT'),
-    REDIS_PASSWORD: readString(config, 'REDIS_PASSWORD') || undefined,
-    REDIS_DB: redisUrl
-      ? config.REDIS_DB || config.REDIS_DB === 0
-        ? readNumber(config, 'REDIS_DB', 0)
-        : undefined
-      : readRequiredNumber(config, 'REDIS_DB'),
     MAIL_QUEUE_NAME: mailQueueName,
   };
 }

@@ -185,7 +185,33 @@ export class ProjectsService {
       this.prisma.project.count({ where }),
     ]);
 
-    return createPaginatedResponse(projects, total, queryDto);
+    const projectIds = projects.map((project) => project.id);
+    const taskCounts = projectIds.length
+      ? await this.prisma.task.groupBy({
+          by: ['projectId'],
+          where: {
+            projectId: { in: projectIds },
+            isDeleted: false,
+            parentTaskId: null,
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const taskCountByProjectId = new Map(
+      taskCounts.map((item) => [item.projectId, item._count._all]),
+    );
+
+    const normalizedProjects = projects.map((project) => ({
+      ...project,
+      taskCount: taskCountByProjectId.get(project.id) ?? 0,
+      memberCount: project._count.members,
+      role:
+        project.createdBy === userId
+          ? ProjectMemberRole.OWNER
+          : project.members.find((member) => member.userId === userId)?.role,
+    }));
+
+    return createPaginatedResponse(normalizedProjects, total, queryDto);
   }
 
   async findOne(userId: string, id: string) {

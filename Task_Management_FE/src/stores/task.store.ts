@@ -510,6 +510,7 @@ export const useTaskStore = defineStore('tasks', () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.all }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.taskAnalytics.all }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects.list() }),
       ...(projectId
         ? [queryClient.invalidateQueries({ queryKey: QUERY_KEYS.files.allInProject(projectId) })]
         : []),

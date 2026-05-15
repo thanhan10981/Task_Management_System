@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex bg-[#0a0a1a] overflow-hidden">
+  <div class="min-h-screen flex bg-[#0a0a1a] overflow-x-hidden">
     <!-- Animated background blobs -->
     <div class="pointer-events-none fixed inset-0 overflow-hidden">
       <div class="animate-blob animation-delay-0 absolute -top-32 -left-32 w-96 h-96 rounded-full bg-sky-600/20 blur-3xl" />
@@ -61,7 +61,7 @@
 
     <!-- Right form panel -->
     <div class="relative flex flex-1 items-center justify-center p-6 lg:p-12">
-      <div class="w-full max-w-md animate-fade-up">
+      <div class="w-full animate-fade-up" :class="route.meta.authWide ? 'max-w-5xl' : 'max-w-md'">
         <!-- Mobile logo -->
         <div class="mb-8 lg:hidden">
           <OctomLogo size="md" textColor="text-white" />
@@ -75,6 +75,9 @@
 
 <script setup lang="ts">
 import OctomLogo from '@/components/common/OctomLogo.vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 
 const features = [
   {

@@ -306,7 +306,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import type { ProjectSummary } from '@/types/project.types'
 import { storeToRefs } from 'pinia'
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 type RoleFilter = 'all' | 'owned' | 'joined'
@@ -333,6 +333,10 @@ const editForm = reactive({
 const updateProjectMutation = useUpdateProjectMutation()
 const deleteProjectMutation = useDeleteProjectMutation()
 const leaveProjectMutation = useLeaveProjectMutation()
+
+onMounted(() => {
+  void projectStore.initializeAfterAuth(true)
+})
 
 const roleFilters: Array<{ label: string; value: RoleFilter }> = [
   { label: 'All', value: 'all' },

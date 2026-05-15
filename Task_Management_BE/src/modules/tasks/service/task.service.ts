@@ -243,6 +243,7 @@ export class TaskService {
     const deletedOnly = queryDto.deleted === 'true';
 
     const where: Prisma.TaskWhereInput = {
+      parentTaskId: null,
       project: {
         OR: [
           { createdBy: userId },

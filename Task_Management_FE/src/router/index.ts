@@ -176,6 +176,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Forgot Password', guestOnly: true },
       },
       {
+        path: 'guide',
+        name: 'auth-guide',
+        component: () => import('@/features/auth/views/GuideView.vue'),
+        meta: { title: 'User Guide', authWide: true },
+      },
+      {
         path: 'reset-password',
         name: 'reset-password',
         component: () => import('@/features/auth/views/ResetPasswordView.vue'),

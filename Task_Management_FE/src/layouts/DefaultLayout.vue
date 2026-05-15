@@ -21,12 +21,22 @@
           :key="item.name"
           :to="navTarget(item)"
           class="nav-item relative w-11 h-11 rounded-[14px] flex items-center justify-center cursor-pointer no-underline font-[inherit] border-none bg-transparent transition-all duration-[180ms]"
-          :class="isActive(item) ? 'nav-item--active' : ''"
-          :title="item.label"
+          :class="[
+            isActive(item) ? 'nav-item--active' : '',
+            isProjectNavLocked(item) ? 'nav-item--locked' : '',
+          ]"
+          :title="navTooltip(item)"
           active-class=""
+          @click="handleNavClick(item, $event)"
         >
           <span class="nav-icon flex items-center justify-center" v-html="item.icon" />
-          <span class="nav-tooltip">{{ item.label }}</span>
+          <span v-if="isProjectNavLocked(item)" class="nav-lock-dot" aria-hidden="true">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+          </span>
+          <span class="nav-tooltip">{{ navTooltip(item) }}</span>
         </RouterLink>
       </nav>
     </aside>
@@ -329,12 +339,16 @@
         v-for="item in navItems"
         :key="item.name"
         :to="navTarget(item)"
-        class="bottom-nav-item flex flex-col items-center justify-center gap-0.5 flex-1 h-full
+        class="bottom-nav-item relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full
                text-[10px] font-semibold cursor-pointer no-underline transition-all duration-150"
-        :class="isActive(item) ? 'bottom-nav-item--active' : ''"
+        :class="[
+          isActive(item) ? 'bottom-nav-item--active' : '',
+          isProjectNavLocked(item) ? 'bottom-nav-item--locked' : '',
+        ]"
         active-class=""
+        @click="handleNavClick(item, $event)"
       >
-        <span class="nav-icon flex items-center justify-center" v-html="item.icon" />
+        <span class="nav-icon relative flex items-center justify-center" v-html="item.icon" />
         <span>{{ item.label }}</span>
       </RouterLink>
     </nav>
@@ -400,12 +414,12 @@
                   type="text"
                   class="field-input w-full rounded-[10px] px-3 py-2.5 text-sm outline-none font-[inherit] transition-all duration-[180ms]"
                   style="border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--text-primary);"
-                  placeholder="Search user by name or email"
-                  @focus="memberDropdownOpen = true"
+                  placeholder="Search by member email"
+                  @focus="openMemberDropdown"
                 >
 
                 <div
-                  v-if="memberDropdownOpen"
+                  v-if="shouldShowMemberDropdown"
                   class="mt-1.5 rounded-[10px] border max-h-[190px] overflow-y-auto"
                   style="border-color: var(--border-medium); background: var(--dropdown-bg); box-shadow: var(--shadow-md);"
                 >
@@ -457,6 +471,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { post } from '@/api/client'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
@@ -667,24 +682,26 @@ const selectedMembers   = ref<User[]>([])
 const createProjectForm = reactive({ name: '', description: '' })
 
 const selectedMemberIds = computed(() => new Set(selectedMembers.value.map((m) => m.id)))
+const memberEmailQuery = computed(() => memberSearchQuery.value.trim().toLowerCase())
+const canSearchMembers = computed(() => memberEmailQuery.value.length > 0)
+const shouldShowMemberDropdown = computed(() => memberDropdownOpen.value && canSearchMembers.value)
 const shouldHydrateCurrentUser = computed(() => authStore.isAuthenticated)
 const authMeQuery = useAuthMeQuery(shouldHydrateCurrentUser)
 const assignableUsersQuery = useUsersQuery(memberSearchQuery, {
-  enabled: computed(() => createProjectModalOpen.value),
+  enabled: computed(() => createProjectModalOpen.value && canSearchMembers.value),
 })
 const assignableUsers        = computed(() => assignableUsersQuery.data.value ?? [])
-const loadingAssignableUsers = computed(() => assignableUsersQuery.isPending.value)
+const loadingAssignableUsers = computed(() => assignableUsersQuery.isFetching.value)
 const memberLoadError        = computed(() => (assignableUsersQuery.isError.value ? 'Failed to load users' : ''))
 
 const filteredAssignableUsers = computed(() => {
-  const query = memberSearchQuery.value.trim().toLowerCase()
+  const query = memberEmailQuery.value
+  if (!query) return []
+
   return assignableUsers.value
     .filter((u) => u.id !== authStore.user?.id)
     .filter((u) => !selectedMemberIds.value.has(u.id))
-    .filter((u) => {
-      if (!query) return true
-      return (u.fullName || '').toLowerCase().includes(query) || u.email.toLowerCase().includes(query)
-    })
+    .filter((u) => u.email.toLowerCase().includes(query))
     .slice(0, 8)
 })
 
@@ -764,6 +781,10 @@ watch(
   },
 )
 
+watch(memberSearchQuery, () => {
+  memberDropdownOpen.value = canSearchMembers.value
+})
+
 watch(
   routeProjectId,
   (value) => {
@@ -800,11 +821,18 @@ const displayUserName = computed(() =>
   authStore.user?.fullName?.trim() || authStore.user?.email?.split('@')[0] || 'User'
 )
 
-function handleLogout() {
+async function handleLogout() {
   userMenuOpen.value = false
   projectMenuOpen.value = false
-  authStore.logout()
-  router.push({ name: 'login' })
+
+  try {
+    await post('/auth/logout')
+  } catch {
+    // Local logout should still happen even if the session is already expired.
+  } finally {
+    authStore.logout()
+    router.push({ name: 'login' })
+  }
 }
 
 function selectProject(projectId: string) {
@@ -837,6 +865,10 @@ function goToCreateProject() {
   memberDropdownOpen.value = false
 }
 
+function openMemberDropdown() {
+  memberDropdownOpen.value = canSearchMembers.value
+}
+
 function closeCreateProjectModal() {
   createProjectModalOpen.value = false
   createProjectError.value = ''
@@ -855,7 +887,7 @@ function addMember(user: User) {
   if (selectedMemberIds.value.has(user.id)) return
   selectedMembers.value.push(user)
   memberSearchQuery.value = ''
-  memberDropdownOpen.value = true
+  memberDropdownOpen.value = false
 }
 
 function removeMember(userId: string) {
@@ -905,13 +937,43 @@ function isActive(item: { routeName: string }) {
   return routeName === item.routeName
 }
 
+type NavItem = {
+  name: string
+  label: string
+  routeName: string
+  requiresProject: boolean
+  icon: string
+}
+
+function isProjectNavLocked(item: Pick<NavItem, 'requiresProject'>) {
+  return Boolean(item.requiresProject && !effectiveProjectId.value)
+}
+
+function navTooltip(item: Pick<NavItem, 'label' | 'requiresProject'>) {
+  return isProjectNavLocked(item) ? 'Select or create a project first' : item.label
+}
+
+function handleNavClick(item: Pick<NavItem, 'requiresProject'>, event: MouseEvent) {
+  if (!isProjectNavLocked(item)) return
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  if (projects.value.length > 0) {
+    projectMenuOpen.value = true
+    return
+  }
+
+  goToCreateProject()
+}
+
 function navTarget(item: { routeName: string; requiresProject?: boolean }) {
   if (!item.requiresProject) return { name: item.routeName }
   if (!effectiveProjectId.value) return { name: 'dashboard' }
   return { name: item.routeName, params: { projectId: effectiveProjectId.value } }
 }
 
-const navItems = [
+const navItems: NavItem[] = [
   {
     name: 'dashboard', label: 'Dashboard', routeName: 'dashboard', requiresProject: false,
     icon: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -966,10 +1028,37 @@ const navItems = [
   color: var(--nav-hover-color);
   transform: translateY(-1px);
 }
+.nav-item--locked {
+  color: var(--text-muted);
+  opacity: 0.58;
+}
+.nav-item--locked:hover {
+  opacity: 1;
+  background: var(--bg-surface-2);
+  color: #6366f1;
+}
 .nav-item--active {
   background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
   color: #ffffff !important;
   box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+}
+.nav-lock-dot {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  color: #6366f1;
+  border: 1px solid var(--border-base);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14);
+}
+.nav-lock-dot svg {
+  display: block;
 }
 
 /* 2. :deep() for injected SVG */
@@ -1044,6 +1133,31 @@ const navItems = [
 /* 9. Bottom nav — mobile only */
 .bottom-nav-item { color: var(--text-subtle); }
 .bottom-nav-item :deep(svg) { width: 20px; height: 20px; }
+.bottom-nav-item--locked {
+  opacity: 0.55;
+}
+.bottom-nav-item--locked::after {
+  content: 'Select project';
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: #1e293b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.bottom-nav-item--locked:active::after,
+.bottom-nav-item--locked:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-2px);
+}
 .bottom-nav-item--active {
   color: #6366f1;
 }

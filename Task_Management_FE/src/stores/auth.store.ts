@@ -1,4 +1,6 @@
 import type { User } from '@/types/user.types'
+import { QUERY_KEYS } from '@/constants/query-keys'
+import { queryClient } from '@/lib/query-client'
 import { useProjectStore } from '@/stores/project.store'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -47,7 +49,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const projectStore = useProjectStore()
-      projectStore.resetProjectContext({ clearStoredLastProject: false })
+      projectStore.resetProjectContext({ clearStoredLastProject: true })
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.projects.all })
     } catch {
       // Ignore reset errors when pinia is not available yet.
     }

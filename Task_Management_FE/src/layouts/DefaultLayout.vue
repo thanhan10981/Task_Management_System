@@ -721,7 +721,12 @@ function onClickOutside(e: MouseEvent) {
 watch(
   () => authMeQuery.data.value?.data,
   (user) => {
-    if (user) authStore.setAuth(authStore.accessToken, user)
+    if (!user) return
+
+    const currentUserId = authStore.user?.id
+    if (currentUserId && user.id !== currentUserId) return
+
+    authStore.setAuth(authStore.accessToken, user)
   },
   { immediate: true },
 )

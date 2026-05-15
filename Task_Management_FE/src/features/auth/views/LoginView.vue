@@ -117,8 +117,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useApiError } from '@/composables/useApiError'
+import { QUERY_KEYS } from '@/constants/query-keys'
 import { useAuthStore } from '@/stores/auth.store'
+import { useProjectStore } from '@/stores/project.store'
 import { toTypedSchema } from '@vee-validate/zod'
+import { useQueryClient } from '@tanstack/vue-query'
 import { useForm } from 'vee-validate'
 import { useRoute, useRouter } from 'vue-router'
 import { useLoginMutation } from '../composables/useAuthMutations'
@@ -127,6 +130,8 @@ import { loginSchema } from '../schemas/auth.schema'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const projectStore = useProjectStore()
+const queryClient = useQueryClient()
 const { apiError, handleError, clearError } = useApiError()
 const loginMutation = useLoginMutation()
 
@@ -143,6 +148,9 @@ const onSubmit = handleSubmit(async (values) => {
   try {
     const response = await loginMutation.mutateAsync(values)
     authStore.setAuth(null, response.data.user)
+    queryClient.setQueryData(QUERY_KEYS.auth.me, { data: response.data.user })
+    queryClient.removeQueries({ queryKey: QUERY_KEYS.projects.all })
+    projectStore.resetProjectContext({ clearStoredLastProject: true })
 
     const redirectTarget = typeof route.query.redirect === 'string' ? route.query.redirect : null
     if (redirectTarget?.startsWith('/')) {

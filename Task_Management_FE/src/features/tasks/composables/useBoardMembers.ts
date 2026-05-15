@@ -76,6 +76,34 @@ export function useBoardMembers(deps: BoardMembersDeps) {
     return `${base}?${INVITE_TOKEN_QUERY_KEY}=${encodeURIComponent(token)}`
   }
 
+  async function copyTextToClipboard(text: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+        return
+      }
+    } catch {
+      // Some browsers expose Clipboard API but reject it outside secure/user-activation contexts.
+    }
+
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    textarea.style.top = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+
+    try {
+      const copied = document.execCommand('copy')
+      if (!copied) throw new Error('Copy command failed')
+    } finally {
+      document.body.removeChild(textarea)
+    }
+  }
+
   const currentUserProjectMember = computed<ProjectMember | null>(() =>
     deps.members.value.find((member) => member.id === deps.authUserId.value) ?? null
   )
@@ -252,6 +280,11 @@ export function useBoardMembers(deps: BoardMembersDeps) {
       return
     }
 
+    if (!canManageProjectMembers.value) {
+      deps.toast.error('Only project owner or admin can create invite links')
+      return
+    }
+
     try {
       const tokenResponse = await createProjectInviteToken(deps.effectiveProjectId.value)
       inviteToken.value = tokenResponse?.token || null
@@ -261,19 +294,15 @@ export function useBoardMembers(deps: BoardMembersDeps) {
       }
 
       const link = buildInviteLink(inviteToken.value)
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link)
-      } else {
-        const input = document.createElement('input')
-        input.value = link
-        document.body.appendChild(input)
-        input.select()
-        document.execCommand('copy')
-        document.body.removeChild(input)
-      }
+      await copyTextToClipboard(link)
       deps.toast.success('Invite link copied')
-    } catch {
-      deps.toast.error('Cannot copy invite link')
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status
+      deps.toast.error(
+        status === 403
+          ? 'Only project owner or admin can create invite links'
+          : 'Cannot copy invite link'
+      )
     }
   }
 

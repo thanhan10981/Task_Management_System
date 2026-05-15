@@ -104,7 +104,10 @@
                   <button
                     type="button"
                     class="w-full h-[32px] px-2.5 rounded-[8px] border text-[12px] font-semibold transition-colors flex items-center justify-center gap-1.5"
+                    :class="!canManageProjectMembers ? 'opacity-50 cursor-not-allowed' : ''"
+                    :title="canManageProjectMembers ? 'Copy invite link' : 'Only project owner or admin can create invite links'"
                     style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-secondary);"
+                    :disabled="!canManageProjectMembers"
                     @click="copyInviteLink"
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l2.92-2.92a5 5 0 0 0-7.07-7.07L11.8 5"/><path d="M14 11a5 5 0 0 0-7.54-.54L3.54 13.38a5 5 0 0 0 7.07 7.07L12.2 19"/></svg>
@@ -1182,7 +1185,8 @@ import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
-import { useProjectSettingsQuery, type ProjectRolePermissionMatrix } from '@/api/projects'
+import { createProjectInviteToken, useProjectSettingsQuery, type ProjectRolePermissionMatrix } from '@/api/projects'
+import { INVITE_TOKEN_QUERY_KEY } from '@/features/projects/constants/invite.constants'
 import { listProjectSprints, type SprintSummary } from '@/api/sprints'
 import { listProjectGroups, createProjectGroup, type TaskGroup } from '@/api/tasks'
 import { useProjectStore } from '@/stores/project.store'
@@ -1362,9 +1366,42 @@ const searchedUsers = computed(() => {
 
 const inviteLink = computed(() => {
   if (!effectiveProjectId.value) return ''
-  if (typeof window === 'undefined') return `/projects/${effectiveProjectId.value}`
-  return `${window.location.origin}/projects/${effectiveProjectId.value}`
+  if (typeof window === 'undefined') return `/projects/${effectiveProjectId.value}/join`
+  return `${window.location.origin}/projects/${effectiveProjectId.value}/join`
 })
+
+function buildInviteLink(token: string) {
+  if (!inviteLink.value) return ''
+  return `${inviteLink.value}?${INVITE_TOKEN_QUERY_KEY}=${encodeURIComponent(token)}`
+}
+
+async function copyTextToClipboard(text: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return
+    }
+  } catch {
+    // Some browsers expose Clipboard API but reject it outside secure/user-activation contexts.
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  textarea.style.top = '0'
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+
+  try {
+    const copied = document.execCommand('copy')
+    if (!copied) throw new Error('Copy command failed')
+  } finally {
+    document.body.removeChild(textarea)
+  }
+}
 
 const currentUserProjectMember = computed<ProjectMember | null>(() =>
   (store.members.find((m) => m.id === authStore.user?.id) as ProjectMember | undefined) ?? null
@@ -1503,20 +1540,29 @@ async function copyInviteLink() {
     toast.error('Cannot create invite link for this project')
     return
   }
+
+  if (!canManageProjectMembers.value) {
+    toast.error('Only project owner or admin can create invite links')
+    return
+  }
+
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(inviteLink.value)
-    } else {
-      const input = document.createElement('input')
-      input.value = inviteLink.value
-      document.body.appendChild(input)
-      input.select()
-      document.execCommand('copy')
-      document.body.removeChild(input)
+    const tokenResponse = await createProjectInviteToken(effectiveProjectId.value as string)
+    const token = tokenResponse?.token || null
+    if (!token) {
+      toast.error('Cannot create invite link for this project')
+      return
     }
+
+    await copyTextToClipboard(buildInviteLink(token))
     toast.success('Invite link copied')
-  } catch {
-    toast.error('Cannot copy invite link')
+  } catch (error) {
+    const status = (error as { response?: { status?: number } })?.response?.status
+    toast.error(
+      status === 403
+        ? 'Only project owner or admin can create invite links'
+        : 'Cannot copy invite link'
+    )
   }
 }
 

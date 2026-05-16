@@ -18,7 +18,9 @@ export class MailService {
   async sendTaskReminder(dto: TaskReminderMailDto): Promise<void> {
     const fromAddress = buildMailFrom(
       this.configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-      this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
+      this.configService.get<string>('SMTP_FROM') ||
+        this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS') ||
+        this.configService.get<string>('SMTP_USER'),
     );
     const dueDateDisplay = formatDateTimeVietnam(dto.dueDate);
     const mail = taskReminderTemplate({
@@ -37,6 +39,8 @@ export class MailService {
       html: mail.html,
     });
 
-    this.logger.log(`Reminder email queued for ${dto.to} for task "${dto.taskTitle}"`);
+    this.logger.log(
+      `Reminder email queued for ${dto.to} for task "${dto.taskTitle}"`,
+    );
   }
 }

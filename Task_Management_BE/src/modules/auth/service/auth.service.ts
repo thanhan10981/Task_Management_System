@@ -84,7 +84,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.passwordHash,
+    );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');
@@ -107,11 +110,17 @@ export class AuthService {
     }
 
     const { passwordHash: _, ...userWithoutPassword } = user;
-    const tokenPayload = { sub: userWithoutPassword.id, email: userWithoutPassword.email };
+    const tokenPayload = {
+      sub: userWithoutPassword.id,
+      email: userWithoutPassword.email,
+    };
 
     const [accessToken, newRefreshToken] = await Promise.all([
       this.generateAccessToken(tokenPayload),
-      this.generateRefreshTokenWithRemainingLifetime(tokenPayload, remainingLifetime),
+      this.generateRefreshTokenWithRemainingLifetime(
+        tokenPayload,
+        remainingLifetime,
+      ),
     ]);
 
     return {
@@ -148,7 +157,8 @@ export class AuthService {
     const tokenHash = this.hashResetCode(resetToken);
     const expiresInMinutes = this.getResetCodeExpiryMinutes();
     const expiresInSeconds = expiresInMinutes * 60;
-    const clientUrl = this.configService.get<string>('CLIENT_URL') || 'http://localhost:5173';
+    const clientUrl =
+      this.configService.get<string>('CLIENT_URL') || 'http://localhost:5173';
     const normalizedClientUrl = clientUrl.replace(/\/$/, '');
     const resetLink = `${normalizedClientUrl}/auth/reset-password?token=${encodeURIComponent(
       resetToken,
@@ -156,13 +166,19 @@ export class AuthService {
 
     await this.storePasswordResetToken(user.id, tokenHash, expiresInSeconds);
 
-    const mail = resetPasswordTemplate(user.fullName, resetLink, expiresInMinutes);
+    const mail = resetPasswordTemplate(
+      user.fullName,
+      resetLink,
+      expiresInMinutes,
+    );
 
     await this.mailJobQueueService.enqueue({
       to: user.email,
       from: buildMailFrom(
         this.configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-        this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
+        this.configService.get<string>('SMTP_FROM') ||
+          this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS') ||
+          this.configService.get<string>('SMTP_USER'),
       ),
       subject: mail.subject,
       text: mail.text,
@@ -296,7 +312,12 @@ export class AuthService {
     }
 
     pipeline.set(userKey, tokenHash, 'EX', expiresInSeconds);
-    pipeline.set(this.getPasswordResetTokenKey(tokenHash), userId, 'EX', expiresInSeconds);
+    pipeline.set(
+      this.getPasswordResetTokenKey(tokenHash),
+      userId,
+      'EX',
+      expiresInSeconds,
+    );
 
     await pipeline.exec();
   }
@@ -323,7 +344,9 @@ export class AuthService {
   }
 
   private getResetCodeExpiryMinutes() {
-    const rawValue = this.configService.get<string>('RESET_PASSWORD_CODE_EXPIRES_MINUTES') ?? '15';
+    const rawValue =
+      this.configService.get<string>('RESET_PASSWORD_CODE_EXPIRES_MINUTES') ??
+      '15';
     const value = Number(rawValue);
 
     if (!Number.isInteger(value) || value <= 0) {

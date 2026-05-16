@@ -2,11 +2,18 @@ export const DEFAULT_MAIL_FROM_NAME =
   process.env.MAIL_PUBLIC_FROM_NAME?.trim() || 'Task Management';
 
 export const DEFAULT_MAIL_FROM_ADDRESS =
-  process.env.MAIL_PUBLIC_FROM_ADDRESS?.trim() || 'no-reply@task.local';
+  process.env.MAIL_PUBLIC_FROM_ADDRESS?.trim() ||
+  process.env.SMTP_FROM?.trim() ||
+  process.env.SMTP_USER?.trim() ||
+  'no-reply@task.local';
 
 export const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
-export const DEFAULT_CLOUDINARY_ALLOWED_PREFIXES = ['tasks', 'projects', 'avatars'];
+export const DEFAULT_CLOUDINARY_ALLOWED_PREFIXES = [
+  'tasks',
+  'projects',
+  'avatars',
+];
 
 export const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   'image/jpeg',

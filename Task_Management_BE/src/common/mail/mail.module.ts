@@ -22,9 +22,13 @@ import { MailWorkerService } from './services/mail-worker.service';
         const user = configService.get<string>('SMTP_USER');
         const pass = configService.get<string>('SMTP_PASS');
         const port = Number(configService.get<string>('SMTP_PORT') ?? 587);
+        const secure =
+          configService.get<boolean>('SMTP_SECURE') ?? port === 465;
         const fromAddress = buildMailFrom(
           configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-          configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
+          configService.get<string>('SMTP_FROM') ||
+            configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS') ||
+            user,
         );
 
         if (!host || !user || !pass) {
@@ -42,7 +46,7 @@ import { MailWorkerService } from './services/mail-worker.service';
           transport: {
             host,
             port,
-            secure: port === 465,
+            secure,
             auth: {
               user,
               pass,
@@ -60,9 +64,12 @@ import { MailWorkerService } from './services/mail-worker.service';
       provide: MAIL_QUEUE,
       inject: [ConfigService, REDIS_CONNECTION_OPTIONS],
       useFactory: (configService: ConfigService, connection) => {
-        const queue = new Queue<MailJob>(configService.get<string>('MAIL_QUEUE_NAME'), {
-          connection,
-        });
+        const queue = new Queue<MailJob>(
+          configService.get<string>('MAIL_QUEUE_NAME'),
+          {
+            connection,
+          },
+        );
         const logger = new Logger('MailQueue');
 
         queue.on('error', (error) => {

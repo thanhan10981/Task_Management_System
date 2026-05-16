@@ -14,6 +14,7 @@ export interface EnvVariables {
   CLIENT_URL?: string;
   SMTP_HOST?: string;
   SMTP_PORT?: number;
+  SMTP_SECURE?: boolean;
   SMTP_USER?: string;
   SMTP_PASS?: string;
   SMTP_FROM?: string;
@@ -46,10 +47,6 @@ function parseEmailAddress(value?: string): string | undefined {
   return (addressInBrackets ?? plainAddress)?.toLowerCase();
 }
 
-function isPersonalMailbox(email: string): boolean {
-  return /@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email);
-}
-
 function readString(config: RawConfig, key: string, fallback = ''): string {
   const value = config[key];
 
@@ -73,6 +70,30 @@ function readNumber(config: RawConfig, key: string, fallback: number): number {
   }
 
   return value;
+}
+
+function readBoolean(config: RawConfig, key: string): boolean | undefined {
+  const value = config[key];
+
+  if (value == null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  const normalizedValue = String(value).trim().toLowerCase();
+
+  if (['true', '1', 'yes'].includes(normalizedValue)) {
+    return true;
+  }
+
+  if (['false', '0', 'no'].includes(normalizedValue)) {
+    return false;
+  }
+
+  throw new Error(`Environment variable ${key} must be a valid boolean`);
 }
 
 export function validate(config: RawConfig): EnvVariables {
@@ -101,30 +122,33 @@ export function validate(config: RawConfig): EnvVariables {
   const smtpHost = readString(config, 'SMTP_HOST') || undefined;
   const smtpUser = readString(config, 'SMTP_USER') || undefined;
   const smtpPass = readString(config, 'SMTP_PASS') || undefined;
-  const mailPublicFromName = readString(config, 'MAIL_PUBLIC_FROM_NAME') || 'Task Management';
+  const smtpFrom = readString(config, 'SMTP_FROM') || undefined;
+  const mailPublicFromName =
+    readString(config, 'MAIL_PUBLIC_FROM_NAME') || 'Task Management';
   const mailPublicFromAddress =
-    readString(config, 'MAIL_PUBLIC_FROM_ADDRESS') || 'no-reply@task.local';
+    readString(config, 'MAIL_PUBLIC_FROM_ADDRESS') ||
+    smtpFrom ||
+    smtpUser ||
+    'no-reply@task.local';
   const publicFromEmail = parseEmailAddress(mailPublicFromAddress);
-  const smtpUserEmail = parseEmailAddress(smtpUser);
 
   const isSmtpConfigured = Boolean(smtpHost || smtpUser || smtpPass);
-  if (isSmtpConfigured && (!smtpHost || !smtpUser || !smtpPass)) {
-    throw new Error('SMTP_HOST, SMTP_USER, SMTP_PASS must all be provided together');
-  }
-//deploy production checks for SMTP_USER to prevent common misconfigurations that lead to email delivery failure and sender leakage. These checks are only enforced in production to allow flexibility during development and testing, where developers may use personal email accounts or different sender addresses without the same risks.
-  // if (nodeEnv === 'production' && smtpUserEmail) {
-  //   if (isPersonalMailbox(smtpUserEmail)) {
-  //     throw new Error(
-  //       'SMTP_USER must not be a personal mailbox in production. Use a dedicated no-reply mailbox.',
-  //     );
-  //   }
 
-  //   if (publicFromEmail && smtpUserEmail !== publicFromEmail) {
-  //     throw new Error(
-  //       'MAIL_PUBLIC_FROM_ADDRESS must match SMTP_USER in production to prevent provider rewrite and sender leakage.',
-  //     );
-  //   }
-  // }
+  if (nodeEnv === 'production' && !isSmtpConfigured) {
+    throw new Error(
+      'SMTP_HOST, SMTP_USER, SMTP_PASS are required in production so emails are actually delivered',
+    );
+  }
+
+  if (isSmtpConfigured && (!smtpHost || !smtpUser || !smtpPass)) {
+    throw new Error(
+      'SMTP_HOST, SMTP_USER, SMTP_PASS must all be provided together',
+    );
+  }
+
+  if (!publicFromEmail) {
+    throw new Error('MAIL_PUBLIC_FROM_ADDRESS must be a valid email address');
+  }
 
   const redisUrl = readString(config, 'REDIS_URL');
   const mailQueueName = readString(config, 'MAIL_QUEUE_NAME');
@@ -136,20 +160,6 @@ export function validate(config: RawConfig): EnvVariables {
   if (!mailQueueName) {
     throw new Error('MAIL_QUEUE_NAME is required');
   }
-  //if (nodeEnv === 'production' && smtpUserEmail) {
-  //   if (isPersonalMailbox(smtpUserEmail)) {
-  //     throw new Error(
-  //       'SMTP_USER must not be a personal mailbox in production. Use a dedicated no-reply mailbox.',
-  //     );
-  //   }
-
-  //   if (publicFromEmail && smtpUserEmail !== publicFromEmail) {
-  //     throw new Error(
-  //       'MAIL_PUBLIC_FROM_ADDRESS must match SMTP_USER in production to prevent provider rewrite and sender leakage.',
-  //     );
-  //   }
-  // }
-
   return {
     NODE_ENV: nodeEnv as EnvVariables['NODE_ENV'],
     PORT: readNumber(config, 'PORT', 3001),
@@ -163,19 +173,24 @@ export function validate(config: RawConfig): EnvVariables {
     JWT_REFRESH_EXPIRES_IN: readString(config, 'JWT_REFRESH_EXPIRES_IN', '7d'),
     CLIENT_URL: readString(config, 'CLIENT_URL') || undefined,
     SMTP_HOST: smtpHost,
-    SMTP_PORT: config.SMTP_PORT ? readNumber(config, 'SMTP_PORT', 587) : undefined,
+    SMTP_PORT: config.SMTP_PORT
+      ? readNumber(config, 'SMTP_PORT', 587)
+      : undefined,
+    SMTP_SECURE: readBoolean(config, 'SMTP_SECURE'),
     SMTP_USER: smtpUser,
     SMTP_PASS: smtpPass,
-    SMTP_FROM: readString(config, 'SMTP_FROM') || undefined,
+    SMTP_FROM: smtpFrom,
     MAIL_PUBLIC_FROM_NAME: mailPublicFromName,
     MAIL_PUBLIC_FROM_ADDRESS: mailPublicFromAddress,
     REMINDER_THRESHOLDS_MINUTES:
       readString(config, 'REMINDER_THRESHOLDS_MINUTES') || undefined,
-    RESET_PASSWORD_CODE_EXPIRES_MINUTES: config.RESET_PASSWORD_CODE_EXPIRES_MINUTES
-      ? readNumber(config, 'RESET_PASSWORD_CODE_EXPIRES_MINUTES', 15)
-      : undefined,
+    RESET_PASSWORD_CODE_EXPIRES_MINUTES:
+      config.RESET_PASSWORD_CODE_EXPIRES_MINUTES
+        ? readNumber(config, 'RESET_PASSWORD_CODE_EXPIRES_MINUTES', 15)
+        : undefined,
     GEMINI_API_KEY: readString(config, 'GEMINI_API_KEY') || undefined,
-    GEMINI_FALLBACK_MODEL: readString(config, 'GEMINI_FALLBACK_MODEL') || undefined,
+    GEMINI_FALLBACK_MODEL:
+      readString(config, 'GEMINI_FALLBACK_MODEL') || undefined,
     REDIS_URL: redisUrl,
     MAIL_QUEUE_NAME: mailQueueName,
   };

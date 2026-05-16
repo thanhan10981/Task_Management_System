@@ -2,6 +2,8 @@ import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { Queue } from 'bullmq';
+import * as net from 'net';
+import * as tls from 'tls';
 import { buildMailFrom } from '../helpers/mail-from.helper';
 import { REDIS_CONNECTION_OPTIONS } from '../../config/redis/redis.constants';
 import { RedisModule } from '../../config/redis/redis.module';
@@ -24,6 +26,7 @@ import { MailWorkerService } from './services/mail-worker.service';
         const port = Number(configService.get<string>('SMTP_PORT') ?? 587);
         const secure =
           configService.get<boolean>('SMTP_SECURE') ?? port === 465;
+        const forceIpv4 = configService.get<boolean>('SMTP_FORCE_IPV4') ?? true;
         const fromAddress = buildMailFrom(
           configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
           configService.get<string>('SMTP_FROM') ||
@@ -42,16 +45,67 @@ import { MailWorkerService } from './services/mail-worker.service';
           };
         }
 
-        return {
-          transport: {
-            host,
-            port,
-            secure,
-            auth: {
-              user,
-              pass,
-            },
+        const transport = {
+          host,
+          port,
+          secure,
+          auth: {
+            user,
+            pass,
           },
+          tls: {
+            servername: host,
+          },
+        };
+
+        if (forceIpv4) {
+          Object.assign(transport, {
+            getSocket: (options, callback) => {
+              let settled = false;
+              const socketOptions = {
+                host: options.host,
+                port: Number(options.port),
+                family: 4,
+                servername: options.host,
+              };
+              const connection = secure
+                ? tls.connect(socketOptions)
+                : net.connect(socketOptions);
+
+              const done = (error?: Error) => {
+                if (settled) {
+                  return;
+                }
+
+                settled = true;
+                connection.removeListener('connect', handleConnect);
+                connection.removeListener('secureConnect', handleConnect);
+                connection.removeListener('error', handleError);
+
+                if (error) {
+                  callback(error);
+                  return;
+                }
+
+                callback(null, {
+                  connection,
+                  servername: options.host,
+                });
+              };
+              const handleConnect = () => done();
+              const handleError = (error: Error) => done(error);
+
+              connection.once(
+                secure ? 'secureConnect' : 'connect',
+                handleConnect,
+              );
+              connection.once('error', handleError);
+            },
+          });
+        }
+
+        return {
+          transport,
           defaults: {
             from: fromAddress,
           },

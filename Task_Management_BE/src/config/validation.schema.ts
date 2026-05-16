@@ -15,6 +15,7 @@ export interface EnvVariables {
   SMTP_HOST?: string;
   SMTP_PORT?: number;
   SMTP_SECURE?: boolean;
+  SMTP_FORCE_IPV4?: boolean;
   SMTP_USER?: string;
   SMTP_PASS?: string;
   SMTP_FROM?: string;
@@ -177,6 +178,7 @@ export function validate(config: RawConfig): EnvVariables {
       ? readNumber(config, 'SMTP_PORT', 587)
       : undefined,
     SMTP_SECURE: readBoolean(config, 'SMTP_SECURE'),
+    SMTP_FORCE_IPV4: readBoolean(config, 'SMTP_FORCE_IPV4'),
     SMTP_USER: smtpUser,
     SMTP_PASS: smtpPass,
     SMTP_FROM: smtpFrom,

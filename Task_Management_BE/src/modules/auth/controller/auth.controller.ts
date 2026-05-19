@@ -20,6 +20,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
+import { FirebaseLoginDto } from '../dto/firebase-google-login.dto';
 import { Public } from '../decorators/public.decorator';
 
 @ApiTags('Auth')
@@ -108,6 +109,52 @@ export class AuthController {
       'refreshToken',
       data.refreshToken,
       this.getCookieOptions(14 * 24 * 60 * 60 * 1000), // 14 days
+    );
+
+    return res.status(HttpStatus.CREATED).json({
+      data: { user: data.user },
+      message: 'Login successful',
+    });
+  }
+
+  @Public()
+  @Post('firebase/google')
+  @ApiOperation({ summary: 'Login using a Firebase Google ID token' })
+  @ApiBody({ type: FirebaseLoginDto })
+  async firebaseGoogleLogin(
+    @Body() firebaseLoginDto: FirebaseLoginDto,
+    @Response() res: any,
+  ) {
+    return this.handleFirebaseLogin(firebaseLoginDto, res);
+  }
+
+  @Public()
+  @Post('firebase')
+  @ApiOperation({ summary: 'Login using a Firebase Auth ID token' })
+  @ApiBody({ type: FirebaseLoginDto })
+  async firebaseLogin(
+    @Body() firebaseLoginDto: FirebaseLoginDto,
+    @Response() res: any,
+  ) {
+    return this.handleFirebaseLogin(firebaseLoginDto, res);
+  }
+
+  private async handleFirebaseLogin(
+    firebaseLoginDto: FirebaseLoginDto,
+    res: any,
+  ) {
+    const data = await this.authService.loginWithFirebase(firebaseLoginDto.idToken);
+
+    res.cookie(
+      'accessToken',
+      data.accessToken,
+      this.getCookieOptions(60 * 60 * 1000),
+    );
+
+    res.cookie(
+      'refreshToken',
+      data.refreshToken,
+      this.getCookieOptions(14 * 24 * 60 * 60 * 1000),
     );
 
     return res.status(HttpStatus.CREATED).json({

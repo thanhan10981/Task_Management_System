@@ -39,4 +39,8 @@ export default () => ({
     apiKey: process?.env?.GEMINI_API_KEY,
     fallbackModel: process?.env?.GEMINI_FALLBACK_MODEL,
   },
+
+  firebase: {
+    projectId: process?.env?.FIREBASE_PROJECT_ID,
+  },
 });

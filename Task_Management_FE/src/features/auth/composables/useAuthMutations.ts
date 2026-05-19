@@ -30,6 +30,10 @@ interface ResetPasswordPayload {
   confirmPassword: string
 }
 
+interface FirebaseGoogleLoginPayload {
+  idToken: string
+}
+
 export function useLoginMutation() {
   return useMutation({
     mutationKey: QUERY_KEYS.auth.login,
@@ -41,6 +45,21 @@ export function useRegisterMutation() {
   return useMutation({
     mutationKey: QUERY_KEYS.auth.register,
     mutationFn: (payload: RegisterPayload) => post<AuthSuccessResponse>('/auth/register', payload),
+  })
+}
+
+export function useFirebaseGoogleLoginMutation() {
+  return useMutation({
+    mutationKey: ['auth', 'firebase-google-login'],
+    mutationFn: (payload: FirebaseGoogleLoginPayload) =>
+      post<AuthSuccessResponse>('/auth/firebase/google', payload),
+  })
+}
+
+export function useFirebaseLoginMutation() {
+  return useMutation({
+    mutationKey: ['auth', 'firebase-login'],
+    mutationFn: (payload: FirebaseGoogleLoginPayload) => post<AuthSuccessResponse>('/auth/firebase', payload),
   })
 }
 

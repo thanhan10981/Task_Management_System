@@ -24,6 +24,7 @@ export interface EnvVariables {
   RESET_PASSWORD_CODE_EXPIRES_MINUTES?: number;
   GEMINI_API_KEY?: string;
   GEMINI_FALLBACK_MODEL?: string;
+  FIREBASE_PROJECT_ID?: string;
   REDIS_URL: string;
   MAIL_QUEUE_NAME: string;
 }
@@ -191,6 +192,8 @@ export function validate(config: RawConfig): EnvVariables {
     GEMINI_API_KEY: readString(config, 'GEMINI_API_KEY') || undefined,
     GEMINI_FALLBACK_MODEL:
       readString(config, 'GEMINI_FALLBACK_MODEL') || undefined,
+    FIREBASE_PROJECT_ID:
+      readString(config, 'FIREBASE_PROJECT_ID') || undefined,
     REDIS_URL: redisUrl,
     MAIL_QUEUE_NAME: mailQueueName,
   };

@@ -8,7 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, createVerify, randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { buildMailFrom } from '../../../common/helpers/mail-from.helper';
 import { MailJobQueueService } from '../../../common/mail/services/mail-job-queue.service';
@@ -26,13 +26,40 @@ type JwtPayload = {
   exp?: number;
 };
 
+type FirebaseJwtHeader = {
+  alg?: string;
+  kid?: string;
+};
+
+type FirebaseIdTokenPayload = {
+  aud?: string;
+  exp?: number;
+  iat?: number;
+  iss?: string;
+  sub?: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  firebase?: {
+    sign_in_provider?: string;
+  };
+};
+
 const PASSWORD_RESET_TOKEN_PREFIX = 'auth:password-reset:token';
 const PASSWORD_RESET_USER_PREFIX = 'auth:password-reset:user';
 const PASSWORD_RESET_COOLDOWN_PREFIX = 'auth:password-reset:cooldown';
 const PASSWORD_RESET_EMAIL_COOLDOWN_SECONDS = 60;
+const FIREBASE_CERTS_URL =
+  'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 
 @Injectable()
 export class AuthService {
+  private firebaseCertCache: {
+    certs: Record<string, string>;
+    expiresAt: number;
+  } | null = null;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -132,6 +159,49 @@ export class AuthService {
 
   async logout(_userId: string) {
     return { success: true };
+  }
+
+  async loginWithFirebase(idToken: string) {
+    const firebaseUser = await this.verifyFirebaseIdToken(idToken);
+    const email = firebaseUser.email?.trim().toLowerCase();
+    const signInProvider = firebaseUser.firebase?.sign_in_provider;
+
+    if (!email) {
+      throw new UnauthorizedException('Firebase account email is missing');
+    }
+
+    if (signInProvider === 'google.com' && firebaseUser.email_verified !== true) {
+      throw new UnauthorizedException('Firebase account email is not verified');
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    const user =
+      existingUser ||
+      (await this.createGoogleUser(
+        email,
+        firebaseUser.name || email,
+        firebaseUser.picture,
+      ));
+
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return this.generateTokens(userWithoutPassword);
+  }
+
+  private createGoogleUser(
+    email: string,
+    fullName: string,
+    avatarUrl?: string,
+  ) {
+    return this.prisma.user.create({
+      data: {
+        email,
+        fullName,
+        avatarUrl,
+      },
+    });
   }
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
@@ -267,6 +337,130 @@ export class AuthService {
       secret: this.configService.get<string>('jwt.refreshSecret'),
       expiresIn: remainingLifetime,
     });
+  }
+
+  private async verifyFirebaseIdToken(idToken: string) {
+    const [encodedHeader, encodedPayload, encodedSignature] = idToken.split('.');
+
+    if (!encodedHeader || !encodedPayload || !encodedSignature) {
+      throw new UnauthorizedException('Invalid Firebase token');
+    }
+
+    const header = this.parseBase64UrlJson<FirebaseJwtHeader>(encodedHeader);
+    const payload =
+      this.parseBase64UrlJson<FirebaseIdTokenPayload>(encodedPayload);
+    const projectId = this.getFirebaseProjectId();
+    const now = Math.floor(Date.now() / 1000);
+
+    if (header.alg !== 'RS256' || !header.kid) {
+      throw new UnauthorizedException('Invalid Firebase token header');
+    }
+
+    this.assertValidFirebaseClaims(payload, projectId, now);
+
+    const certs = await this.getFirebasePublicCerts();
+    const cert = certs[header.kid];
+
+    if (!cert) {
+      throw new UnauthorizedException('Unknown Firebase token key');
+    }
+
+    const verifier = createVerify('RSA-SHA256');
+    verifier.update(`${encodedHeader}.${encodedPayload}`);
+    verifier.end();
+
+    const isValid = verifier.verify(
+      cert,
+      Buffer.from(encodedSignature, 'base64url'),
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid Firebase token signature');
+    }
+
+    return payload;
+  }
+
+  private parseBase64UrlJson<T>(value: string): T {
+    try {
+      return JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as T;
+    } catch {
+      throw new UnauthorizedException('Invalid Firebase token');
+    }
+  }
+
+  private assertValidFirebaseClaims(
+    payload: FirebaseIdTokenPayload,
+    projectId: string,
+    now: number,
+  ) {
+    const expectedIssuer = `https://securetoken.google.com/${projectId}`;
+
+    if (payload.aud !== projectId) {
+      throw new UnauthorizedException(
+        `Invalid Firebase token audience. Expected ${projectId}, received ${payload.aud || 'missing'}`,
+      );
+    }
+
+    if (payload.iss !== expectedIssuer) {
+      throw new UnauthorizedException(
+        `Invalid Firebase token issuer. Expected ${expectedIssuer}, received ${payload.iss || 'missing'}`,
+      );
+    }
+
+    if (!payload.sub) {
+      throw new UnauthorizedException('Invalid Firebase token subject');
+    }
+
+    if (!payload.iat || !payload.exp) {
+      throw new UnauthorizedException('Invalid Firebase token timestamps');
+    }
+
+    if (payload.iat > now + 300) {
+      throw new UnauthorizedException(
+        'Firebase token was issued in the future. Check server clock.',
+      );
+    }
+
+    if (payload.exp <= now - 300) {
+      throw new UnauthorizedException(
+        'Firebase token is expired. Check server clock or sign in again.',
+      );
+    }
+  }
+
+  private async getFirebasePublicCerts() {
+    if (
+      this.firebaseCertCache &&
+      this.firebaseCertCache.expiresAt > Date.now()
+    ) {
+      return this.firebaseCertCache.certs;
+    }
+
+    const response = await fetch(FIREBASE_CERTS_URL);
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Unable to verify Firebase token');
+    }
+
+    const cacheControl = response.headers.get('cache-control') || '';
+    const maxAgeSeconds = Number(cacheControl.match(/max-age=(\d+)/)?.[1] || 0);
+    const certs = (await response.json()) as Record<string, string>;
+
+    this.firebaseCertCache = {
+      certs,
+      expiresAt: Date.now() + Math.max(maxAgeSeconds, 60) * 1000,
+    };
+
+    return certs;
+  }
+
+  private getFirebaseProjectId() {
+    return (
+      this.configService.get<string>('FIREBASE_PROJECT_ID') ||
+      this.configService.get<string>('firebase.projectId') ||
+      'task-management-system-gg'
+    );
   }
 
   private hashResetCode(code: string) {

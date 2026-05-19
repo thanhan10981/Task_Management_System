@@ -1552,6 +1552,12 @@
     background: var(--bg-surface-2);
     border: 1px solid var(--border-base);
   }
+  .td-comment-card--highlight {
+    outline: 2px solid rgba(56,189,248,.88);
+    box-shadow: 0 0 0 4px rgba(56,189,248,.18), 0 14px 32px rgba(14,165,233,.14);
+    background: rgba(14,165,233,.13) !important;
+    transition: outline-color .2s ease, box-shadow .2s ease, background .2s ease;
+  }
   .td-comment-card-body { @apply flex-1 min-w-0; }
   .td-comment-card-text { @apply text-sm leading-relaxed m-0; color: var(--text-primary); }
   .td-comment-action {

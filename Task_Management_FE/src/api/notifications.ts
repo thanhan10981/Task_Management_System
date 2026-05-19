@@ -1,5 +1,13 @@
 import { get, patch } from './client'
 
+export interface NotificationData {
+  taskId?: string
+  commentId?: string
+  parentCommentId?: string
+  authorId?: string
+  [key: string]: unknown
+}
+
 export interface NotificationItem {
   id: string
   userId: string
@@ -7,7 +15,7 @@ export interface NotificationItem {
   type: string
   title?: string | null
   content?: string | null
-  data?: unknown
+  data?: NotificationData | null
   isRead: boolean
   readAt?: string | null
   createdAt: string

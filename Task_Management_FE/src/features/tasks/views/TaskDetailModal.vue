@@ -309,7 +309,12 @@
                 <div class="flex flex-col gap-2 mt-2">
                   <template v-for="entry in mergedActivity" :key="entry.id">
                     <!-- Comment: card style -->
-                    <div v-if="entry.isComment" class="td-comment-card">
+                    <div
+                      v-if="entry.isComment"
+                      class="td-comment-card"
+                      :class="{ 'td-comment-card--highlight': highlightedCommentId === entry.id }"
+                      :data-comment-id="entry.id"
+                    >
                       <div class="td-avatar-xs" :style="{ background: store.getMember(entry.authorId)?.color ?? '#94a3b8' }">
                         {{ store.getMember(entry.authorId)?.initials ?? '?' }}
                       </div>
@@ -359,7 +364,13 @@
                         </div>
 
                         <div v-if="entry.replies?.length" class="flex flex-col gap-1.5 mt-3">
-                          <div v-for="reply in entry.replies" :key="reply.id" class="td-comment-reply">
+                          <div
+                            v-for="reply in entry.replies"
+                            :key="reply.id"
+                            class="td-comment-reply"
+                            :class="{ 'td-comment-card--highlight': highlightedCommentId === reply.id }"
+                            :data-comment-id="reply.id"
+                          >
                             <div
                               class="td-avatar-xxs"
                               :style="{ background: store.getMember(reply.authorId)?.color ?? '#94a3b8' }"
@@ -842,6 +853,7 @@ import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 const props = defineProps<{
   modelValue: boolean
   taskId: string | null
+  focusCommentId?: string | null
 }>()
 const emit = defineEmits<{
   'update:modelValue': [v: boolean]
@@ -887,6 +899,7 @@ const sortedSubtasks = computed(() => {
 const taskAttachments = computed(() =>
   props.taskId ? store.attachmentsByTaskOnly(props.taskId) : []
 )
+const highlightedCommentId = ref<string | null>(null)
 const commentImagePreviewUrls = ref<Record<string, string>>({})
 const commentImagePreviewLoading = ref<Record<string, boolean>>({})
 const commentThreads = computed(() => {
@@ -931,6 +944,43 @@ const mergedActivity = computed<MergedActivityEntry[]>(() => {
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )
 })
+
+function getCommentElement(commentId: string) {
+  const escapedId = typeof CSS !== 'undefined' && CSS.escape
+    ? CSS.escape(commentId)
+    : commentId.replace(/["\\]/g, '\\$&')
+  return document.querySelector<HTMLElement>(`[data-comment-id="${escapedId}"]`)
+}
+
+async function scrollToFocusedComment() {
+  const commentId = props.focusCommentId
+  if (!props.modelValue || !commentId) return
+
+  await nextTick()
+  const element = getCommentElement(commentId)
+  if (!element) return
+
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  highlightedCommentId.value = commentId
+  window.setTimeout(() => {
+    if (highlightedCommentId.value === commentId) {
+      highlightedCommentId.value = null
+    }
+  }, 2600)
+}
+
+watch(
+  [
+    () => props.modelValue,
+    () => props.taskId,
+    () => props.focusCommentId,
+    () => mergedActivity.value.length,
+  ],
+  () => {
+    void scrollToFocusedComment()
+  },
+  { immediate: true }
+)
 
 watch(
   () => [props.modelValue, props.taskId] as const,

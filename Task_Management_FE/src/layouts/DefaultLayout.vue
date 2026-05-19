@@ -612,6 +612,15 @@ const unreadCount = computed(() =>
   notifications.value.filter((note) => !note.isRead).length
 )
 
+function getNotificationTarget(note: NotificationItem) {
+  const data = note.data && typeof note.data === 'object' ? note.data : null
+  const taskId = typeof data?.taskId === 'string' ? data.taskId : null
+  const commentId = typeof data?.commentId === 'string' ? data.commentId : null
+  const projectId = typeof note.projectId === 'string' ? note.projectId : null
+
+  return { projectId, taskId, commentId }
+}
+
 async function loadNotifications() {
   notificationsError.value = ''
   try {
@@ -645,6 +654,21 @@ async function handleNotificationClick(note: NotificationItem) {
       notificationsError.value = 'Failed to mark notification as read'
     }
   }
+
+  const { projectId, taskId, commentId } = getNotificationTarget(note)
+  if (!projectId || !taskId) return
+
+  notifMenuOpen.value = false
+  projectStore.setCurrentProjectId(projectId, { persist: true })
+
+  await router.push({
+    name: 'project-tasks',
+    params: { projectId },
+    query: {
+      taskId,
+      ...(commentId ? { commentId } : {}),
+    },
+  })
 }
 
 async function markAllRead() {

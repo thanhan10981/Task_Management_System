@@ -1037,7 +1037,12 @@
 
 
     <!-- ══ TASK DETAIL MODAL ══════════════════════════════════════════════ -->
-    <TaskDetailModal v-model="modalOpen" :task-id="selectedTaskId" @deleted="onTaskDeleted"/>
+    <TaskDetailModal
+      v-model="modalOpen"
+      :task-id="selectedTaskId"
+      :focus-comment-id="focusCommentId"
+      @deleted="onTaskDeleted"
+    />
     <AICreateTaskModal
       v-model="aiCreateOpen"
       :project-id="effectiveProjectId"
@@ -1608,6 +1613,9 @@ onUnmounted(() => {
 // ── Modal ──────────────────────────────────────────────────────────────────────
 const modalOpen = ref(false)
 const selectedTaskId = ref<string | null>(null)
+const focusCommentId = computed(() =>
+  typeof route.query.commentId === 'string' ? route.query.commentId : null
+)
 const aiCreateOpen = ref(false)
 const trashOpen = ref(false)
 const restoringTaskId = ref<string | null>(null)
@@ -1644,6 +1652,7 @@ watch(modalOpen, (open) => {
   if (open || !route.query.taskId) return
   const nextQuery = { ...route.query }
   delete nextQuery.taskId
+  delete nextQuery.commentId
   if (!routeProjectId.value) return
   void router.replace({
     name: 'project-tasks',

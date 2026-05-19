@@ -12,6 +12,13 @@ import {
 } from 'firebase/auth'
 import type { FirebaseError } from 'firebase/app'
 
+export class FirebasePopupClosedError extends Error {
+  constructor() {
+    super('Firebase popup was closed by the user.')
+    this.name = 'FirebasePopupClosedError'
+  }
+}
+
 const firebaseConfig = {
   apiKey: env.VITE_FIREBASE_API_KEY,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -43,6 +50,10 @@ export async function signInWithGoogle() {
 
     if (firebaseError.code === 'auth/configuration-not-found') {
       throw new Error('Firebase Authentication is not enabled for this project. Enable Google sign-in in Firebase Console.')
+    }
+
+    if (firebaseError.code === 'auth/popup-closed-by-user') {
+      throw new FirebasePopupClosedError()
     }
 
     throw error

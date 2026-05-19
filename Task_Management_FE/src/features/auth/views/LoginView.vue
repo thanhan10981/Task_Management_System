@@ -142,7 +142,7 @@
 import { ref } from 'vue'
 import { useApiError } from '@/composables/useApiError'
 import { QUERY_KEYS } from '@/constants/query-keys'
-import { signInWithGoogle } from '@/lib/firebase'
+import { FirebasePopupClosedError, signInWithGoogle } from '@/lib/firebase'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -192,6 +192,7 @@ async function onGoogleSignIn() {
     const response = await firebaseLoginMutation.mutateAsync({ idToken })
     await finishAuth(response.data.user, getRedirectTarget())
   } catch (err) {
+    if (err instanceof FirebasePopupClosedError) return
     handleError(err)
   } finally {
     isGoogleSubmitting.value = false

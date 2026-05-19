@@ -8,7 +8,10 @@
     </div>
 
     <!-- Left decorative panel (hidden on mobile) -->
-    <div class="relative hidden lg:flex lg:w-1/2 xl:w-[55%] flex-col justify-between p-12 overflow-hidden">
+    <div
+      v-if="!route.meta.authWide"
+      class="relative hidden lg:flex lg:w-1/2 xl:w-[55%] flex-col justify-between p-12 overflow-hidden"
+    >
       <!-- Grid pattern overlay -->
       <div
         class="pointer-events-none absolute inset-0 opacity-[0.03]"
@@ -60,10 +63,16 @@
     </div>
 
     <!-- Right form panel -->
-    <div class="relative flex flex-1 items-center justify-center p-6 lg:p-12">
-      <div class="w-full animate-fade-up" :class="route.meta.authWide ? 'max-w-5xl' : 'max-w-md'">
+    <div
+      class="relative flex flex-1"
+      :class="route.meta.authWide ? 'min-h-screen items-stretch justify-stretch p-0' : 'items-center justify-center p-6 lg:p-12'"
+    >
+      <div
+        class="w-full animate-fade-up"
+        :class="route.meta.authWide ? 'max-w-none' : 'max-w-md'"
+      >
         <!-- Mobile logo -->
-        <div class="mb-8 lg:hidden">
+        <div v-if="!route.meta.authWide" class="mb-8 lg:hidden">
           <OctomLogo size="md" textColor="text-white" />
         </div>
 

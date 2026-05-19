@@ -1,15 +1,16 @@
 <template>
-  <div class="auth-card">
-    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+  <div class="min-h-screen w-full bg-[#09091a] px-3 py-3 text-white sm:px-5 sm:py-5 lg:px-8 lg:py-8">
+    <div class="mx-auto flex min-h-[calc(100vh-1.5rem)] w-full max-w-[1480px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/30 backdrop-blur-xl sm:min-h-[calc(100vh-2.5rem)] sm:p-5 lg:min-h-[calc(100vh-4rem)] lg:p-6">
+    <div class="mb-5 flex shrink-0 flex-col gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-start lg:justify-between">
       <div>
         <p class="text-xs font-semibold uppercase tracking-wider text-sky-300">{{ copy.eyebrow }}</p>
-        <h2 class="mt-2 text-3xl font-bold text-white">{{ copy.title }}</h2>
+        <h2 class="mt-2 text-2xl font-bold leading-tight text-white sm:text-3xl lg:text-4xl">{{ copy.title }}</h2>
         <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
           {{ copy.subtitle }}
         </p>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3 lg:justify-end">
         <button
           type="button"
           class="group flex h-10 items-center gap-2 rounded-xl border border-sky-300/30 bg-gradient-to-r from-sky-500 to-indigo-600 px-4 text-sm font-bold text-white shadow-lg shadow-sky-950/30 transition-all hover:-translate-y-0.5 hover:from-sky-400 hover:to-indigo-500 hover:shadow-sky-900/40 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
@@ -48,7 +49,7 @@
       </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid shrink-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <section
         v-for="item in quickStart"
         :key="item.title"
@@ -64,13 +65,13 @@
       </section>
     </div>
 
-    <div class="mt-8 grid gap-5 lg:grid-cols-[260px_1fr]">
-      <nav class="h-fit rounded-xl border border-white/10 bg-white/[0.04] p-3">
+    <div class="mt-5 grid min-h-0 flex-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <nav class="flex gap-2 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.04] p-3 lg:block lg:h-full lg:overflow-y-auto">
         <button
           v-for="section in guideSections"
           :key="section.id"
           type="button"
-          class="mb-1 flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all last:mb-0"
+          class="flex min-w-[220px] items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all lg:mb-1 lg:min-w-0 lg:w-full lg:last:mb-0"
           :class="section.id === activeSectionId
             ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-950/30'
             : 'text-slate-300 hover:bg-white/10 hover:text-white'"
@@ -84,7 +85,7 @@
         </button>
       </nav>
 
-      <section class="min-h-[520px] rounded-xl border border-white/10 bg-white/[0.04] p-5">
+      <section class="min-h-[520px] overflow-y-auto rounded-xl border border-white/10 bg-white/[0.04] p-4 sm:p-5 lg:min-h-0">
         <div class="mb-5 flex flex-col gap-2 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p class="text-xs font-semibold uppercase tracking-wider text-sky-300">{{ copy.viewing }}</p>
@@ -118,6 +119,7 @@
           </div>
         </div>
       </section>
+    </div>
     </div>
   </div>
 </template>

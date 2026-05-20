@@ -76,7 +76,7 @@ export class MailWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async sendMail(job: Job<MailJob>): Promise<void> {
-    const { to, from, subject, text, html } = job.data;
+    const { to, subject, text, html } = job.data;
 
     this.logger.log(`Processing mail job ${job.id} for ${to}`);
 
@@ -89,7 +89,7 @@ export class MailWorkerService implements OnModuleInit, OnModuleDestroy {
 
     const payload: CreateEmailOptions = {
       to,
-      from: from || this.defaultFrom,
+      from: this.defaultFrom,
       subject,
       ...(html ? { html } : { text: text || '' }),
       ...(html && text ? { text } : {}),

@@ -1,21 +1,38 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { MailerService } from '@nestjs-modules/mailer';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import { RedisOptions } from 'ioredis';
+import { CreateEmailOptions, Resend } from 'resend';
 import { REDIS_CONNECTION_OPTIONS } from '../../../config/redis/redis.constants';
+import { buildMailFrom } from '../../helpers/mail-from.helper';
 import { MailJob } from '../types/mail-job.type';
 
 @Injectable()
 export class MailWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MailWorkerService.name);
   private worker: Worker<MailJob>;
+  private readonly resend?: Resend;
+  private readonly defaultFrom: string;
 
   constructor(
-    private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
-    @Inject(REDIS_CONNECTION_OPTIONS) private readonly redisConnection: RedisOptions,
-  ) {}
+    @Inject(REDIS_CONNECTION_OPTIONS)
+    private readonly redisConnection: RedisOptions,
+  ) {
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+
+    this.resend = apiKey ? new Resend(apiKey) : undefined;
+    this.defaultFrom = buildMailFrom(
+      this.configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
+      this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
+    );
+  }
 
   onModuleInit(): void {
     this.worker = new Worker<MailJob>(
@@ -63,12 +80,27 @@ export class MailWorkerService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`Processing mail job ${job.id} for ${to}`);
 
-    await this.mailerService.sendMail({
+    if (!this.resend) {
+      this.logger.warn(
+        `RESEND_API_KEY is missing. Mail job ${job.id} for ${to} was not delivered.`,
+      );
+      return;
+    }
+
+    const payload: CreateEmailOptions = {
       to,
-      from,
+      from: from || this.defaultFrom,
       subject,
-      text,
-      html,
-    });
+      ...(html ? { html } : { text: text || '' }),
+      ...(html && text ? { text } : {}),
+    };
+
+    const result = await this.resend.emails.send(payload);
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    this.logger.log(`Mail job ${job.id} sent via Resend (${result.data?.id})`);
   }
 }

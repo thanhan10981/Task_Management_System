@@ -12,6 +12,7 @@ export interface EnvVariables {
   JWT_REFRESH_SECRET: string;
   JWT_REFRESH_EXPIRES_IN: string;
   CLIENT_URL?: string;
+  RESEND_API_KEY?: string;
   SMTP_HOST?: string;
   SMTP_PORT?: number;
   SMTP_SECURE?: boolean;
@@ -107,6 +108,7 @@ export function validate(config: RawConfig): EnvVariables {
   const databaseUrl = readString(config, 'DATABASE_URL');
   const jwtSecret = readString(config, 'JWT_SECRET');
   const jwtRefreshSecret = readString(config, 'JWT_REFRESH_SECRET');
+  const resendApiKey = readString(config, 'RESEND_API_KEY') || undefined;
 
   if (!databaseUrl) {
     throw new Error('DATABASE_URL is required');
@@ -130,20 +132,12 @@ export function validate(config: RawConfig): EnvVariables {
     readString(config, 'MAIL_PUBLIC_FROM_ADDRESS') ||
     smtpFrom ||
     smtpUser ||
-    'no-reply@task.local';
+    'onboarding@resend.dev';
   const publicFromEmail = parseEmailAddress(mailPublicFromAddress);
 
-  const isSmtpConfigured = Boolean(smtpHost || smtpUser || smtpPass);
-
-  if (nodeEnv === 'production' && !isSmtpConfigured) {
+  if (nodeEnv === 'production' && !resendApiKey) {
     throw new Error(
-      'SMTP_HOST, SMTP_USER, SMTP_PASS are required in production so emails are actually delivered',
-    );
-  }
-
-  if (isSmtpConfigured && (!smtpHost || !smtpUser || !smtpPass)) {
-    throw new Error(
-      'SMTP_HOST, SMTP_USER, SMTP_PASS must all be provided together',
+      'RESEND_API_KEY is required in production so emails are actually delivered',
     );
   }
 
@@ -173,6 +167,7 @@ export function validate(config: RawConfig): EnvVariables {
     JWT_REFRESH_SECRET: jwtRefreshSecret,
     JWT_REFRESH_EXPIRES_IN: readString(config, 'JWT_REFRESH_EXPIRES_IN', '7d'),
     CLIENT_URL: readString(config, 'CLIENT_URL') || undefined,
+    RESEND_API_KEY: resendApiKey,
     SMTP_HOST: smtpHost,
     SMTP_PORT: config.SMTP_PORT
       ? readNumber(config, 'SMTP_PORT', 587)
@@ -192,8 +187,7 @@ export function validate(config: RawConfig): EnvVariables {
     GEMINI_API_KEY: readString(config, 'GEMINI_API_KEY') || undefined,
     GEMINI_FALLBACK_MODEL:
       readString(config, 'GEMINI_FALLBACK_MODEL') || undefined,
-    FIREBASE_PROJECT_ID:
-      readString(config, 'FIREBASE_PROJECT_ID') || undefined,
+    FIREBASE_PROJECT_ID: readString(config, 'FIREBASE_PROJECT_ID') || undefined,
     REDIS_URL: redisUrl,
     MAIL_QUEUE_NAME: mailQueueName,
   };

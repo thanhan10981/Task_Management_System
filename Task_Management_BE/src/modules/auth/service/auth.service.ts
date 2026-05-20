@@ -170,7 +170,10 @@ export class AuthService {
       throw new UnauthorizedException('Firebase account email is missing');
     }
 
-    if (signInProvider === 'google.com' && firebaseUser.email_verified !== true) {
+    if (
+      signInProvider === 'google.com' &&
+      firebaseUser.email_verified !== true
+    ) {
       throw new UnauthorizedException('Firebase account email is not verified');
     }
 
@@ -246,9 +249,7 @@ export class AuthService {
       to: user.email,
       from: buildMailFrom(
         this.configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-        this.configService.get<string>('SMTP_FROM') ||
-          this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS') ||
-          this.configService.get<string>('SMTP_USER'),
+        this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),
       ),
       subject: mail.subject,
       text: mail.text,
@@ -340,7 +341,8 @@ export class AuthService {
   }
 
   private async verifyFirebaseIdToken(idToken: string) {
-    const [encodedHeader, encodedPayload, encodedSignature] = idToken.split('.');
+    const [encodedHeader, encodedPayload, encodedSignature] =
+      idToken.split('.');
 
     if (!encodedHeader || !encodedPayload || !encodedSignature) {
       throw new UnauthorizedException('Invalid Firebase token');

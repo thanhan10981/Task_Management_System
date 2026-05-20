@@ -5,7 +5,7 @@ export const DEFAULT_MAIL_FROM_ADDRESS =
   process.env.MAIL_PUBLIC_FROM_ADDRESS?.trim() ||
   process.env.SMTP_FROM?.trim() ||
   process.env.SMTP_USER?.trim() ||
-  'no-reply@task.local';
+  'onboarding@resend.dev';
 
 export const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 

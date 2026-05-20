@@ -1,8 +1,6 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MailerModule } from '@nestjs-modules/mailer';
 import { Queue } from 'bullmq';
-import { buildMailFrom } from '../helpers/mail-from.helper';
 import { REDIS_CONNECTION_OPTIONS } from '../../config/redis/redis.constants';
 import { RedisModule } from '../../config/redis/redis.module';
 import { MAIL_QUEUE } from './mail.constants';
@@ -14,50 +12,6 @@ import { MailWorkerService } from './services/mail-worker.service';
   imports: [
     ConfigModule,
     RedisModule,
-    MailerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const host = configService.get<string>('SMTP_HOST');
-        const user = configService.get<string>('SMTP_USER');
-        const pass = configService.get<string>('SMTP_PASS');
-        const port = Number(configService.get<string>('SMTP_PORT') ?? 587);
-        const secure =
-          configService.get<boolean>('SMTP_SECURE') ?? port === 465;
-        const fromAddress = buildMailFrom(
-          configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
-          configService.get<string>('SMTP_FROM') ||
-            configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS') ||
-            user,
-        );
-
-        if (!host || !user || !pass) {
-          return {
-            transport: {
-              jsonTransport: true,
-            },
-            defaults: {
-              from: fromAddress,
-            },
-          };
-        }
-
-        return {
-          transport: {
-            host,
-            port,
-            secure,
-            auth: {
-              user,
-              pass,
-            },
-          },
-          defaults: {
-            from: fromAddress,
-          },
-        };
-      },
-    }),
   ],
   providers: [
     {

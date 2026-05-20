@@ -22,10 +22,16 @@ export default () => ({
     apiKey: process?.env?.CLOUDINARY_API_KEY,
     apiSecret: process?.env?.CLOUDINARY_API_SECRET,
     authTokenKey: process?.env?.CLOUDINARY_AUTH_TOKEN_KEY,
-    authenticatedUrlTtlSeconds: parseInt(process?.env?.CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS ?? '300', 10),
+    authenticatedUrlTtlSeconds: parseInt(
+      process?.env?.CLOUDINARY_AUTHENTICATED_URL_TTL_SECONDS ?? '300',
+      10,
+    ),
   },
 
-  clientUrl: process?.env?.CLIENT_URL || process?.env?.FRONTEND_URL || 'http://localhost:5173',
+  clientUrl:
+    process?.env?.CLIENT_URL ||
+    process?.env?.FRONTEND_URL ||
+    'http://localhost:5173',
 
   redis: {
     url: process?.env?.REDIS_URL,
@@ -33,6 +39,10 @@ export default () => ({
 
   mailQueue: {
     name: process?.env?.MAIL_QUEUE_NAME,
+  },
+
+  resend: {
+    apiKey: process?.env?.RESEND_API_KEY,
   },
 
   gemini: {

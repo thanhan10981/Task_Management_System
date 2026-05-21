@@ -18,6 +18,12 @@ export interface Member {
   initials: string
   color: string
   role?: string
+  email?: string | null
+  avatarUrl?: string | null
+  coverUrl?: string | null
+  jobTitle?: string | null
+  phone?: string | null
+  bio?: string | null
 }
 
 export interface Column {
@@ -93,6 +99,11 @@ type RawUser = {
   id?: string
   fullName?: string | null
   email?: string | null
+  avatarUrl?: string | null
+  coverUrl?: string | null
+  jobTitle?: string | null
+  phone?: string | null
+  bio?: string | null
 }
 
 type RawTaskAssignee = {
@@ -355,6 +366,12 @@ export const useTaskStore = defineStore('tasks', () => {
       name,
       initials: initialsFromName(name),
       color: colorFromSeed(id || name),
+      email: rawAssignee.user?.email ?? null,
+      avatarUrl: rawAssignee.user?.avatarUrl ?? null,
+      coverUrl: rawAssignee.user?.coverUrl ?? null,
+      jobTitle: rawAssignee.user?.jobTitle ?? null,
+      phone: rawAssignee.user?.phone ?? null,
+      bio: rawAssignee.user?.bio ?? null,
     }
   }
 
@@ -599,6 +616,12 @@ export const useTaskStore = defineStore('tasks', () => {
         name,
         initials: initialsFromName(name),
         color: colorFromSeed(id || name),
+        email: rawComment.user?.email ?? null,
+        avatarUrl: rawComment.user?.avatarUrl ?? null,
+        coverUrl: rawComment.user?.coverUrl ?? null,
+        jobTitle: rawComment.user?.jobTitle ?? null,
+        phone: rawComment.user?.phone ?? null,
+        bio: rawComment.user?.bio ?? null,
       })
     })
   }
@@ -848,6 +871,12 @@ export const useTaskStore = defineStore('tasks', () => {
       initials: initialsFromName(name),
       color: colorFromSeed(id || name),
       role,
+      email: rawMember.user?.email ?? null,
+      avatarUrl: rawMember.user?.avatarUrl ?? null,
+      coverUrl: rawMember.user?.coverUrl ?? null,
+      jobTitle: rawMember.user?.jobTitle ?? null,
+      phone: rawMember.user?.phone ?? null,
+      bio: rawMember.user?.bio ?? null,
     }
   }
 

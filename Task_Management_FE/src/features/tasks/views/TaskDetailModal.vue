@@ -156,13 +156,18 @@
 
                         <!-- Assignee -->
                         <div class="relative">
-                          <div
+                          <UserProfileHover
                             v-if="store.getMember(st.assigneeId ?? '')"
-                            class="td-avatar-xxs cursor-pointer opacity-100"
-                            :style="{ background: store.getMember(st.assigneeId!)!.color }"
-                            :title="store.getMember(st.assigneeId!)!.name"
+                            :user="profileForMember(store.getMember(st.assigneeId!)!)"
+                            placement="right"
                             @click.stop="toggleStAssigneePicker(st.id)"
-                          >{{ store.getMember(st.assigneeId!)!.initials }}</div>
+                          >
+                            <span
+                              class="td-avatar-xxs cursor-pointer opacity-100"
+                              :style="{ background: store.getMember(st.assigneeId!)!.color }"
+                              :title="store.getMember(st.assigneeId!)!.name"
+                            >{{ store.getMember(st.assigneeId!)!.initials }}</span>
+                          </UserProfileHover>
                           <button
                             v-else
                             class="td-subtask-meta-btn opacity-0 group-hover:opacity-100"
@@ -256,7 +261,12 @@
 
                 <!-- Comment input -->
                 <div class="td-comment-wrap">
-                  <div class="td-avatar-xs" style="background:#6366f1">AJ</div>
+                  <UserProfileHover :user="currentUserHoverProfile" placement="right">
+                    <div class="td-avatar-xs" :style="{ background: currentUserHoverProfile.color }">
+                      <img v-if="currentUserHoverProfile.avatarUrl" :src="currentUserHoverProfile.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                      <span v-else>{{ currentUserHoverProfile.initials }}</span>
+                    </div>
+                  </UserProfileHover>
                   <div class="td-comment-input-wrap gap-2">
                     <div class="relative w-full">
                       <textarea
@@ -315,12 +325,17 @@
                       :class="{ 'td-comment-card--highlight': highlightedCommentId === entry.id }"
                       :data-comment-id="entry.id"
                     >
-                      <div class="td-avatar-xs" :style="{ background: store.getMember(entry.authorId)?.color ?? '#94a3b8' }">
-                        {{ store.getMember(entry.authorId)?.initials ?? '?' }}
-                      </div>
+                      <UserProfileHover :user="profileForAuthor(entry.authorId)" placement="right">
+                        <div class="td-avatar-xs" :style="{ background: profileForAuthor(entry.authorId).color ?? '#94a3b8' }">
+                          <img v-if="profileForAuthor(entry.authorId).avatarUrl" :src="profileForAuthor(entry.authorId).avatarUrl!" alt="avatar" class="w-full h-full object-cover">
+                          <span v-else>{{ profileForAuthor(entry.authorId).initials }}</span>
+                        </div>
+                      </UserProfileHover>
                       <div class="td-comment-card-body">
                         <div class="flex items-center gap-2 mb-1">
-                          <span class="td-activity-user">{{ store.getMember(entry.authorId)?.name ?? 'User' }}</span>
+                          <UserProfileHover :user="profileForAuthor(entry.authorId)" placement="top" inline>
+                            <span class="td-activity-user">{{ store.getMember(entry.authorId)?.name ?? 'User' }}</span>
+                          </UserProfileHover>
                           <span class="td-activity-time">{{ timeAgo(entry.createdAt) }}</span>
                           <button class="td-comment-action" @click="startReply(entry.id)">
                             Reply
@@ -371,15 +386,20 @@
                             :class="{ 'td-comment-card--highlight': highlightedCommentId === reply.id }"
                             :data-comment-id="reply.id"
                           >
-                            <div
-                              class="td-avatar-xxs"
-                              :style="{ background: store.getMember(reply.authorId)?.color ?? '#94a3b8' }"
-                            >
-                              {{ store.getMember(reply.authorId)?.initials ?? '?' }}
-                            </div>
+                            <UserProfileHover :user="profileForAuthor(reply.authorId)" placement="right">
+                              <div
+                                class="td-avatar-xxs"
+                                :style="{ background: profileForAuthor(reply.authorId).color ?? '#94a3b8' }"
+                              >
+                                <img v-if="profileForAuthor(reply.authorId).avatarUrl" :src="profileForAuthor(reply.authorId).avatarUrl!" alt="avatar" class="w-full h-full object-cover">
+                                <span v-else>{{ profileForAuthor(reply.authorId).initials }}</span>
+                              </div>
+                            </UserProfileHover>
                             <div class="min-w-0 flex-1">
                               <div class="flex items-center gap-2 mb-0.5">
-                                <span class="td-activity-user">{{ store.getMember(reply.authorId)?.name ?? 'User' }}</span>
+                                <UserProfileHover :user="profileForAuthor(reply.authorId)" placement="top" inline>
+                                  <span class="td-activity-user">{{ store.getMember(reply.authorId)?.name ?? 'User' }}</span>
+                                </UserProfileHover>
                                 <span class="td-activity-time">{{ timeAgo(reply.createdAt) }}</span>
                                 <button
                                   v-if="canRemoveComment(reply.authorId)"
@@ -481,7 +501,9 @@
                     <!-- Activity log: compact line -->
                     <div v-else class="td-log-row">
                       <div class="td-log-dot"/>
-                      <span class="td-log-user">{{ store.getMember(entry.authorId)?.name?.split(' ')[0] ?? 'User' }}</span>
+                      <UserProfileHover :user="profileForAuthor(entry.authorId)" placement="right" inline>
+                        <span class="td-log-user">{{ store.getMember(entry.authorId)?.name?.split(' ')[0] ?? 'User' }}</span>
+                      </UserProfileHover>
                       <span class="td-log-text" :title="entry.text">{{ entry.text }}</span>
                       <span class="td-activity-time">{{ timeAgo(entry.createdAt) }}</span>
                     </div>
@@ -699,8 +721,15 @@
                 <p class="td-prop-label">Assignees</p>
                 <div class="flex flex-wrap gap-1.5 mt-1">
                   <div v-for="m in task.assignees" :key="m.id" class="td-assignee-chip" :style="{ borderColor: m.color + '55', background: m.color + '15' }">
-                    <span class="td-avatar-xxs" :style="{ background: m.color }">{{ m.initials }}</span>
-                    <span>{{ m.name.split(' ')[0] }}</span>
+                    <UserProfileHover :user="profileForMember(m)" placement="left">
+                      <span class="td-avatar-xxs" :style="{ background: m.color }">
+                        <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                        <span v-else>{{ m.initials }}</span>
+                      </span>
+                    </UserProfileHover>
+                    <UserProfileHover :user="profileForMember(m)" placement="left" inline>
+                      <span>{{ m.name.split(' ')[0] }}</span>
+                    </UserProfileHover>
                     <button @click="removeAssignee(m.id)" title="Remove">×</button>
                   </div>
                 </div>
@@ -834,6 +863,7 @@
 <script setup lang="ts">
 import { getFilePreviewUrl } from '@/api/cloudinary'
 import { useToast } from '@/composables/useToast'
+import UserProfileHover, { type UserHoverProfile } from '@/components/common/UserProfileHover.vue'
 import { generateAiTaskDescription } from '@/features/tasks/services/ai-task.service'
 import {
   useDeleteFileMutation,
@@ -877,6 +907,51 @@ const projectStore = useProjectStore()
 const { currentProject, currentProjectId } = storeToRefs(projectStore)
 const signedFileUploadMutation = useSignedFileUploadMutation()
 const deleteFileMutation = useDeleteFileMutation()
+
+const currentUserHoverProfile = computed<UserHoverProfile>(() => {
+  const user = authStore.user
+  const name = user?.fullName?.trim() || user?.email || 'User'
+  return {
+    id: user?.id,
+    name,
+    initials: initialsFromText(name),
+    color: '#6366f1',
+    email: user?.email,
+    avatarUrl: user?.avatarUrl,
+    coverUrl: user?.coverUrl,
+    jobTitle: user?.jobTitle,
+    phone: user?.phone,
+    bio: user?.bio,
+  }
+})
+
+function initialsFromText(text: string) {
+  const parts = text.trim().split(/\s+/).filter(Boolean)
+  return (parts.length ? parts.slice(0, 2).map((part) => part.charAt(0)).join('') : 'U').toUpperCase()
+}
+
+function profileForMember(member: Member): UserHoverProfile {
+  return {
+    id: member.id,
+    name: member.name,
+    initials: member.initials,
+    color: member.color,
+    role: member.role,
+    email: member.email,
+    avatarUrl: member.avatarUrl,
+    coverUrl: member.coverUrl,
+    jobTitle: member.jobTitle,
+    phone: member.phone,
+    bio: member.bio,
+  }
+}
+
+function profileForAuthor(authorId: string): UserHoverProfile {
+  const member = store.getMember(authorId)
+  if (member) return profileForMember(member)
+  if (authorId === authStore.user?.id) return currentUserHoverProfile.value
+  return { id: authorId, name: 'User', initials: '?', color: '#94a3b8' }
+}
 
 // ── Task ref ──────────────────────────────────────────────────────────────────
 const task = computed(() => (props.taskId ? store.getTask(props.taskId) : null))

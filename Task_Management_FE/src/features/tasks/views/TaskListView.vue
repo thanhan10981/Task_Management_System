@@ -46,10 +46,19 @@
             <div class="flex items-center -space-x-2">
               <button
                 v-for="m in store.members.slice(0, visibleAvatarCount)" :key="m.id"
-                class="kb-avatar-lg text-[11px] ring-2 ring-[var(--bg-app)] opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-150 cursor-default"
-                :style="{ background: m.color }"
-                :title="m.name"
-              >{{ m.initials }}</button>
+                class="bg-transparent border-0 p-0 -ml-2 first:ml-0"
+              >
+                <UserProfileHover :user="profileForMember(m)" placement="bottom">
+                  <span
+                    class="kb-avatar-lg text-[11px] ring-2 ring-[var(--bg-app)] opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-150 cursor-default overflow-hidden"
+                    :style="{ background: m.color }"
+                    :title="m.name"
+                  >
+                    <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                    <span v-else>{{ m.initials }}</span>
+                  </span>
+                </UserProfileHover>
+              </button>
 
               <!-- Overflow badge -->
               <button
@@ -126,7 +135,12 @@
                     :key="m.id"
                     class="mp-item w-full text-left"
                   >
-                    <div class="mp-item-avatar" :style="{ background: m.color }">{{ m.initials }}</div>
+                    <UserProfileHover :user="profileForMember(m)" placement="left">
+                      <div class="mp-item-avatar" :style="{ background: m.color }">
+                        <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                        <span v-else>{{ m.initials }}</span>
+                      </div>
+                    </UserProfileHover>
                     <div class="mp-item-info">
                       <span class="mp-item-name">{{ m.name }}</span>
                       <span class="text-[10px] font-semibold uppercase" style="color:var(--text-subtle)">
@@ -177,9 +191,12 @@
                     :disabled="addingMemberId === user.id"
                     @click="addMemberFromPicker(user)"
                   >
-                    <div class="mp-item-avatar" :style="{ background: userAvatarColor(user) }">
-                      {{ userInitials(user) }}
-                    </div>
+                    <UserProfileHover :user="profileForUser(user)" placement="left">
+                      <div class="mp-item-avatar" :style="{ background: userAvatarColor(user) }">
+                        <img v-if="user.avatarUrl" :src="user.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                        <span v-else>{{ userInitials(user) }}</span>
+                      </div>
+                    </UserProfileHover>
                     <div class="mp-item-info">
                       <span class="mp-item-name">{{ user.fullName || user.email }}</span>
                     </div>
@@ -415,12 +432,20 @@
                     <!-- Footer -->
                     <div class="kb-card-footer">
                       <div class="flex items-center -space-x-1.5">
-                        <div
+                        <UserProfileHover
                           v-for="m in task.assignees.slice(0,3)" :key="m.id"
-                          class="kb-avatar-sm"
-                          :style="{ background: m.color }"
-                          :title="m.name"
-                        >{{ m.initials }}</div>
+                          :user="profileForMember(m)"
+                          placement="top"
+                        >
+                          <div
+                            class="kb-avatar-sm overflow-hidden"
+                            :style="{ background: m.color }"
+                            :title="m.name"
+                          >
+                            <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                            <span v-else>{{ m.initials }}</span>
+                          </div>
+                        </UserProfileHover>
                         <span
                           v-if="task.assignees.length > 3"
                           class="kb-avatar-sm text-[8px]"
@@ -602,12 +627,20 @@
                   <!-- Assignees -->
                   <td class="lv-td">
                     <div class="lv-assignees">
-                      <div
+                      <UserProfileHover
                         v-for="m in task.assignees.slice(0, 4)" :key="m.id"
-                        class="kb-avatar-sm"
-                        :style="{ background: m.color }"
-                        :title="m.name"
-                      >{{ m.initials }}</div>
+                        :user="profileForMember(m)"
+                        placement="left"
+                      >
+                        <div
+                          class="kb-avatar-sm overflow-hidden"
+                          :style="{ background: m.color }"
+                          :title="m.name"
+                        >
+                          <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                          <span v-else>{{ m.initials }}</span>
+                        </div>
+                      </UserProfileHover>
                       <span
                         v-if="task.assignees.length > 4"
                         class="kb-avatar-sm text-[8px]"
@@ -1188,6 +1221,7 @@
 <script setup lang="ts">
 import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
+import UserProfileHover, { type UserHoverProfile } from '@/components/common/UserProfileHover.vue'
 import { useAuthStore } from '@/stores/auth.store'
 import { useUsersQuery } from '@/features/users/composables/useUsersQuery'
 import { createProjectInviteToken, useProjectSettingsQuery, type ProjectRolePermissionMatrix } from '@/api/projects'
@@ -1340,7 +1374,7 @@ async function confirmColDelete() {
 
 
 // ── Member picker ────────────────────────────────────────────────────────────────────
-type ProjectMember = { id: string; name: string; initials: string; color: string; role?: string | null }
+type ProjectMember = UserHoverProfile & { id: string; name: string; initials: string; color: string; role?: string | null }
 
 const memberPickerOpen = ref(false)
 const memberSearch = ref('')
@@ -1496,6 +1530,38 @@ function userAvatarColor(user: User) {
   const palette = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#ef4444', '#f97316']
   const hash = Array.from(seed).reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return palette[hash % palette.length]
+}
+
+function profileForMember(member: ProjectMember): UserHoverProfile {
+  return {
+    id: member.id,
+    name: member.name,
+    initials: member.initials,
+    color: member.color,
+    role: member.role,
+    email: member.email,
+    avatarUrl: member.avatarUrl,
+    coverUrl: member.coverUrl,
+    jobTitle: member.jobTitle,
+    phone: member.phone,
+    bio: member.bio,
+  }
+}
+
+function profileForUser(user: User): UserHoverProfile {
+  const name = user.fullName?.trim() || user.email || 'User'
+  return {
+    id: user.id,
+    name,
+    initials: userInitials(user),
+    color: userAvatarColor(user),
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    coverUrl: user.coverUrl,
+    jobTitle: user.jobTitle,
+    phone: user.phone,
+    bio: user.bio,
+  }
 }
 
 async function openMemberPicker() {

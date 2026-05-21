@@ -42,7 +42,9 @@
       </label>
       <div class="flex-1 min-w-0 pt-9">
         <h2 class="text-[1.375rem] font-[800] m-0 tracking-[-0.01em]" style="color: var(--text-heading);">Profile Settings</h2>
-        <p class="text-[0.8125rem] mt-0.5 m-0" style="color: var(--text-muted);">{{ preview.fullName || 'Your Name' }} · {{ preview.jobTitle || 'Your role' }}</p>
+        <p class="text-[0.8125rem] mt-0.5 m-0" style="color: var(--text-muted);">
+          {{ preview.fullName || 'Your Name' }}<span v-if="preview.jobTitle"> · {{ preview.jobTitle }}</span>
+        </p>
       </div>
 
       <div class="flex gap-2.5 items-center mt-9">

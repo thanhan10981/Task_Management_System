@@ -108,10 +108,19 @@
             <button
               v-for="m in store.members.slice(0, visibleAvatarCount)"
               :key="m.id"
-              class="w-[30px] h-[30px] rounded-full flex items-center justify-center text-white text-[11px] font-bold border-2 border-[var(--bg-surface)] -ml-2 first:ml-0 shadow-sm cursor-default transition-transform hover:-translate-y-0.5"
-              :style="{ background: m.color }"
-              :title="m.name"
-            >{{ m.initials }}</button>
+              class="-ml-2 first:ml-0"
+            >
+              <UserProfileHover :user="profileForMember(m)" placement="bottom">
+                <span
+                  class="w-[30px] h-[30px] rounded-full flex items-center justify-center text-white text-[11px] font-bold border-2 border-[var(--bg-surface)] shadow-sm cursor-default transition-transform hover:-translate-y-0.5 overflow-hidden"
+                  :style="{ background: m.color }"
+                  :title="m.name"
+                >
+                  <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                  <span v-else>{{ m.initials }}</span>
+                </span>
+              </UserProfileHover>
+            </button>
             <button
               v-if="store.members.length > visibleAvatarCount"
               class="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-[var(--bg-surface)] -ml-2 cursor-pointer transition-transform hover:-translate-y-0.5"
@@ -190,7 +199,12 @@
                   :key="m.id"
                   class="mp-item w-full text-left"
                 >
-                  <div class="mp-item-avatar" :style="{ background: m.color }">{{ m.initials }}</div>
+                  <UserProfileHover :user="profileForMember(m)" placement="left">
+                    <div class="mp-item-avatar" :style="{ background: m.color }">
+                      <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                      <span v-else>{{ m.initials }}</span>
+                    </div>
+                  </UserProfileHover>
                   <div class="mp-item-info">
                     <span class="mp-item-name">{{ m.name }}</span>
                     <span class="text-[10px] font-semibold uppercase" style="color:var(--text-subtle)">
@@ -241,9 +255,12 @@
                   :disabled="addingMemberId === user.id"
                   @click="addMemberFromPicker(user)"
                 >
-                  <div class="mp-item-avatar" :style="{ background: userAvatarColor(user) }">
-                    {{ userInitials(user) }}
-                  </div>
+                  <UserProfileHover :user="profileForUser(user)" placement="left">
+                    <div class="mp-item-avatar" :style="{ background: userAvatarColor(user) }">
+                      <img v-if="user.avatarUrl" :src="user.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                      <span v-else>{{ userInitials(user) }}</span>
+                    </div>
+                  </UserProfileHover>
                   <div class="mp-item-info">
                     <span class="mp-item-name">{{ user.fullName || user.email }}</span>
                   </div>
@@ -333,7 +350,12 @@
               <span class="w-5 h-5 rounded-[6px] flex items-center justify-center text-white text-[12px] font-bold shrink-0" :style="{ background: group.color }">{{ group.expanded ? '−' : '+' }}</span>
               <span class="flex-1 text-[12.5px] font-bold truncate" style="color:var(--text-primary);">{{ group.name }}</span>
               <div class="flex shrink-0">
-                <div v-for="(m, mi) in group.members.slice(0, 3)" :key="mi" class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8.5px] font-bold border-[1.5px] border-[var(--bg-surface)] -ml-[5px] first:ml-0" :style="{ background: m.color }" :title="m.name">{{ m.initial }}</div>
+                <UserProfileHover v-for="(m, mi) in group.members.slice(0, 3)" :key="mi" :user="m" placement="bottom" class="-ml-[5px] first:ml-0">
+                  <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8.5px] font-bold border-[1.5px] border-[var(--bg-surface)] overflow-hidden" :style="{ background: m.color }" :title="m.name">
+                    <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                    <span v-else>{{ m.initial }}</span>
+                  </div>
+                </UserProfileHover>
               </div>
               <button class="w-[22px] h-[22px] rounded-[6px] border-none bg-transparent flex items-center justify-center cursor-pointer opacity-0 group-hover/sbrow:opacity-100 transition-all hover:bg-[var(--bg-surface-3)]" style="color:var(--text-subtle);" @click.stop>
                 <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
@@ -512,7 +534,12 @@
                     </span>
                   </div>
                   <div class="flex items-center">
-                    <div v-for="(m, i) in task.assignees" :key="i" class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold border-2 border-[var(--bg-surface)] -ml-1.5 first:ml-0" :style="{ background: m.color, zIndex: 10 - Number(i) }" :title="m.name">{{ m.initial }}</div>
+                    <UserProfileHover v-for="(m, i) in task.assignees" :key="i" :user="m" placement="top" class="-ml-1.5 first:ml-0" :style="{ zIndex: 10 - Number(i) }">
+                      <div class="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold border-2 border-[var(--bg-surface)] overflow-hidden" :style="{ background: m.color }" :title="m.name">
+                        <img v-if="m.avatarUrl" :src="m.avatarUrl" alt="avatar" class="w-full h-full object-cover">
+                        <span v-else>{{ m.initial }}</span>
+                      </div>
+                    </UserProfileHover>
                   </div>
                 </div>
               </div>
@@ -888,6 +915,7 @@ import type { TaskGroup } from '@/api/tasks'
 import { useProjectSettingsQuery } from '@/api/projects'
 import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
+import UserProfileHover, { type UserHoverProfile } from '@/components/common/UserProfileHover.vue'
 import { fetchProjectGroupsQuery } from '@/features/tasks/composables/useTaskGroupsQuery'
 import {
   useBoardMembers,
@@ -908,6 +936,7 @@ import { useRoute } from 'vue-router'
 import draggable from 'vuedraggable'
 import AICreateTaskModal from '../components/AICreateTaskModal.vue'
 import TaskDetailModal from './TaskDetailModal.vue'
+import type { User } from '@/types/user.types'
 
 const store = useTaskStore()
 const projectStore = useProjectStore()
@@ -923,7 +952,7 @@ const effectiveProjectId = computed(() => routeProjectId.value ?? currentProject
 const projectSettingsQuery = useProjectSettingsQuery(effectiveProjectId)
 
 /* ── Types ─────────────────────────────────────────────────────── */
-interface Member { initial: string; name: string; color: string }
+interface Member extends UserHoverProfile { initial: string; color: string }
 interface Subtasks { done: number; total: number }
 interface Task {
   id: string
@@ -1021,11 +1050,52 @@ const {
 const projectGroups = ref<TaskGroup[]>([])
 const groupByGroup = ref(false)
 
-function toBoardMember(member: { id?: string; initials?: string; name: string; color: string }): Member {
+function profileForMember(member: ProjectMember): UserHoverProfile {
   return {
+    id: member.id,
+    name: member.name,
+    initials: member.initials,
+    color: member.color,
+    role: member.role,
+    email: member.email,
+    avatarUrl: member.avatarUrl,
+    coverUrl: member.coverUrl,
+    jobTitle: member.jobTitle,
+    phone: member.phone,
+    bio: member.bio,
+  }
+}
+
+function profileForUser(user: User): UserHoverProfile {
+  const name = user.fullName?.trim() || user.email || 'User'
+  return {
+    id: user.id,
+    name,
+    initials: userInitials(user),
+    color: userAvatarColor(user),
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    coverUrl: user.coverUrl,
+    jobTitle: user.jobTitle,
+    phone: user.phone,
+    bio: user.bio,
+  }
+}
+
+function toBoardMember(member: ProjectMember): Member {
+  return {
+    id: member.id,
+    initials: member.initials ?? member.name.charAt(0).toUpperCase(),
     initial: member.initials ?? member.name.charAt(0).toUpperCase(),
     name: member.name,
     color: member.color,
+    role: member.role,
+    email: member.email,
+    avatarUrl: member.avatarUrl,
+    coverUrl: member.coverUrl,
+    jobTitle: member.jobTitle,
+    phone: member.phone,
+    bio: member.bio,
   }
 }
 

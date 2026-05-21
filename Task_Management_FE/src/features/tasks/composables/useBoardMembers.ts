@@ -11,6 +11,12 @@ export type ProjectMember = {
   initials: string
   color: string
   role?: string
+  email?: string | null
+  avatarUrl?: string | null
+  coverUrl?: string | null
+  jobTitle?: string | null
+  phone?: string | null
+  bio?: string | null
 }
 
 type RolePermissionMatrix = Record<string, { canCreateTask: boolean }>

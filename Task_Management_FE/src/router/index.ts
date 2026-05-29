@@ -116,6 +116,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Settings', requiresProject: true },
       },
       {
+        path: 'reports',
+        name: 'reports',
+        component: () => import('@/features/reports/views/ReportsView.vue'),
+        meta: { title: 'Reports & Analytics' },
+      },
+      {
         path: 'tasks',
         name: 'tasks-legacy',
         redirect: (to) => resolveLegacyProjectRoute('project-tasks', to),

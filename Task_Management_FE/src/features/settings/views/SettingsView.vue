@@ -1,12 +1,12 @@
 <template>
   <div class="relative flex flex-col gap-0 pb-12 font-[Inter,system-ui,sans-serif]">
 
-    <!-- ── Cover ──────────────────────────────────────────────────────── -->
+    <!-- Cover -->
     <div class="h-[172px] rounded-[18px] relative overflow-hidden flex-shrink-0" :style="coverStyle">
       <!-- Upload overlay when uploading cover -->
       <div v-if="uploadingCover" class="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10" style="background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);">
         <span class="btn-spinner w-7 h-7 rounded-full border-[3px] border-white/30 border-t-white" />
-        <span class="text-xs font-semibold text-white">Uploading… {{ coverUploadProgress }}%</span>
+        <span class="text-xs font-semibold text-white">Uploading... {{ coverUploadProgress }}%</span>
       </div>
       <label
         class="sp-cover-upload absolute bottom-3 right-3.5 inline-flex items-center gap-1.5 px-3.5 py-[7px] rounded-[10px] text-xs font-semibold text-gray-700 transition-colors duration-[180ms] border border-white/60"
@@ -19,8 +19,8 @@
       </label>
     </div>
 
-    <!-- ── Page Header ─────────────────────────────────────────────────── -->
-    <div class="flex items-end gap-4 px-1 -mt-8 relative z-10 flex-wrap">
+    <!-- Page Header -->
+    <div class="flex items-end gap-3 px-1 -mt-8 relative z-10 flex-wrap">
       <!-- Avatar -->
       <label
         class="sp-avatar-wrap relative flex-shrink-0"
@@ -40,28 +40,31 @@
           <img :src="pencilEditIcon" alt="" width="14" height="14" aria-hidden="true">
         </div>
       </label>
+
+      <!-- Title + name: flex-1 so it takes remaining space, truncate avoids overflow -->
       <div class="flex-1 min-w-0 pt-9">
-        <h2 class="text-[1.375rem] font-[800] m-0 tracking-[-0.01em]" style="color: var(--text-heading);">Profile Settings</h2>
-        <p class="text-[0.8125rem] mt-0.5 m-0" style="color: var(--text-muted);">
-          {{ preview.fullName || 'Your Name' }}<span v-if="preview.jobTitle"> · {{ preview.jobTitle }}</span>
+        <h2 class="text-[1.15rem] sm:text-[1.375rem] font-[800] m-0 tracking-[-0.01em] leading-tight" style="color: var(--text-heading);">Profile Settings</h2>
+        <p class="text-[0.8125rem] mt-0.5 m-0 truncate" style="color: var(--text-muted);">
+          {{ preview.fullName || 'Your Name' }}<span v-if="preview.jobTitle"> &middot; {{ preview.jobTitle }}</span>
         </p>
       </div>
 
-      <div class="flex gap-2.5 items-center mt-9">
+      <!-- Action buttons: full-width on mobile, auto on sm+ -->
+      <div class="flex gap-2 items-center w-full sm:w-auto sm:mt-9 mt-2">
         <button
-          class="sp-btn-secondary"
+          class="sp-btn-secondary flex-1 sm:flex-none"
           style="border-color: var(--border-medium); background: var(--bg-surface); color: var(--text-muted);"
           :disabled="!isDirty || saving || uploadingAvatar || uploadingCover"
           @click="handleCancel"
         >Cancel</button>
         <button
-          class="sp-btn-primary"
+          class="sp-btn-primary flex-1 sm:flex-none"
           style="box-shadow: 0 2px 10px rgba(99,102,241,0.30);"
           :disabled="!isDirty || saving || uploadingAvatar || uploadingCover"
           @click="handleSave"
         >
           <span v-if="saving" class="btn-spinner w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white" />
-          {{ saving ? 'Saving…' : 'Save changes' }}
+          {{ saving ? 'Saving...' : 'Save changes' }}
         </button>
       </div>
     </div>

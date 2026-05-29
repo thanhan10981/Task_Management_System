@@ -4,7 +4,7 @@
     <!-- ══ PAGE HEADER ══════════════════════════════════════════════════════════════════════════ -->
     <div class="flex items-center justify-between px-3 sm:px-5 md:px-7 pt-2.5 sm:pt-4 md:pt-5 pb-2 sm:pb-3 shrink-0">
       <div class="flex items-center gap-1.5 sm:gap-3 min-w-0">
-        <span class="text-lg sm:text-2xl">🔥</span>
+        <!-- <span class="text-lg sm:text-2xl">🔥</span> -->
         <h1 class="text-sm sm:text-xl md:text-2xl font-extrabold tracking-tight truncate" style="color:var(--text-heading)">Task</h1>
       </div>
 
@@ -1991,9 +1991,12 @@ const assigneeSearch = ref('')
 
 const filteredAssigneeMembers = computed(() => {
   const q = assigneeSearch.value.trim().toLowerCase()
-  if (!q) return store.members
+  if (!q) return []
   return store.members.filter(
-    (m) => m.name.toLowerCase().includes(q)
+    (m) =>
+      m.name.toLowerCase().includes(q) ||
+      m.initials.toLowerCase().includes(q) ||
+      (m.email ?? '').toLowerCase().includes(q)
   )
 })
 

@@ -1477,8 +1477,13 @@ function modalCreateOrPickLabel() {
 /* assignee search for modal */
 const modalAssigneeSearch = ref('')
 const modalFilteredAssignees = computed(() => {
-  const q = modalAssigneeSearch.value.toLowerCase()
-  return store.members.filter(m => !q || m.name.toLowerCase().includes(q) || m.initials.toLowerCase().includes(q))
+  const q = modalAssigneeSearch.value.trim().toLowerCase()
+  if (!q) return []
+  return store.members.filter(m =>
+    m.name.toLowerCase().includes(q) ||
+    m.initials.toLowerCase().includes(q) ||
+    (m.email ?? '').toLowerCase().includes(q)
+  )
 })
 function modalToggleAssignee(id: string) {
   const ids = newTask.value.assigneeIds

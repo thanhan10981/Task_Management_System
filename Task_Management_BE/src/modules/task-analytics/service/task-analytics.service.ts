@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TaskChartQueryDto } from '../dto/task-chart-query.dto';
+import { TaskReportQueryDto } from '../dto/task-report-query.dto';
 import {
   DEFAULT_TASK_CHART_PERIOD,
 } from '../constants/task-chart.constants';
@@ -9,6 +10,9 @@ import {
   TaskChartResponse,
   TaskChartSeriesItem,
   TaskChartTaskRow,
+  TaskReportMemberRow,
+  TaskReportResponse,
+  TaskReportTaskRow,
 } from '../types/task-chart.types';
 import { TaskAnalyticsRepository } from '../repository/task-analytics.repository';
 
@@ -70,12 +74,214 @@ export class TaskAnalyticsService {
     };
   }
 
+  async getTaskReport(userId: string, queryDto: TaskReportQueryDto): Promise<TaskReportResponse> {
+    const period = queryDto.period ?? DEFAULT_TASK_CHART_PERIOD;
+    const targetDate = this.parseTargetDate(queryDto.month);
+    const buckets = this.buildChartBuckets(period, targetDate);
+
+    const [tasks, members] = await Promise.all([
+      this.taskAnalyticsRepository.findTasksForReport(
+        userId,
+        queryDto.projectId,
+        queryDto.sprintId,
+      ),
+      this.taskAnalyticsRepository.findMembersForReport(userId, queryDto.projectId),
+    ]);
+
+    const visibleTasks = tasks as TaskReportTaskRow[];
+    const visibleMembers = members as TaskReportMemberRow[];
+    const totalTasks = visibleTasks.length;
+    const completedTasks = visibleTasks.filter((task) => this.isReportTaskDone(task)).length;
+    const overdueTasks = visibleTasks.filter((task) => this.isReportTaskOverdue(task)).length;
+
+    return {
+      summary: {
+        totalTasks,
+        completedTasks,
+        overdueTasks,
+        completionRate: totalTasks
+          ? Number(((completedTasks / totalTasks) * 100).toFixed(2))
+          : 0,
+      },
+      taskByStatus: this.buildTaskByStatus(visibleTasks),
+      taskByPriority: this.buildTaskByPriority(visibleTasks),
+      sprintProgress: this.buildSprintProgress(visibleTasks),
+      completionChart: this.buildCompletionChart(visibleTasks, buckets, period),
+      overdueTasks: this.buildOverdueTasks(visibleTasks),
+      memberPerformance: this.buildMemberPerformance(visibleTasks, visibleMembers),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   private isTaskDone(task: TaskChartTaskRow): boolean {
     if (task.status.isDone) {
       return true;
     }
 
     return /done|complete/i.test(task.status.name);
+  }
+
+  private isReportTaskDone(task: TaskReportTaskRow): boolean {
+    if (task.status.isDone) return true;
+    return /done|complete/i.test(task.status.name);
+  }
+
+  private isReportTaskOverdue(task: TaskReportTaskRow): boolean {
+    if (!task.dueDate || this.isReportTaskDone(task)) return false;
+    return task.dueDate.getTime() < this.startOfDay(new Date()).getTime();
+  }
+
+  private buildTaskByStatus(tasks: TaskReportTaskRow[]): TaskReportResponse['taskByStatus'] {
+    const map = new Map<string, { label: string; count: number; color: string }>();
+
+    for (const task of tasks) {
+      const label = task.status.name || 'Unknown';
+      const current = map.get(label) ?? {
+        label,
+        count: 0,
+        color: task.status.color || '#94a3b8',
+      };
+      current.count += 1;
+      map.set(label, current);
+    }
+
+    return [...map.values()].sort((a, b) => b.count - a.count);
+  }
+
+  private buildTaskByPriority(tasks: TaskReportTaskRow[]): TaskReportResponse['taskByPriority'] {
+    const colors: Record<string, string> = {
+      URGENT: '#ef4444',
+      HIGH: '#f59e0b',
+      MEDIUM: '#6366f1',
+      LOW: '#10b981',
+    };
+    const labels = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
+    const counts = new Map<string, number>();
+
+    for (const task of tasks) {
+      counts.set(task.priority, (counts.get(task.priority) ?? 0) + 1);
+    }
+
+    return labels
+      .map((priority) => ({
+        label: this.toTitleCase(priority),
+        count: counts.get(priority) ?? 0,
+        color: colors[priority] ?? '#94a3b8',
+      }))
+      .filter((item) => item.count > 0);
+  }
+
+  private buildSprintProgress(tasks: TaskReportTaskRow[]): TaskReportResponse['sprintProgress'] {
+    const map = new Map<string, { id: string; name: string; total: number; done: number }>();
+
+    for (const task of tasks) {
+      const id = task.sprint?.id ?? '__backlog';
+      const current = map.get(id) ?? {
+        id,
+        name: task.sprint?.name ?? 'Backlog',
+        total: 0,
+        done: 0,
+      };
+      current.total += 1;
+      if (this.isReportTaskDone(task)) current.done += 1;
+      map.set(id, current);
+    }
+
+    return [...map.values()]
+      .map((sprint) => ({
+        ...sprint,
+        remaining: Math.max(0, sprint.total - sprint.done),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  private buildCompletionChart(
+    tasks: TaskReportTaskRow[],
+    buckets: TaskChartBucket[],
+    period: TaskChartResponse['period'],
+  ): TaskReportResponse['completionChart'] {
+    const completedSeries = buckets.map(() => 0);
+
+    for (const task of tasks) {
+      if (!this.isReportTaskDone(task)) continue;
+
+      const index = buckets.findIndex(
+        (bucket) => task.updatedAt >= bucket.start && task.updatedAt <= bucket.end,
+      );
+
+      if (index >= 0) {
+        completedSeries[index] += 1;
+      }
+    }
+
+    return {
+      period,
+      labels: buckets.map((bucket) => bucket.label),
+      completedSeries,
+    };
+  }
+
+  private buildOverdueTasks(tasks: TaskReportTaskRow[]): TaskReportResponse['overdueTasks'] {
+    return tasks
+      .filter((task) => this.isReportTaskOverdue(task))
+      .sort((a, b) => (a.dueDate?.getTime() ?? 0) - (b.dueDate?.getTime() ?? 0))
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        assignee: task.assignees.map((assignee) => assignee.user.fullName).join(', ') || 'Unassigned',
+        priority: this.toTitleCase(task.priority),
+        dueDate: task.dueDate ? task.dueDate.toISOString() : '',
+        status: task.status.name,
+        project: task.project.name,
+      }));
+  }
+
+  private buildMemberPerformance(
+    tasks: TaskReportTaskRow[],
+    members: TaskReportMemberRow[],
+  ): TaskReportResponse['memberPerformance'] {
+    const memberMap = new Map<string, TaskReportResponse['memberPerformance'][number]>();
+
+    for (const member of members) {
+      memberMap.set(`${member.projectId}:${member.userId}`, {
+        id: `${member.projectId}:${member.userId}`,
+        name: member.user.fullName,
+        email: member.user.email,
+        role: this.toTitleCase(member.role),
+        assigned: 0,
+        completed: 0,
+        overdue: 0,
+        rate: 0,
+      });
+    }
+
+    for (const task of tasks) {
+      for (const assignee of task.assignees) {
+        const key = `${task.project.id}:${assignee.userId}`;
+        const current = memberMap.get(key);
+        if (!current) continue;
+
+        current.assigned += 1;
+        if (this.isReportTaskDone(task)) current.completed += 1;
+        if (this.isReportTaskOverdue(task)) current.overdue += 1;
+      }
+    }
+
+    return [...memberMap.values()]
+      .map((member) => ({
+        ...member,
+        rate: member.assigned ? Math.round((member.completed / member.assigned) * 100) : 0,
+      }))
+      .sort((a, b) => b.assigned - a.assigned || a.name.localeCompare(b.name));
+  }
+
+  private toTitleCase(value: string): string {
+    return value
+      .toLowerCase()
+      .split(/[_\s-]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
   }
 
   /**

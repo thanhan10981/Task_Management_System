@@ -28,6 +28,8 @@ export const QUERY_KEYS = {
     all: ['task-analytics'] as const,
     chart: (period: 'daily' | 'weekly' | 'monthly', projectId?: string | null, month?: string) =>
       [...QUERY_KEYS.taskAnalytics.all, 'chart', period, projectId ?? 'all', month ?? 'current'] as const,
+    report: (params: Record<string, unknown>) =>
+      [...QUERY_KEYS.taskAnalytics.all, 'report', params] as const,
   },
   files: {
     all: ['files'] as const,

@@ -1365,32 +1365,64 @@
     border: 1.5px solid var(--border-medium);
     box-shadow: 0 24px 80px rgba(0,0,0,0.35);
   }
+  /* ─── Mobile: bottom-sheet, sidebar on top → main below ─── */
   @media (max-width: 640px) {
     .td-overlay { @apply p-0 items-end; }
+
     .td-panel {
       border-radius: 20px 20px 0 0;
       height: 95dvh;
       max-height: none;
       border-bottom: none;
+      overflow: hidden;
     }
-    .td-body { @apply flex-col-reverse; }
+
+    /* Body: single scrollable column */
+    .td-body {
+      display: flex !important;
+      flex-direction: column !important;
+      overflow-y: auto !important;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Sidebar: visually first, compact 2-col grid of properties */
     .td-sidebar {
+      order: -1;
       width: 100% !important;
+      max-height: none !important;
+      flex-shrink: 0 !important;
+      flex-grow: 0 !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      gap: 10px !important;
+      padding: 12px 16px !important;
+      overflow-y: visible !important;
       border-left: none !important;
-      border-bottom: 1.5px solid var(--border-base);
-      flex-direction: row;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 12px 16px;
-      overflow-y: visible;
+      border-bottom: 1.5px solid var(--border-base) !important;
     }
-    .td-prop { min-width: 140px; flex: 1; }
-    .td-main { padding: 16px; gap: 5; }
-    .td-title { @apply text-xl; }
-    .td-topbar { @apply px-3 py-2; }
+
+    /* Each property: half-width so 2 per row */
+    .td-prop {
+      min-width: calc(50% - 5px) !important;
+      flex: 1 1 calc(50% - 5px) !important;
+    }
+
+    /* Main content: natural height, no flex-grow, scrolls with body */
+    .td-main {
+      order: 0;
+      flex-grow: 0 !important;   /* don't eat remaining space */
+      flex-shrink: 0 !important;
+      overflow-y: visible !important;
+      padding: 16px !important;
+    }
+
+    .td-title { font-size: 1.25rem !important; }
+    .td-topbar { padding: 8px 12px !important; }
+    .td-editor { min-height: 120px; }
   }
 
-  /* Top bar */
+
   .td-topbar {
     @apply flex items-center justify-between px-5 py-2.5 shrink-0;
     border-bottom: 1.5px solid var(--border-base);
@@ -1414,9 +1446,6 @@
   /* Body */
   .td-body {
     @apply flex flex-1 overflow-hidden;
-  }
-  @media (max-width: 640px) {
-    .td-body { @apply flex-col overflow-y-auto; }
   }
 
   /* Main content area */

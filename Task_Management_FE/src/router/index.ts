@@ -119,7 +119,7 @@ const routes: RouteRecordRaw[] = [
         path: 'reports',
         name: 'reports',
         component: () => import('@/features/reports/views/ReportsView.vue'),
-        meta: { title: 'Reports & Analytics' },
+        meta: { title: 'Reports & Analytics', requiresProject: true },
       },
       {
         path: 'tasks',

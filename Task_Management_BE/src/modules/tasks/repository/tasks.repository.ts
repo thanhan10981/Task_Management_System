@@ -88,6 +88,12 @@ export class TasksRepository {
             name: true,
           },
         },
+        project: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
     });
   }

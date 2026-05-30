@@ -6,6 +6,7 @@ describe('TaskService', () => {
   let repository: any;
   let access: any;
   let preferences: any;
+  let assignmentMail: any;
 
   const task = {
     id: 'task-1',
@@ -55,7 +56,8 @@ describe('TaskService', () => {
       isEnabled: jest.fn().mockResolvedValue(true),
       filterEnabledUserIds: jest.fn().mockResolvedValue([]),
     };
-    service = new TaskService(repository, access, preferences);
+    assignmentMail = { sendTaskAssignedEmails: jest.fn() };
+    service = new TaskService(repository, access, preferences, assignmentMail);
   });
 
   it('creates a task with default self assignment and history', async () => {
@@ -67,6 +69,11 @@ describe('TaskService', () => {
     ).resolves.toEqual(task);
     expect(repository.assignUser).toHaveBeenCalledWith('task-1', 'user-1', 'user-1', 'tx');
     expect(repository.createTaskHistory).toHaveBeenCalled();
+    expect(assignmentMail.sendTaskAssignedEmails).toHaveBeenCalledWith({
+      assigneeIds: [],
+      taskTitle: 'Build',
+      projectName: undefined,
+    });
   });
 
   it('rejects create when status or parent is outside project', async () => {

@@ -6,6 +6,7 @@ describe('TaskAssigneeService', () => {
   let repository: any;
   let access: any;
   let preferences: any;
+  let assignmentMail: any;
 
   beforeEach(() => {
     repository = {
@@ -24,7 +25,8 @@ describe('TaskAssigneeService', () => {
       ensureProjectMember: jest.fn(),
     };
     preferences = { isEnabled: jest.fn().mockResolvedValue(true) };
-    service = new TaskAssigneeService(repository, access, preferences);
+    assignmentMail = { sendTaskAssignedEmails: jest.fn() };
+    service = new TaskAssigneeService(repository, access, preferences, assignmentMail);
   });
 
   it('lists assignees after ensuring task access', async () => {
@@ -44,6 +46,11 @@ describe('TaskAssigneeService', () => {
       userId: 'user-2',
     });
     expect(repository.createNotification).toHaveBeenCalled();
+    expect(assignmentMail.sendTaskAssignedEmails).toHaveBeenCalledWith({
+      assigneeIds: ['user-2'],
+      taskTitle: 'Build',
+      projectName: undefined,
+    });
   });
 
   it('rejects missing task and duplicate assignment', async () => {

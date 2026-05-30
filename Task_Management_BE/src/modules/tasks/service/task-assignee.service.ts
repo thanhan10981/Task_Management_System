@@ -14,6 +14,7 @@ import {
 } from '../constants/task-actions.constants';
 import { TasksRepository } from '../repository/tasks.repository';
 import { buildTaskHistoryMetadata } from '../utils/task-history.util';
+import { TaskAssignmentMailService } from './task-assignment-mail.service';
 
 @Injectable()
 export class TaskAssigneeService {
@@ -23,6 +24,7 @@ export class TaskAssigneeService {
     private readonly tasksRepository: TasksRepository,
     private readonly projectAccessService: ProjectAccessService,
     private readonly notificationPreferencesService: NotificationPreferencesService,
+    private readonly taskAssignmentMailService: TaskAssignmentMailService,
   ) {}
 
   async listAssignees(userId: string, taskId: string) {
@@ -52,6 +54,7 @@ export class TaskAssigneeService {
     }
 
     let assignment;
+    const assignmentMailUserIds: string[] = [];
     try {
       assignment = await this.tasksRepository.withTransaction(async (tx) => {
         const created = await this.tasksRepository.assignUser(
@@ -81,7 +84,8 @@ export class TaskAssigneeService {
             dto.userId,
             NOTIFICATION_PREFERENCE_KEYS.taskAssigned,
           ))
-            ? [
+            ? (assignmentMailUserIds.push(dto.userId),
+              [
                 this.tasksRepository.createNotification(
                   {
                     user: { connect: { id: dto.userId } },
@@ -98,7 +102,7 @@ export class TaskAssigneeService {
                   },
                   tx,
                 ),
-              ]
+              ])
             : []),
         ]);
 
@@ -116,6 +120,13 @@ export class TaskAssigneeService {
     }
 
     this.logger.log(`Task ${taskId} assigned to user ${dto.userId} by ${userId}`);
+
+    await this.taskAssignmentMailService.sendTaskAssignedEmails({
+      assigneeIds: assignmentMailUserIds,
+      taskTitle: task.title,
+      projectName: task.project?.name,
+    });
+
     return assignment;
   }
 

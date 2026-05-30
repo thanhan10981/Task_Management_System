@@ -1,6 +1,8 @@
 import {
   createProjectSprint,
+  deleteProjectSprint,
   listProjectSprints,
+  updateProjectSprint,
   type SprintSummary,
 } from '@/api/sprints'
 import { QUERY_KEYS } from '@/constants/query-keys'
@@ -13,6 +15,21 @@ type CreateProjectSprintInput = {
   name: string
   startDate?: string
   endDate?: string
+}
+
+type UpdateProjectSprintInput = {
+  projectId: string
+  sprintId: string
+  payload: {
+    name?: string
+    startDate?: string | null
+    endDate?: string | null
+  }
+}
+
+type DeleteProjectSprintInput = {
+  projectId: string
+  sprintId: string
 }
 
 type UseProjectSprintsQueryOptions = {
@@ -59,6 +76,35 @@ export function useCreateProjectSprintMutation() {
     onSuccess: async (_created, payload) => {
       await Promise.all([
         localQueryClient.invalidateQueries({ queryKey: QUERY_KEYS.sprints.list(payload.projectId) }),
+        localQueryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.all }),
+      ])
+    },
+  })
+}
+
+export function useUpdateProjectSprintMutation() {
+  const localQueryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ sprintId, payload }: UpdateProjectSprintInput) =>
+      updateProjectSprint(sprintId, payload),
+    onSuccess: async (_updated, input) => {
+      await Promise.all([
+        localQueryClient.invalidateQueries({ queryKey: QUERY_KEYS.sprints.list(input.projectId) }),
+        localQueryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.all }),
+      ])
+    },
+  })
+}
+
+export function useDeleteProjectSprintMutation() {
+  const localQueryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ sprintId }: DeleteProjectSprintInput) => deleteProjectSprint(sprintId),
+    onSuccess: async (_deleted, input) => {
+      await Promise.all([
+        localQueryClient.invalidateQueries({ queryKey: QUERY_KEYS.sprints.list(input.projectId) }),
         localQueryClient.invalidateQueries({ queryKey: QUERY_KEYS.tasks.all }),
       ])
     },

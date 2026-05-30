@@ -10,7 +10,7 @@ describe('SprintsService', () => {
     prisma = {
       project: {
         findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }),
-        findUnique: jest.fn().mockResolvedValue({ id: 'project-1', createdBy: 'owner-1' }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'project-1', createdBy: 'owner-1', members: [] }),
       },
       sprint: {
         create: jest.fn(),
@@ -29,19 +29,19 @@ describe('SprintsService', () => {
     prisma.sprint.create.mockResolvedValue({ id: 'sprint-1', name: 'Sprint 1' });
 
     await expect(
-      service.create('user-1', {
+      service.create('owner-1', {
         projectId: 'project-1',
         name: 'Sprint 1',
         startDate: '2026-05-01',
         endDate: '2026-05-15',
       } as any),
     ).resolves.toEqual({ id: 'sprint-1', name: 'Sprint 1' });
-    expect(prisma.sprint.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ createdBy: 'user-1' }) }));
+    expect(prisma.sprint.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ createdBy: 'owner-1' }) }));
   });
 
   it('rejects invalid sprint business rules and inaccessible projects', async () => {
     await expect(
-      service.create('user-1', {
+      service.create('owner-1', {
         projectId: 'project-1',
         name: 'Sprint 1',
         startDate: '2026-05-15',
@@ -50,16 +50,16 @@ describe('SprintsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     await expect(
-      service.create('user-1', {
+      service.create('owner-1', {
         projectId: 'project-1',
         name: 'Sprint 1',
         status: SprintStatus.COMPLETED,
       } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    prisma.project.findFirst.mockResolvedValue(null);
+    prisma.project.findUnique.mockResolvedValue(null);
     await expect(service.create('user-1', { projectId: 'project-1', name: 'Sprint 1' } as any)).rejects.toBeInstanceOf(
-      ForbiddenException,
+      NotFoundException,
     );
   });
 
@@ -89,6 +89,7 @@ describe('SprintsService', () => {
       completedAt: null,
     });
     prisma.sprint.update.mockResolvedValue({ id: 'sprint-1', name: 'New' });
+    prisma.project.findUnique.mockResolvedValue({ id: 'project-1', createdBy: 'owner-1', members: [{ role: 'ADMIN' }] });
 
     await expect(service.update('user-1', 'sprint-1', { name: 'New' } as any)).resolves.toEqual({
       id: 'sprint-1',
@@ -97,7 +98,7 @@ describe('SprintsService', () => {
 
     await expect(service.remove('owner-1', 'sprint-1')).resolves.toEqual({ success: true });
 
-    prisma.project.findUnique.mockResolvedValue({ id: 'project-1', createdBy: 'other' });
+    prisma.project.findUnique.mockResolvedValue({ id: 'project-1', createdBy: 'other', members: [] });
     await expect(service.remove('owner-1', 'sprint-1')).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

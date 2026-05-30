@@ -1,4 +1,4 @@
-import { get, post } from './client'
+import { del, get, patch, post } from './client'
 
 export interface SprintSummary {
   id: string
@@ -58,4 +58,20 @@ export async function createProjectSprint(payload: {
 }): Promise<SprintSummary> {
   const response = await post<SprintSummary | ApiEnvelope<SprintSummary>>('/sprints', payload)
   return unwrapApiPayload(response)
+}
+
+export async function updateProjectSprint(
+  sprintId: string,
+  payload: {
+    name?: string
+    startDate?: string | null
+    endDate?: string | null
+  }
+): Promise<SprintSummary> {
+  const response = await patch<SprintSummary | ApiEnvelope<SprintSummary>>(`/sprints/${sprintId}`, payload)
+  return unwrapApiPayload(response)
+}
+
+export async function deleteProjectSprint(sprintId: string): Promise<void> {
+  await del(`/sprints/${sprintId}`)
 }

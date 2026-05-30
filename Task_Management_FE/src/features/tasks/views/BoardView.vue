@@ -34,23 +34,42 @@
               @click.stop
             >
               <div class="text-[10px] font-bold tracking-widest uppercase px-2.5 pt-1.5 pb-1" style="color:var(--text-subtle);">Sprint</div>
-              <button
+              <div
                 v-for="s in sprints" :key="s.id"
-                class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[13px] font-semibold cursor-pointer text-left transition-colors"
+                class="flex items-center gap-1.5 w-full rounded-lg transition-colors"
                 :class="s.id === selectedSprintId ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'"
-                @click="selectSprint(s.id)"
               >
-                <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }"></span>
-                <span class="flex-1">{{ s.name }}</span>
-                <span class="text-[11px] text-[var(--text-muted)]">{{ s.dates }}</span>
-                <svg v-if="s.id === selectedSprintId" class="w-3.5 h-3.5 text-indigo-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              </button>
+                <button
+                  class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border-none bg-transparent px-2.5 py-2 text-left text-[13px] font-semibold cursor-pointer"
+                  @click="selectSprint(s.id)"
+                >
+                  <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }"></span>
+                  <span class="min-w-0 flex-1 truncate">{{ s.name }}</span>
+                  <span class="text-[11px] text-[var(--text-muted)] whitespace-nowrap">{{ s.dates }}</span>
+                  <svg v-if="s.id === selectedSprintId" class="w-3.5 h-3.5 text-indigo-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+                <div v-if="canManageSprints && s.id" class="flex shrink-0 items-center gap-0.5 pr-1">
+                  <button class="sprint-action-btn" type="button" title="Edit sprint" @click.stop="openEditSprint(s.id)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
+                  <button class="sprint-action-btn sprint-action-btn--danger" type="button" title="Delete sprint" @click.stop="openDeleteSprint(s.id)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M3 6h18" />
+                      <path d="M8 6V4h8v2" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
               <div class="h-px my-1" style="background:var(--border-base);"></div>
-              <div v-if="!showNewSprintForm" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-[12.5px] font-semibold text-indigo-500 cursor-pointer hover:bg-indigo-50 transition-colors" @click.stop="showNewSprintForm = true">
+              <div v-if="canManageSprints && !showNewSprintForm" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-[12.5px] font-semibold text-indigo-500 cursor-pointer hover:bg-indigo-50 transition-colors" @click.stop="showNewSprintForm = true">
                 <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 New Sprint
               </div>
-              <div v-else class="flex flex-col gap-2 p-2 pb-1" @click.stop>
+              <div v-else-if="canManageSprints" class="flex flex-col gap-2 p-2 pb-1" @click.stop>
                 <input v-model="newSprint.name" class="sprint-inp h-[30px] px-2.5 rounded-lg border-[1.5px] text-[12.5px] outline-none font-[inherit] transition-all" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" placeholder="Sprint name" @keydown.enter="createSprint" @keydown.esc="showNewSprintForm = false" ref="sprintNameInput" maxlength="30"/>
                 <div class="sprint-date-row flex items-center gap-1.5">
                   <input v-model="newSprint.startDate" type="date" class="sprint-inp flex-1 h-[30px] px-1.5 rounded-lg border-[1.5px] text-[11px] outline-none font-[inherit]" style="border-color:var(--border-medium);background:var(--bg-surface-2);color:var(--text-primary);" title="Start date"/>
@@ -617,6 +636,83 @@
       </div>
     </Transition>
 
+    <!-- EDIT SPRINT MODAL -->
+    <Transition name="modal">
+      <div v-if="editingSprint" class="fixed inset-0 z-[620] flex items-center justify-center bg-[rgba(15,23,42,0.5)] backdrop-blur-[4px]" @click.self="closeEditSprint">
+        <form class="modal-box rounded-[20px] border overflow-hidden flex flex-col" style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 32px 80px rgba(0,0,0,0.3);width:calc(100% - 32px);max-width:430px;" @submit.prevent="submitEditSprint">
+          <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid var(--border-base);">
+            <div>
+              <h2 class="text-[16px] font-extrabold m-0" style="color:var(--text-heading);">Edit sprint</h2>
+              <p class="text-[12px] m-0 mt-0.5" style="color:var(--text-subtle);">Update sprint name and dates.</p>
+            </div>
+            <button class="w-[30px] h-[30px] rounded-[8px] border-none flex items-center justify-center cursor-pointer transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed" type="button" style="background:var(--bg-surface-3);color:var(--text-muted);" :disabled="sprintActionLoading" @click="closeEditSprint">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <div class="p-5 flex flex-col gap-4">
+            <label class="flex flex-col gap-1.5 text-[12px] font-bold uppercase tracking-[0.06em]" style="color:var(--text-muted);">
+              Sprint name
+              <input v-model.trim="editSprintForm.name" class="modal-input w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit]" maxlength="150" required>
+            </label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="flex flex-col gap-1.5 text-[12px] font-bold uppercase tracking-[0.06em]" style="color:var(--text-muted);">
+                Start date
+                <input v-model="editSprintForm.startDate" type="date" class="modal-input w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit]">
+              </label>
+              <label class="flex flex-col gap-1.5 text-[12px] font-bold uppercase tracking-[0.06em]" style="color:var(--text-muted);">
+                End date
+                <input v-model="editSprintForm.endDate" type="date" class="modal-input w-full rounded-[10px] border-[1.5px] border-[var(--border-medium)] bg-[var(--bg-surface-2)] text-[var(--text-primary)] text-[13px] px-3 py-[9px] outline-none font-[inherit]">
+              </label>
+            </div>
+            <p v-if="sprintActionError" class="m-0 rounded-[12px] border px-3 py-2 text-[12.5px]" style="border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.1);color:#ef4444;">{{ sprintActionError }}</p>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 px-5 py-4" style="border-top:1px solid var(--border-base);">
+            <button class="h-9 px-4 rounded-[10px] border-[1.5px] bg-transparent text-[13px] font-semibold cursor-pointer transition-colors hover:bg-[var(--bg-surface-2)] disabled:opacity-50 disabled:cursor-not-allowed" type="button" style="border-color:var(--border-medium);color:var(--text-secondary);" :disabled="sprintActionLoading" @click="closeEditSprint">Cancel</button>
+            <button class="h-9 px-5 rounded-[10px] border-none text-white text-[13px] font-bold cursor-pointer transition-all bg-gradient-to-br from-indigo-500 to-violet-500 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed" type="submit" :disabled="sprintActionLoading || !editSprintForm.name.trim()">
+              {{ sprintActionLoading ? 'Saving...' : 'Save changes' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Transition>
+
+    <!-- DELETE SPRINT MODAL -->
+    <Transition name="modal">
+      <div v-if="deleteSprintTarget" class="fixed inset-0 z-[620] flex items-center justify-center bg-[rgba(15,23,42,0.5)] backdrop-blur-[4px]" @click.self="closeDeleteSprint">
+        <div class="modal-box rounded-[20px] border overflow-hidden flex flex-col" style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 32px 80px rgba(0,0,0,0.3);width:calc(100% - 32px);max-width:430px;">
+          <div class="flex items-center gap-3 px-5 py-4" style="border-bottom:1px solid var(--border-base);">
+            <div class="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style="background:linear-gradient(135deg,rgba(239,68,68,0.16),rgba(249,115,22,0.1));">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <h2 class="text-[16px] font-extrabold m-0" style="color:var(--text-heading);">Delete sprint?</h2>
+              <p class="text-[12px] m-0 mt-0.5" style="color:var(--text-subtle);">Tasks inside this sprint will not be deleted.</p>
+            </div>
+            <button class="w-[28px] h-[28px] rounded-[8px] border-none flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--bg-surface-3)] disabled:opacity-50 disabled:cursor-not-allowed" type="button" style="background:var(--bg-surface-2);color:var(--text-muted);" :disabled="sprintActionLoading" @click="closeDeleteSprint">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            </button>
+          </div>
+
+          <div class="p-5 flex flex-col gap-4">
+            <p class="m-0 text-[13.5px] leading-[1.6]" style="color:var(--text-primary);">
+              This action will delete the sprint <strong>"{{ deleteSprintTarget.name }}"</strong>.
+              Tasks inside this sprint will not be deleted. They will be moved to No sprint.
+            </p>
+            <p v-if="sprintActionError" class="m-0 rounded-[12px] border px-3 py-2 text-[12.5px]" style="border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.1);color:#ef4444;">{{ sprintActionError }}</p>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 px-5 py-4" style="border-top:1px solid var(--border-base);">
+            <button class="h-9 px-4 rounded-[10px] border-[1.5px] bg-transparent text-[13px] font-semibold cursor-pointer transition-colors hover:bg-[var(--bg-surface-2)] disabled:opacity-50 disabled:cursor-not-allowed" type="button" style="border-color:var(--border-medium);color:var(--text-secondary);" :disabled="sprintActionLoading" @click="closeDeleteSprint">Cancel</button>
+            <button class="h-9 px-5 rounded-[10px] border-none text-white text-[13px] font-bold cursor-pointer transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed" type="button" style="background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 4px 14px rgba(239,68,68,0.3);" :disabled="sprintActionLoading" @click="confirmDeleteSprint">
+              {{ sprintActionLoading ? 'Deleting...' : 'Delete Sprint' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
 
     <!-- RIGHT STATUS PANEL -->
     <Transition name="status-panel">
@@ -926,10 +1022,15 @@ import {
   useBoardStatuses,
   type BoardStatusColumn,
 } from '@/features/tasks/composables/useBoardStatuses'
-import { useCreateProjectSprintMutation } from '@/features/tasks/composables/useSprintsQuery'
+import {
+  useCreateProjectSprintMutation,
+  useDeleteProjectSprintMutation,
+  useUpdateProjectSprintMutation,
+} from '@/features/tasks/composables/useSprintsQuery'
 import { useProjectStore } from '@/stores/project.store'
 import { useTaskStore } from '@/stores/task.store'
 import { useAuthStore } from '@/stores/auth.store'
+import type { SprintSummary } from '@/api/sprints'
 import { storeToRefs } from 'pinia'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -943,6 +1044,8 @@ const projectStore = useProjectStore()
 const authStore = useAuthStore()
 const { currentProjectId } = storeToRefs(projectStore)
 const createSprintMutation = useCreateProjectSprintMutation()
+const updateSprintMutation = useUpdateProjectSprintMutation()
+const deleteSprintMutation = useDeleteProjectSprintMutation()
 const toast = useToast()
 const route = useRoute()
 const routeProjectId = computed(() =>
@@ -1046,6 +1149,17 @@ const {
   toast,
 })
 
+const canManageSprints = computed(() => canManageProjectMembers.value)
+const editingSprint = ref<SprintSummary | null>(null)
+const deleteSprintTarget = ref<SprintSummary | null>(null)
+const sprintActionLoading = ref(false)
+const sprintActionError = ref('')
+const editSprintForm = ref({
+  name: '',
+  startDate: '',
+  endDate: '',
+})
+
 /* -- Tasks per sprint --------------------------------------------- */
 const projectGroups = ref<TaskGroup[]>([])
 const groupByGroup = ref(false)
@@ -1079,6 +1193,122 @@ function profileForUser(user: User): UserHoverProfile {
     jobTitle: user.jobTitle,
     phone: user.phone,
     bio: user.bio,
+  }
+}
+
+function sprintDateForInput(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+function sprintDateForPayload(value: string) {
+  return value ? new Date(value).toISOString() : null
+}
+
+function findRemoteSprint(id: string) {
+  return remoteSprintCache.value.find((sprint) => sprint.id === id) ?? null
+}
+
+function openEditSprint(id: string) {
+  if (!canManageSprints.value) return
+  const sprint = findRemoteSprint(id)
+  if (!sprint) return
+
+  editingSprint.value = sprint
+  deleteSprintTarget.value = null
+  sprintActionError.value = ''
+  editSprintForm.value = {
+    name: sprint.name,
+    startDate: sprintDateForInput(sprint.startDate),
+    endDate: sprintDateForInput(sprint.endDate),
+  }
+  sprintMenuOpen.value = false
+  showNewSprintForm.value = false
+}
+
+function closeEditSprint() {
+  if (sprintActionLoading.value) return
+  editingSprint.value = null
+  sprintActionError.value = ''
+}
+
+async function submitEditSprint() {
+  if (!editingSprint.value || !effectiveProjectId.value || !editSprintForm.value.name.trim()) return
+  if (!canManageSprints.value) {
+    toast.error('Only project owner or admin can edit sprints')
+    return
+  }
+
+  sprintActionLoading.value = true
+  sprintActionError.value = ''
+
+  try {
+    await updateSprintMutation.mutateAsync({
+      projectId: effectiveProjectId.value,
+      sprintId: editingSprint.value.id,
+      payload: {
+        name: editSprintForm.value.name.trim(),
+        startDate: sprintDateForPayload(editSprintForm.value.startDate),
+        endDate: sprintDateForPayload(editSprintForm.value.endDate),
+      },
+    })
+    await syncProjectBoard(effectiveProjectId.value)
+    toast.success('Sprint updated')
+    editingSprint.value = null
+  } catch (error) {
+    sprintActionError.value = extractApiErrorMessage(error, 'Cannot update sprint')
+  } finally {
+    sprintActionLoading.value = false
+  }
+}
+
+function openDeleteSprint(id: string) {
+  if (!canManageSprints.value) return
+  const sprint = findRemoteSprint(id)
+  if (!sprint) return
+
+  deleteSprintTarget.value = sprint
+  editingSprint.value = null
+  sprintActionError.value = ''
+  sprintMenuOpen.value = false
+  showNewSprintForm.value = false
+}
+
+function closeDeleteSprint() {
+  if (sprintActionLoading.value) return
+  deleteSprintTarget.value = null
+  sprintActionError.value = ''
+}
+
+async function confirmDeleteSprint() {
+  if (!deleteSprintTarget.value || !effectiveProjectId.value) return
+  if (!canManageSprints.value) {
+    toast.error('Only project owner or admin can delete sprints')
+    return
+  }
+
+  const sprint = deleteSprintTarget.value
+  sprintActionLoading.value = true
+  sprintActionError.value = ''
+
+  try {
+    await deleteSprintMutation.mutateAsync({
+      projectId: effectiveProjectId.value,
+      sprintId: sprint.id,
+    })
+    if (selectedSprintId.value === sprint.id) {
+      selectedSprintId.value = ''
+      persistSelectedSprint('')
+    }
+    await syncProjectBoard(effectiveProjectId.value)
+    toast.success('Sprint deleted')
+    deleteSprintTarget.value = null
+  } catch (error) {
+    sprintActionError.value = extractApiErrorMessage(error, 'Cannot delete sprint')
+  } finally {
+    sprintActionLoading.value = false
   }
 }
 
@@ -1608,6 +1838,29 @@ onUnmounted(() => {
 /* ── Sprint/card dropdown animation ── */
 .sprint-drop, .card-drop { animation: dropIn 0.18s ease; }
 @keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+.sprint-action-btn {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sprint-action-btn:hover {
+  background: var(--bg-surface-3);
+  color: #6366f1;
+}
+
+.sprint-action-btn--danger:hover {
+  color: #ef4444;
+}
 
 
 /* ── Sprint form input focus ── */

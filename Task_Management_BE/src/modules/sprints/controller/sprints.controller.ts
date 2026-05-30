@@ -34,7 +34,7 @@ export class SprintsController {
   @ApiResponse({ status: 201, description: 'Sprint created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request body' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'No access to target project' })
+  @ApiResponse({ status: 403, description: 'Only project owner or admin can create sprint' })
   create(@Request() req, @Body() createSprintDto: CreateSprintDto) {
     return this.sprintsService.create(req.user.id, createSprintDto);
   }
@@ -64,7 +64,7 @@ export class SprintsController {
   @ApiResponse({ status: 200, description: 'Sprint updated successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request body or sprint id' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'No access to target project' })
+  @ApiResponse({ status: 403, description: 'Only project owner or admin can update sprint' })
   @ApiResponse({ status: 404, description: 'Sprint not found' })
   update(
     @Request() req,
@@ -80,7 +80,7 @@ export class SprintsController {
   @ApiResponse({ status: 200, description: 'Sprint deleted successfully' })
   @ApiResponse({ status: 400, description: 'Invalid sprint id' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Only project owner can delete sprint' })
+  @ApiResponse({ status: 403, description: 'Only project owner or admin can delete sprint' })
   @ApiResponse({ status: 404, description: 'Sprint not found' })
   remove(@Request() req, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.sprintsService.remove(req.user.id, id);

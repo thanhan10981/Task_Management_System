@@ -495,6 +495,11 @@ function closeEdit() {
   actionError.value = ''
 }
 
+function resetEdit() {
+  editingProject.value = null
+  actionError.value = ''
+}
+
 async function submitEdit() {
   if (!editingProject.value || !editForm.name) return
   actionLoading.value = true
@@ -512,7 +517,7 @@ async function submitEdit() {
     })
     await projectStore.initializeAfterAuth(true)
     toast.success('Project updated')
-    closeEdit()
+    resetEdit()
   } catch (error) {
     actionError.value = extractErrorMessage(error)
   } finally {

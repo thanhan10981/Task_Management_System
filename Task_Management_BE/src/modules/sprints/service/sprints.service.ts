@@ -11,6 +11,7 @@ import {
 	createPaginatedResponse,
 	createPaginationOptions,
 } from '../../../common/helpers/pagination.helper';
+import { ProjectMemberRole } from '../../projects/constants/project-role-permissions.constants';
 import { CreateSprintDto, SprintQueryDto, UpdateSprintDto } from '../dto/sprint.dto';
 
 @Injectable()
@@ -18,7 +19,7 @@ export class SprintsService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	async create(userId: string, createSprintDto: CreateSprintDto) {
-		await this.ensureProjectAccess(userId, createSprintDto.projectId);
+		await this.ensureProjectAdminOrOwner(userId, createSprintDto.projectId);
 
 		const startDate = this.normalizeNullableDateInput(createSprintDto.startDate);
 		const endDate = this.normalizeNullableDateInput(createSprintDto.endDate);
@@ -127,7 +128,7 @@ export class SprintsService {
 			throw new NotFoundException('Sprint not found');
 		}
 
-		await this.ensureProjectAccess(userId, existingSprint.projectId);
+		await this.ensureProjectAdminOrOwner(userId, existingSprint.projectId);
 
 		const startDate = this.normalizeOptionalDateInput(updateSprintDto.startDate);
 		const endDate = this.normalizeOptionalDateInput(updateSprintDto.endDate);
@@ -182,7 +183,7 @@ export class SprintsService {
 			throw new NotFoundException('Sprint not found');
 		}
 
-		await this.ensureProjectOwnership(userId, existingSprint.projectId);
+		await this.ensureProjectAdminOrOwner(userId, existingSprint.projectId);
 
 		await this.prisma.sprint.delete({
 			where: { id },
@@ -205,18 +206,29 @@ export class SprintsService {
 		}
 	}
 
-	private async ensureProjectOwnership(userId: string, projectId: string) {
+	private async ensureProjectAdminOrOwner(userId: string, projectId: string) {
 		const project = await this.prisma.project.findUnique({
 			where: { id: projectId },
-			select: { id: true, createdBy: true },
+			select: {
+				id: true,
+				createdBy: true,
+				members: {
+					where: { userId },
+					select: { role: true },
+					take: 1,
+				},
+			},
 		});
 
 		if (!project) {
 			throw new NotFoundException('Project not found');
 		}
 
-		if (project.createdBy !== userId) {
-			throw new ForbiddenException('Only project owner can delete this sprint');
+		const memberRole = project.members[0]?.role ?? null;
+		const isOwner = project.createdBy === userId || memberRole === ProjectMemberRole.OWNER;
+
+		if (!isOwner && memberRole !== ProjectMemberRole.ADMIN) {
+			throw new ForbiddenException('Only project owner or admin can manage this sprint');
 		}
 	}
 // check if error is unique constraint violation and throw user-friendly message

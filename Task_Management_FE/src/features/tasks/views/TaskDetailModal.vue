@@ -710,9 +710,9 @@
               <!-- Sprint -->
               <div class="td-prop">
                 <p class="td-prop-label">Sprint</p>
-                <select class="td-prop-select" :value="task.sprint" @change="e => store.updateTask(task!.id, { sprint: (e.target as HTMLSelectElement).value })">
+                <select class="td-prop-select" :value="task.sprint" :disabled="loadingSprints" @change="onSprintChange">
                   <option value="">None (Backlog)</option>
-                  <option v-for="sp in store.sprints" :key="sp.id" :value="sp.id">{{ sp.title }}</option>
+                  <option v-for="sp in sprintOptions" :key="sp.id" :value="sp.id">{{ sp.name }}</option>
                 </select>
               </div>
 
@@ -862,6 +862,7 @@
 
 <script setup lang="ts">
 import { getFilePreviewUrl } from '@/api/cloudinary'
+import { listProjectSprints, type SprintSummary } from '@/api/sprints'
 import { useToast } from '@/composables/useToast'
 import UserProfileHover, { type UserHoverProfile } from '@/components/common/UserProfileHover.vue'
 import { generateAiTaskDescription } from '@/features/tasks/services/ai-task.service'
@@ -2033,6 +2034,8 @@ const loadingGroups = ref(false)
 const currentGroup = computed(() =>
   taskGroups.value.find((group) => group.id === task.value?.groupId)
 )
+const sprintOptions = ref<SprintSummary[]>([])
+const loadingSprints = ref(false)
 
 async function loadTaskGroups(projectId: string | null) {
   if (!projectId) {
@@ -2051,11 +2054,31 @@ async function loadTaskGroups(projectId: string | null) {
   }
 }
 
+async function loadTaskSprints(projectId: string | null) {
+  if (!projectId) {
+    sprintOptions.value = []
+    return
+  }
+
+  loadingSprints.value = true
+  try {
+    sprintOptions.value = await listProjectSprints(projectId)
+  } catch (error) {
+    console.error('Failed to load task sprints:', error)
+    sprintOptions.value = []
+  } finally {
+    loadingSprints.value = false
+  }
+}
+
 watch(
-  [() => props.modelValue, currentProjectId],
+  [() => props.modelValue, detailProjectId],
   async ([open, projectId]) => {
     if (!open) return
-    await loadTaskGroups(projectId)
+    await Promise.all([
+      loadTaskGroups(projectId),
+      loadTaskSprints(projectId),
+    ])
   },
   { immediate: true }
 )
@@ -2070,6 +2093,12 @@ async function onGroupChange(groupId: string) {
   if (!task.value) return
   await store.updateTaskRemote(task.value.id, { groupId: groupId || null })
   showGroupDrop.value = false
+}
+
+async function onSprintChange(e: Event) {
+  if (!task.value) return
+  const sprintId = (e.target as HTMLSelectElement).value
+  await store.updateTaskRemote(task.value.id, { sprintId: sprintId || null })
 }
 
 const priorityOptions = [

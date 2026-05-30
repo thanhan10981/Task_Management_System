@@ -963,13 +963,13 @@
                   <svg class="w-3 h-3 shrink-0 transition-transform" :class="modalGroupPickerOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--text-muted)"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 <div v-if="modalGroupPickerOpen" class="absolute left-0 right-0 top-[calc(100%+4px)] rounded-[12px] border p-1 z-[50]" style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 12px 36px rgba(0,0,0,0.14);" @click.stop>
-                  <button type="button" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[12.5px] cursor-pointer text-left transition-colors hover:bg-[var(--bg-hover)]" :class="!newTask.groupId ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent'" style="color:var(--text-primary);" @click="newTask.groupId = ''; modalGroupPickerOpen = false">
+                  <button type="button" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[12.5px] cursor-pointer text-left transition-colors hover:bg-[var(--bg-hover)]" :class="!newTask.groupId ? 'bg-indigo-50' : 'bg-transparent'" :style="{ color: !newTask.groupId ? '#4f46e5' : 'var(--text-primary)' }" @click="newTask.groupId = ''; modalGroupPickerOpen = false">
                     <span class="w-[9px] h-[9px] rounded-full shrink-0" style="background:var(--bg-surface-3);border:1.5px solid var(--border-medium);"/>
                     <span class="flex-1 font-medium">No group</span>
                     <svg v-if="!newTask.groupId" class="w-3 h-3 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                   </button>
                   <div class="h-px my-1" style="background:var(--border-base);"/>
-                  <button v-for="g in projectGroups" :key="g.id" type="button" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[12.5px] cursor-pointer text-left transition-colors hover:bg-[var(--bg-hover)]" :class="newTask.groupId === g.id ? 'bg-indigo-50 text-indigo-600' : 'bg-transparent'" style="color:var(--text-primary);" @click="newTask.groupId = g.id; modalGroupPickerOpen = false">
+                  <button v-for="g in projectGroups" :key="g.id" type="button" class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none text-[12.5px] cursor-pointer text-left transition-colors hover:bg-[var(--bg-hover)]" :class="newTask.groupId === g.id ? 'bg-indigo-50' : 'bg-transparent'" :style="{ color: newTask.groupId === g.id ? '#4f46e5' : 'var(--text-primary)' }" @click="newTask.groupId = g.id; modalGroupPickerOpen = false">
                     <span class="w-[9px] h-[9px] rounded-full shrink-0" :style="{ background: g.color }"/>
                     <span class="flex-1 font-medium">{{ g.name }}</span>
                     <svg v-if="newTask.groupId === g.id" class="w-3 h-3 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>

@@ -14,7 +14,11 @@ describe('MailJobQueueService', () => {
     expect(queue.add).toHaveBeenCalledWith(
       MAIL_QUEUE_JOB_NAME,
       expect.objectContaining({ to: 'ada@example.com' }),
-      expect.objectContaining({ attempts: 3, removeOnFail: false }),
+      expect.objectContaining({
+        attempts: 3,
+        removeOnComplete: true,
+        removeOnFail: { age: 24 * 60 * 60, count: 200 },
+      }),
     );
 
     await service.onModuleDestroy();

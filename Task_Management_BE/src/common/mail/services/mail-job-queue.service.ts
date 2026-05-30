@@ -17,11 +17,11 @@ export class MailJobQueueService implements OnModuleDestroy {
           type: 'exponential',
           delay: 5000,
         },
-        removeOnComplete: {
+        removeOnComplete: true,
+        removeOnFail: {
           age: 24 * 60 * 60,
-          count: 1000,
+          count: 200,
         },
-        removeOnFail: false,
       });
 
       this.logger.log(`Queued mail job ${job.id} for ${data.to}`);

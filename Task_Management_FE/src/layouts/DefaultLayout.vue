@@ -25,7 +25,7 @@
             isActive(item) ? 'nav-item--active' : '',
             isProjectNavLocked(item) ? 'nav-item--locked' : '',
           ]"
-          :title="navTooltip(item)"
+          :aria-label="navTooltip(item)"
           active-class=""
           @click="handleNavClick(item, $event)"
         >
@@ -354,6 +354,119 @@
     </nav>
 
     <!-- ══ CREATE PROJECT MODAL ═══════════════════════════════ -->
+    <button
+      type="button"
+      class="feedback-fab fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[260] inline-flex items-center justify-center gap-2 rounded-2xl border-none px-4 h-12 text-[13px] font-bold text-white cursor-pointer transition-all duration-200 shadow-lg"
+      aria-label="Send feedback"
+      @click="openFeedbackModal"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+        <path d="M8 9h8M8 13h5" />
+      </svg>
+      <span class="hidden sm:inline">Feedback</span>
+    </button>
+
+    <Teleport to="body">
+      <Transition name="dropdown-fade">
+        <div
+          v-if="feedbackModalOpen"
+          class="fixed inset-0 flex items-end sm:items-center justify-center z-[520] p-3 sm:p-5"
+          style="background: rgba(15,23,42,0.48);"
+          @click="closeFeedbackModal"
+        >
+          <div
+            class="w-full max-w-[500px] rounded-2xl border p-4 sm:p-5"
+            style="background: var(--modal-bg); border-color: var(--modal-border); box-shadow: var(--shadow-xl);"
+            @click.stop
+          >
+            <div class="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 class="text-lg font-bold m-0" style="color: var(--text-heading);">Send feedback</h3>
+                <p class="text-[12.5px] m-0 mt-1" style="color: var(--text-muted);">{{ authStore.user?.email }}</p>
+              </div>
+              <button
+                type="button"
+                class="w-8 h-8 rounded-xl border-none cursor-pointer flex items-center justify-center transition-colors"
+                style="background: var(--bg-surface-2); color: var(--text-muted);"
+                aria-label="Close feedback"
+                @click="closeFeedbackModal"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form class="flex flex-col gap-3" @submit.prevent="submitUserFeedback">
+              <div class="grid grid-cols-4 gap-1.5 rounded-xl p-1" style="background: var(--bg-surface-2);">
+                <button
+                  v-for="option in feedbackTypes"
+                  :key="option.value"
+                  type="button"
+                  class="feedback-type-btn h-9 rounded-[10px] border-none text-[12px] font-bold cursor-pointer transition-all duration-150"
+                  :class="feedbackForm.type === option.value ? 'feedback-type-btn--active' : ''"
+                  @click="feedbackForm.type = option.value"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+
+              <div>
+                <label class="text-xs font-semibold" style="color: var(--text-secondary);" for="feedback-subject">Subject</label>
+                <input
+                  id="feedback-subject"
+                  v-model.trim="feedbackForm.subject"
+                  class="field-input mt-1.5 w-full rounded-[10px] px-3 py-2.5 text-sm outline-none font-[inherit] transition-all duration-[180ms]"
+                  style="border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--text-primary);"
+                  maxlength="160"
+                  placeholder="Short title"
+                >
+              </div>
+
+              <div>
+                <label class="text-xs font-semibold" style="color: var(--text-secondary);" for="feedback-message">Message</label>
+                <textarea
+                  id="feedback-message"
+                  v-model.trim="feedbackForm.message"
+                  class="field-input mt-1.5 w-full rounded-[10px] px-3 py-2.5 text-sm outline-none font-[inherit] transition-all duration-[180ms] resize-y min-h-[120px]"
+                  style="border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--text-primary);"
+                  maxlength="5000"
+                  required
+                  placeholder="Describe what happened or what should be improved"
+                />
+              </div>
+
+              <div class="rounded-xl border px-3 py-2 text-[12px]" style="border-color: var(--border-medium); background: var(--bg-surface-2); color: var(--text-muted);">
+                <p class="m-0 truncate">Page: {{ feedbackPageLabel }}</p>
+                <p class="m-0 mt-1 truncate">Project: {{ feedbackProjectLabel }}</p>
+              </div>
+
+              <p v-if="feedbackError" class="text-red-500 text-[13px] m-0">{{ feedbackError }}</p>
+              <p v-if="feedbackSent" class="text-emerald-500 text-[13px] m-0">Feedback sent. Thank you!</p>
+
+              <div class="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  class="border-none rounded-[10px] text-[13px] font-semibold px-3.5 py-2.5 cursor-pointer transition-colors duration-[180ms]"
+                  style="background: var(--bg-surface-3); color: var(--text-secondary);"
+                  :disabled="submittingFeedback"
+                  @click="closeFeedbackModal"
+                >Cancel</button>
+                <button
+                  type="submit"
+                  class="border-none rounded-[10px] text-[13px] font-semibold px-4 py-2.5 cursor-pointer bg-indigo-500 hover:bg-indigo-600 text-white transition-colors duration-[180ms] disabled:opacity-60 disabled:cursor-not-allowed"
+                  :disabled="submittingFeedback || !feedbackForm.message.trim()"
+                >
+                  {{ submittingFeedback ? 'Sending...' : 'Send' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <Teleport to="body">
       <Transition name="dropdown-fade">
         <div
@@ -472,6 +585,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { post } from '@/api/client'
+import { submitFeedback, type FeedbackType } from '@/api/feedback'
 import { useAuthStore } from '@/stores/auth.store'
 import { useProjectStore } from '@/stores/project.store'
 import { storeToRefs } from 'pinia'
@@ -704,6 +818,21 @@ const memberDropdownOpen= ref(false)
 const memberPickerRef   = ref<HTMLElement | null>(null)
 const selectedMembers   = ref<User[]>([])
 const createProjectForm = reactive({ name: '', description: '' })
+const feedbackModalOpen = ref(false)
+const submittingFeedback = ref(false)
+const feedbackError = ref('')
+const feedbackSent = ref(false)
+const feedbackTypes: Array<{ value: FeedbackType; label: string }> = [
+  { value: 'ui', label: 'UI' },
+  { value: 'bug', label: 'Bug' },
+  { value: 'feature', label: 'Feature' },
+  { value: 'other', label: 'Other' },
+]
+const feedbackForm = reactive({
+  type: 'bug' as FeedbackType,
+  subject: '',
+  message: '',
+})
 
 const selectedMemberIds = computed(() => new Set(selectedMembers.value.map((m) => m.id)))
 const memberEmailQuery = computed(() => memberSearchQuery.value.trim().toLowerCase())
@@ -736,6 +865,15 @@ const currentProjectName = computed(() => {
 })
 
 const isBoardRoute = computed(() => route.name === 'project-board')
+const feedbackProject = computed(() => {
+  const id = effectiveProjectId.value
+  return projects.value.find((project) => project.id === id) ?? null
+})
+const feedbackProjectLabel = computed(() => feedbackProject.value?.name ?? 'No project')
+const feedbackPageLabel = computed(() => {
+  const routeName = typeof route.name === 'string' ? route.name : 'Current page'
+  return routeName.replace(/^project-/, '').replace(/-/g, ' ')
+})
 
 function toggleUserMenu(e: MouseEvent) {
   e.stopPropagation()
@@ -744,6 +882,54 @@ function toggleUserMenu(e: MouseEvent) {
 
 function toggleProjectMenu() {
   projectMenuOpen.value = !projectMenuOpen.value
+}
+
+function openFeedbackModal() {
+  userMenuOpen.value = false
+  projectMenuOpen.value = false
+  notifMenuOpen.value = false
+  feedbackError.value = ''
+  feedbackSent.value = false
+  feedbackModalOpen.value = true
+}
+
+function closeFeedbackModal() {
+  if (submittingFeedback.value) return
+  feedbackModalOpen.value = false
+  feedbackError.value = ''
+  feedbackSent.value = false
+}
+
+async function submitUserFeedback() {
+  const message = feedbackForm.message.trim()
+  if (!message) return
+
+  submittingFeedback.value = true
+  feedbackError.value = ''
+  feedbackSent.value = false
+
+  try {
+    await submitFeedback({
+      type: feedbackForm.type,
+      subject: feedbackForm.subject.trim() || undefined,
+      message,
+      pageUrl: window.location.href,
+      projectId: feedbackProject.value?.id,
+      projectName: feedbackProject.value?.name,
+      clientInfo: navigator.userAgent,
+    })
+
+    feedbackSent.value = true
+    feedbackForm.subject = ''
+    feedbackForm.message = ''
+    window.setTimeout(() => {
+      if (!submittingFeedback.value) feedbackModalOpen.value = false
+    }, 900)
+  } catch (error) {
+    feedbackError.value = extractErrorMessage(error, 'Unable to send feedback')
+  } finally {
+    submittingFeedback.value = false
+  }
 }
 
 function onClickOutside(e: MouseEvent) {
@@ -939,7 +1125,7 @@ async function submitCreateProject() {
   }
 }
 
-function extractErrorMessage(error: unknown) {
+function extractErrorMessage(error: unknown, fallback = 'Failed to create project') {
   if (typeof error === 'object' && error && 'response' in error) {
     const payload = (error as { response?: { data?: unknown } }).response?.data
     if (payload && typeof payload === 'object') {
@@ -950,7 +1136,7 @@ function extractErrorMessage(error: unknown) {
     }
   }
   if (error instanceof Error && error.message) return error.message
-  return 'Failed to create project'
+  return fallback
 }
 
 function isActive(item: { routeName: string }) {
@@ -1052,7 +1238,16 @@ const navItems: NavItem[] = [
 
 <style scoped>
 
-.nav-item { color: var(--text-subtle); }
+.nav-item {
+  color: var(--text-subtle);
+  outline: none;
+}
+.nav-item:focus {
+  outline: none;
+}
+.nav-item:focus-visible {
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.24);
+}
 .nav-item:hover {
   background: var(--nav-hover-bg);
   color: var(--nav-hover-color);
@@ -1071,6 +1266,9 @@ const navItems: NavItem[] = [
   background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
   color: #ffffff !important;
   box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+}
+.nav-item--active:focus-visible {
+  box-shadow: 0 4px 14px rgba(99,102,241,0.35), 0 0 0 3px rgba(99,102,241,0.24);
 }
 .nav-lock-dot {
   position: absolute;
@@ -1138,6 +1336,28 @@ const navItems: NavItem[] = [
 .field-input:focus {
   border-color: #6366f1 !important;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+}
+
+.feedback-fab {
+  background: linear-gradient(135deg, #4f46e5, #06b6d4);
+  box-shadow: 0 12px 30px rgba(79,70,229,0.32);
+}
+.feedback-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px rgba(79,70,229,0.38);
+}
+.feedback-type-btn {
+  color: var(--text-muted);
+  background: transparent;
+}
+.feedback-type-btn:hover {
+  color: var(--text-heading);
+  background: var(--bg-surface);
+}
+.feedback-type-btn--active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #4f46e5, #06b6d4);
+  box-shadow: 0 6px 16px rgba(79,70,229,0.22);
 }
 
 /* 6. @keyframes — not possible in Tailwind */

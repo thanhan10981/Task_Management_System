@@ -17,6 +17,7 @@ interface UseFoldersOptions {
 }
 
 const EMPTY_FOLDER_NAME = 'Root'
+const HIDDEN_DESCENDANT_ROOTS = new Set(['comments'])
 
 export function useFolders(options: UseFoldersOptions) {
   const { currentFolder, currentProjectId, toast, errorMessage } = options
@@ -58,7 +59,7 @@ export function useFolders(options: UseFoldersOptions) {
         name: folder.name || (folder.path ? folder.path.split('/').pop() || folder.path : EMPTY_FOLDER_NAME),
         path: normalizeFolderPath(folder.path),
         fileCount: folder.fileCount,
-      }))
+      })).filter((folder) => !isHiddenDescendantFolder(folder.path))
       loaded.sort((a, b) => a.path.localeCompare(b.path))
       autoExpandRoots(loaded)
       folders.value = loaded
@@ -150,6 +151,7 @@ function buildFolderRows(allFolders: CloudinaryFolder[], expandedPaths: Set<stri
   const childrenByParent = new Map<string, CloudinaryFolder[]>()
   for (const folder of allFolders) {
     if (!folder.path) continue
+    if (isHiddenDescendantFolder(folder.path)) continue
     const parentPath = getParentPath(folder.path)
     const siblings = childrenByParent.get(parentPath) ?? []
     siblings.push(folder)
@@ -182,4 +184,9 @@ function getDepth(path: string) {
 function getParentPath(path: string) {
   const parts = path.split('/').filter(Boolean)
   return parts.length <= 1 ? '' : parts.slice(0, -1).join('/')
+}
+
+function isHiddenDescendantFolder(path: string) {
+  const parts = normalizeFolderPath(path).split('/').filter(Boolean)
+  return parts.length > 1 && HIDDEN_DESCENDANT_ROOTS.has(parts[0])
 }

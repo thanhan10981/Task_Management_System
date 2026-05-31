@@ -51,6 +51,8 @@ export const useAuthStore = defineStore('auth', () => {
       const projectStore = useProjectStore()
       projectStore.resetProjectContext({ clearStoredLastProject: true })
       queryClient.removeQueries({ queryKey: QUERY_KEYS.projects.all })
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.userSettings.all })
+      queryClient.removeQueries({ queryKey: QUERY_KEYS.auth.me })
     } catch {
       // Ignore reset errors when pinia is not available yet.
     }

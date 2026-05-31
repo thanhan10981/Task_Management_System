@@ -253,6 +253,7 @@ async function finishAuth(user: Parameters<typeof authStore.setAuth>[1]) {
   authStore.setAuth(null, user)
   queryClient.setQueryData(QUERY_KEYS.auth.me, { data: user })
   queryClient.removeQueries({ queryKey: QUERY_KEYS.projects.all })
+  queryClient.removeQueries({ queryKey: QUERY_KEYS.userSettings.all })
   projectStore.resetProjectContext({ clearStoredLastProject: true })
   await router.push({ name: 'create-project' })
 }

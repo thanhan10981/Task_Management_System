@@ -423,17 +423,21 @@ const saveUserSettingsMutation = useSaveUserSettingsMutation()
 const projectSettingsQuery = useProjectSettingsQuery(computed(() => projectStore.currentProjectId))
 const updateProjectSettingsMutation = useUpdateProjectSettingsMutation()
 
-const DUMMY: ProfileForm = {
-  firstName: authStore.user?.fullName?.split(' ')[0] ?? '',
-  lastName: authStore.user?.fullName?.split(' ').slice(1).join(' ') ?? '',
-  email: authStore.user?.email ?? '',
-  jobTitle: authStore.user?.jobTitle ?? '',
-  phone: authStore.user?.phone ?? '',
-  bio: authStore.user?.bio ?? '',
-  avatarUrl: authStore.user?.avatarUrl ?? '',
-  coverUrl: authStore.user?.coverUrl ?? '',
+function profileFromAuthUser(): ProfileForm {
+  const parts = authStore.user?.fullName?.trim().split(/\s+/).filter(Boolean) ?? []
+  return {
+    firstName: parts[0] ?? '',
+    lastName: parts.slice(1).join(' '),
+    email: authStore.user?.email ?? '',
+    jobTitle: authStore.user?.jobTitle ?? '',
+    phone: authStore.user?.phone ?? '',
+    bio: authStore.user?.bio ?? '',
+    avatarUrl: authStore.user?.avatarUrl ?? '',
+    coverUrl: authStore.user?.coverUrl ?? '',
+  }
 }
 
+const DUMMY: ProfileForm = profileFromAuthUser()
 const form = reactive<ProfileForm>({ ...DUMMY })
 const settings = reactive<UserSettings>({ theme: themeMode.value })
 const pwForm = reactive<PasswordForm>({ current: '', newPw: '', confirm: '' })
@@ -517,6 +521,12 @@ const originalSnapshot = ref<SettingsSnapshot>(buildSnapshot())
 const isDirty = computed(() => JSON.stringify(buildSnapshot()) !== JSON.stringify(originalSnapshot.value))
 
 const preview = reactive<ProfilePreview>({ ...DUMMY, fullName: `${DUMMY.firstName} ${DUMMY.lastName}`.trim() })
+
+function resetProfileStateForCurrentUser() {
+  Object.assign(form, profileFromAuthUser())
+  Object.assign(pwForm, { current: '', newPw: '', confirm: '' })
+  originalSnapshot.value = buildSnapshot()
+}
 
 watch(form, (v) => {
   preview.firstName = v.firstName; preview.lastName = v.lastName
@@ -662,12 +672,12 @@ function applyLoadedUserSettings(payload?: UserSettingsApiData) {
     // Prefer: preferences URL → authStore.user URL → keep existing
     const resolvedAvatarUrl = nonEmptyString(profile.avatarUrl)
       || authStore.user?.avatarUrl
-      || form.avatarUrl
+      || ''
     const resolvedCoverUrl = nonEmptyString(profile.coverUrl)
       || authStore.user?.coverUrl
-      || form.coverUrl
-    if (resolvedAvatarUrl) form.avatarUrl = resolvedAvatarUrl
-    if (resolvedCoverUrl) form.coverUrl = resolvedCoverUrl
+      || ''
+    form.avatarUrl = resolvedAvatarUrl
+    form.coverUrl = resolvedCoverUrl
   } else {
     // No saved preferences profile: seed from authStore directly
     form.firstName = fallbackName.firstName
@@ -675,8 +685,8 @@ function applyLoadedUserSettings(payload?: UserSettingsApiData) {
     form.jobTitle = authStore.user?.jobTitle ?? ''
     form.phone = authStore.user?.phone ?? ''
     form.bio = authStore.user?.bio ?? ''
-    if (!form.avatarUrl && authStore.user?.avatarUrl) form.avatarUrl = authStore.user.avatarUrl
-    if (!form.coverUrl && authStore.user?.coverUrl) form.coverUrl = authStore.user.coverUrl
+    form.avatarUrl = authStore.user?.avatarUrl ?? ''
+    form.coverUrl = authStore.user?.coverUrl ?? ''
   }
   originalSnapshot.value = buildSnapshot()
 }
@@ -696,6 +706,13 @@ function applyLoadedProjectSettings(rolePermissionsPayload?: ProjectRolePermissi
   originalSnapshot.value = buildSnapshot()
 }
 
+watch(
+  () => authStore.user?.id,
+  () => {
+    resetProfileStateForCurrentUser()
+    void userSettingsQuery.refetch()
+  },
+)
 watch(() => userSettingsQuery.data.value, (payload) => { applyLoadedUserSettings(payload) }, { immediate: true })
 watch(
   () => projectSettingsQuery.data.value?.rolePermissions,

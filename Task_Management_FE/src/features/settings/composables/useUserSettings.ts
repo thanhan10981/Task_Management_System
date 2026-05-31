@@ -47,7 +47,7 @@ export function useUserSettingsQuery() {
   const authStore = useAuthStore()
 
   return useQuery({
-    queryKey: QUERY_KEYS.userSettings.me(),
+    queryKey: computed(() => [...QUERY_KEYS.userSettings.me(), authStore.user?.id ?? 'anonymous'] as const),
     enabled: computed(() => authStore.isAuthenticated),
     refetchOnMount: 'always',
     queryFn: async () => {

@@ -359,9 +359,51 @@
       >
         <div class="board-sidebar-head flex items-center justify-between px-4 py-3.5 pb-3 shrink-0" style="border-bottom:1px solid var(--border-base);">
           <span class="text-[13px] font-bold" style="color:var(--text-primary);">Task Groups</span>
-          <button class="w-[26px] h-[26px] rounded-[7px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-colors hover:bg-red-50 hover:text-red-500" style="color:var(--text-subtle);" @click="sidebarOpen = false">
-            <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              v-if="canManageTaskGroups"
+              class="w-[26px] h-[26px] rounded-[7px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-colors hover:bg-indigo-50 hover:text-indigo-500"
+              :class="showNewGroupForm ? 'bg-indigo-50 text-indigo-500' : ''"
+              style="color:var(--text-subtle);"
+              title="New group"
+              @click.stop="toggleNewGroupForm"
+            >
+              <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button class="w-[26px] h-[26px] rounded-[7px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-colors hover:bg-red-50 hover:text-red-500" style="color:var(--text-subtle);" @click="sidebarOpen = false">
+              <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div v-if="showNewGroupForm" class="px-3.5 py-3 shrink-0" style="border-bottom:1px solid var(--border-base);" @click.stop>
+          <div class="flex flex-col gap-2">
+            <input
+              v-model="newGroup.name"
+              class="h-8 px-2.5 rounded-lg border text-[12.5px] font-semibold outline-none"
+              style="background:var(--bg-surface-2);border-color:var(--border-medium);color:var(--text-primary);"
+              placeholder="Group name"
+              maxlength="120"
+              @keydown.enter.prevent="createGroupFromSidebar"
+              @keydown.esc.prevent="cancelNewGroup"
+            />
+            <div class="flex items-center gap-1.5">
+              <button
+                v-for="c in groupColorOptions"
+                :key="c"
+                class="rounded-full border-2 cursor-pointer transition-transform hover:scale-110"
+                :class="newGroup.color === c ? 'scale-110 border-white shadow-[0_0_0_2px_#6366f1]' : 'border-transparent'"
+                :style="{ background: c, width: '18px', height: '18px' }"
+                @click="newGroup.color = c"
+              ></button>
+            </div>
+            <p v-if="groupActionError" class="m-0 rounded-lg border px-2.5 py-1.5 text-[11.5px]" style="border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.1);color:#ef4444;">{{ groupActionError }}</p>
+            <div class="flex justify-end gap-1.5">
+              <button class="h-7 px-2.5 rounded-md border text-[11.5px] font-semibold cursor-pointer" style="border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);" :disabled="groupActionLoading" @click="cancelNewGroup">Cancel</button>
+              <button class="h-7 px-3 rounded-md border-none text-white text-[11.5px] font-bold cursor-pointer bg-indigo-500 disabled:opacity-50" :disabled="groupActionLoading || !newGroup.name.trim()" @click="createGroupFromSidebar">
+                {{ groupActionLoading ? 'Creating...' : 'Create' }}
+              </button>
+            </div>
+          </div>
         </div>
         <div class="board-sidebar-body flex-1 overflow-y-auto overflow-x-hidden py-2" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent;">
           <div v-for="group in taskGroups" :key="group.id" class="mb-0.5 relative">
@@ -407,7 +449,7 @@
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                     Edit
                   </button>
-                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-red-50" style="color:#ef4444;" :disabled="groupActionLoading" @click.stop="confirmDeleteGroup(group)">
+                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-red-50" style="color:#ef4444;" :disabled="groupActionLoading" @click.stop="openDeleteGroup(group)">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
                     Delete
                   </button>
@@ -784,6 +826,41 @@
       </div>
     </Transition>
 
+    <!-- DELETE GROUP MODAL -->
+    <Transition name="modal">
+      <div v-if="deleteGroupTarget" class="fixed inset-0 z-[620] flex items-center justify-center bg-[rgba(15,23,42,0.5)] backdrop-blur-[4px]" @click.self="closeDeleteGroup">
+        <div class="modal-box rounded-[20px] border overflow-hidden flex flex-col" style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 32px 80px rgba(0,0,0,0.3);width:calc(100% - 32px);max-width:430px;">
+          <div class="flex items-center gap-3 px-5 py-4" style="border-bottom:1px solid var(--border-base);">
+            <div class="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style="background:linear-gradient(135deg,rgba(239,68,68,0.16),rgba(249,115,22,0.1));">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M8 6V4h8v2"/></svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <h2 class="text-[16px] font-extrabold m-0" style="color:var(--text-heading);">Delete group?</h2>
+              <p class="text-[12px] m-0 mt-0.5" style="color:var(--text-subtle);">Tasks in this group will not be deleted.</p>
+            </div>
+            <button class="w-[28px] h-[28px] rounded-[8px] border-none flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--bg-surface-3)] disabled:opacity-50 disabled:cursor-not-allowed" type="button" style="background:var(--bg-surface-2);color:var(--text-muted);" :disabled="groupActionLoading" @click="closeDeleteGroup">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>
+            </button>
+          </div>
+
+          <div class="p-5 flex flex-col gap-4">
+            <p class="m-0 text-[13.5px] leading-[1.6]" style="color:var(--text-primary);">
+              This action will delete the group <strong>"{{ deleteGroupTarget.name }}"</strong>.
+              Tasks in this group will be moved to <strong>No group</strong>.
+            </p>
+            <p v-if="groupActionError" class="m-0 rounded-[12px] border px-3 py-2 text-[12.5px]" style="border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.1);color:#ef4444;">{{ groupActionError }}</p>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 px-5 py-4" style="border-top:1px solid var(--border-base);">
+            <button class="h-9 px-4 rounded-[10px] border-[1.5px] bg-transparent text-[13px] font-semibold cursor-pointer transition-colors hover:bg-[var(--bg-surface-2)] disabled:opacity-50 disabled:cursor-not-allowed" type="button" style="border-color:var(--border-medium);color:var(--text-secondary);" :disabled="groupActionLoading" @click="closeDeleteGroup">Cancel</button>
+            <button class="h-9 px-5 rounded-[10px] border-none text-white text-[13px] font-bold cursor-pointer transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed" type="button" style="background:linear-gradient(135deg,#ef4444,#f97316);box-shadow:0 4px 14px rgba(239,68,68,0.3);" :disabled="groupActionLoading" @click="confirmDeleteGroup">
+              {{ groupActionLoading ? 'Deleting...' : 'Delete Group' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
 
     <!-- RIGHT STATUS PANEL -->
     <Transition name="status-panel">
@@ -1093,7 +1170,7 @@
 </template>
 
 <script setup lang="ts">
-import { deleteProjectGroup, updateProjectGroup, type TaskGroup } from '@/api/tasks'
+import { createProjectGroup, deleteProjectGroup, updateProjectGroup, type TaskGroup } from '@/api/tasks'
 import { useProjectSettingsQuery } from '@/api/projects'
 import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
@@ -1263,7 +1340,10 @@ const projectGroups = ref<TaskGroup[]>([])
 const groupByGroup = ref(false)
 const activeSidebarGroupMenu = ref<string | null>(null)
 const editingGroupId = ref<string | null>(null)
+const deleteGroupTarget = ref<SidebarGroup | null>(null)
+const showNewGroupForm = ref(false)
 const groupActionLoading = ref(false)
+const groupActionError = ref('')
 const groupColorOptions = [
   '#6366f1',
   '#8b5cf6',
@@ -1275,6 +1355,7 @@ const groupColorOptions = [
   '#64748b',
 ]
 const editGroupForm = ref({ name: '', color: '#6366f1' })
+const newGroup = ref({ name: '', color: '#6366f1' })
 
 function profileForMember(member: ProjectMember): UserHoverProfile {
   return {
@@ -1695,11 +1776,56 @@ function toggleSidebarGroupMenu(id: string) {
   activeSidebarGroupMenu.value = activeSidebarGroupMenu.value === id ? null : id
 }
 
+function toggleNewGroupForm() {
+  showNewGroupForm.value = !showNewGroupForm.value
+  if (showNewGroupForm.value) {
+    activeSidebarGroupMenu.value = null
+    editingGroupId.value = null
+    deleteGroupTarget.value = null
+    groupActionError.value = ''
+  }
+}
+
+function cancelNewGroup() {
+  if (groupActionLoading.value) return
+  showNewGroupForm.value = false
+  newGroup.value = { name: '', color: '#6366f1' }
+  groupActionError.value = ''
+}
+
+async function createGroupFromSidebar() {
+  if (!effectiveProjectId.value || !newGroup.value.name.trim()) return
+  if (!canManageTaskGroups.value) {
+    toast.error('Only project owner or admin can create groups')
+    return
+  }
+
+  groupActionLoading.value = true
+  groupActionError.value = ''
+  try {
+    await createProjectGroup(effectiveProjectId.value, {
+      name: newGroup.value.name.trim(),
+      color: newGroup.value.color,
+    })
+    projectGroups.value = await fetchProjectGroupsQuery(effectiveProjectId.value)
+    newGroup.value = { name: '', color: '#6366f1' }
+    showNewGroupForm.value = false
+    toast.success('Group created')
+  } catch (error) {
+    groupActionError.value = extractApiErrorMessage(error, 'Cannot create group')
+  } finally {
+    groupActionLoading.value = false
+  }
+}
+
 function startEditGroup(group: SidebarGroup) {
   if (!canManageTaskGroups.value || group.id === '__ungrouped') return
   editingGroupId.value = group.id
   editGroupForm.value = { name: group.name, color: group.color }
   activeSidebarGroupMenu.value = null
+  deleteGroupTarget.value = null
+  showNewGroupForm.value = false
+  groupActionError.value = ''
 }
 
 function cancelEditGroup() {
@@ -1718,6 +1844,7 @@ async function submitEditGroup() {
   if (!name) return
 
   groupActionLoading.value = true
+  groupActionError.value = ''
   try {
     await updateProjectGroup(effectiveProjectId.value, editingGroupId.value, {
       name,
@@ -1733,25 +1860,37 @@ async function submitEditGroup() {
   }
 }
 
-async function confirmDeleteGroup(group: SidebarGroup) {
-  if (!effectiveProjectId.value || group.id === '__ungrouped') return
+function openDeleteGroup(group: SidebarGroup) {
+  if (!canManageTaskGroups.value || group.id === '__ungrouped') return
+  deleteGroupTarget.value = group
+  activeSidebarGroupMenu.value = null
+  groupActionError.value = ''
+}
+
+function closeDeleteGroup() {
+  if (groupActionLoading.value) return
+  deleteGroupTarget.value = null
+  groupActionError.value = ''
+}
+
+async function confirmDeleteGroup() {
+  if (!effectiveProjectId.value || !deleteGroupTarget.value) return
+  const group = deleteGroupTarget.value
   if (!canManageTaskGroups.value) {
     toast.error('Only project owner or admin can delete groups')
     return
   }
 
-  activeSidebarGroupMenu.value = null
-  const ok = window.confirm(`Delete group "${group.name}"? Tasks in this group will move to No group.`)
-  if (!ok) return
-
   groupActionLoading.value = true
+  groupActionError.value = ''
   try {
     await deleteProjectGroup(effectiveProjectId.value, group.id)
     if (editingGroupId.value === group.id) cancelEditGroup()
     await syncProjectBoard(effectiveProjectId.value)
     toast.success('Group deleted')
+    deleteGroupTarget.value = null
   } catch (error) {
-    toast.error(extractApiErrorMessage(error, 'Cannot delete group'))
+    groupActionError.value = extractApiErrorMessage(error, 'Cannot delete group')
   } finally {
     groupActionLoading.value = false
   }

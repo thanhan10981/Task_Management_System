@@ -354,7 +354,7 @@
       <aside
         v-if="sidebarOpen"
         class="board-sidebar flex flex-col shrink-0 overflow-hidden"
-        :class="isMobile ? 'fixed z-[200] left-0 top-[81px] bottom-0 w-[min(240px,68vw)] shadow-[4px_0_32px_rgba(0,0,0,0.22)]' : 'w-[260px] relative z-0'"
+        :class="isMobile ? 'fixed z-[200] left-0 top-[81px] bottom-0 w-[min(240px,68vw)] shadow-[4px_0_32px_rgba(0,0,0,0.22)]' : ['w-[260px] relative', activeSidebarGroupMenu ? 'z-[120]' : 'z-0']"
         style="background:var(--bg-surface);border-right:1px solid var(--border-base);"
       >
         <div class="board-sidebar-head flex items-center justify-between px-4 py-3.5 pb-3 shrink-0" style="border-bottom:1px solid var(--border-base);">
@@ -403,11 +403,11 @@
                   style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 12px 32px rgba(0,0,0,0.18);"
                   @click.stop
                 >
-                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-[var(--bg-hover)]" style="color:var(--text-primary);" @click="startEditGroup(group)">
+                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-[var(--bg-hover)]" style="color:var(--text-primary);" @click.stop="startEditGroup(group)">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                     Edit
                   </button>
-                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-red-50" style="color:#ef4444;" :disabled="groupActionLoading" @click="confirmDeleteGroup(group)">
+                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-red-50" style="color:#ef4444;" :disabled="groupActionLoading" @click.stop="confirmDeleteGroup(group)">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
                     Delete
                   </button>
@@ -565,12 +565,13 @@
                   <span class="h-px flex-1" style="background:var(--border-base);"></span>
                 </div>
                 <div
-                  class="group/card rounded-[14px] p-3.5 cursor-grab relative transition-all border hover:border-[var(--border-medium)] hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] active:cursor-grabbing"
+                  class="group/card rounded-[14px] p-3.5 cursor-grab relative transition-all border active:cursor-grabbing"
                   :class="{
                     'border-l-[3px] border-l-red-500': task.priority==='urgent',
                     'border-l-[3px] border-l-orange-500': task.priority==='high',
                     'border-l-[3px] border-l-amber-400': task.priority==='medium',
                     'border-l-[3px] border-l-indigo-400': task.priority==='low',
+                    'hover:border-[var(--border-medium)] hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)]': activeCardMenu !== task.id,
                   }"
                   style="background:var(--bg-surface);border-color:var(--border-soft);box-shadow:0 1px 6px rgba(0,0,0,0.05);"
                   @click="openTask(task)"
@@ -588,16 +589,9 @@
                     <span class="text-[9px]">{{ priorityIcon(task.priority) }}</span>{{ task.priority }}
                   </span>
                   <div class="relative shrink-0">
-                    <button class="w-[26px] h-[26px] rounded-[7px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-all opacity-0 group-hover/card:opacity-100 hover:bg-[var(--bg-surface-3)]" style="color:var(--text-subtle);" @click.stop="toggleCardMenu(task.id)">
+                    <button class="w-[26px] h-[26px] rounded-[7px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bg-surface-3)]" :class="activeCardMenu === task.id ? 'opacity-100' : 'opacity-0 group-hover/card:opacity-100'" style="color:var(--text-subtle);" @click.stop="toggleCardMenu(task.id, $event)">
                       <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
                     </button>
-                    <div v-if="activeCardMenu === task.id" class="absolute right-0 top-full z-[100] rounded-[12px] border p-1.5 min-w-[160px] card-drop" style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 12px 36px rgba(0,0,0,0.14);" @click.stop>
-                      <button v-for="targetCol in columns" :key="targetCol.id" class="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-[7px] border-none bg-transparent text-[12.5px] cursor-pointer text-left transition-colors hover:bg-[var(--bg-hover)]" style="color:var(--text-primary);" @click="moveTask(task, targetCol.id)"><span class="w-2 h-2 rounded-full shrink-0" :style="{ background: targetCol.color }"></span> {{ targetCol.title }}</button>
-                      <div class="h-px my-1" style="background:var(--border-base);"></div>
-                      <button class="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-[7px] border-none bg-transparent text-[12.5px] cursor-pointer text-left text-red-500 transition-colors hover:bg-red-50" @click="deleteTask(task.id)">
-                        <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>Delete
-                      </button>
-                    </div>
                   </div>
                 </div>
                 <!-- Title -->
@@ -1072,6 +1066,21 @@
 
     <!-- Global overlay (close menus) -->
     <div v-if="sprintMenuOpen || activeCardMenu || activeSidebarGroupMenu" class="fixed inset-0 z-[80]" @click="closeAllMenus"></div>
+    <Teleport to="body">
+      <div
+        v-if="activeCardMenuTask"
+        class="fixed z-[300] rounded-[12px] border p-1.5 min-w-[160px] card-drop"
+        :style="cardMenuStyle"
+        style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 12px 36px rgba(0,0,0,0.14);"
+        @click.stop
+      >
+        <button v-for="targetCol in columns" :key="targetCol.id" class="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-[7px] border-none bg-transparent text-[12.5px] cursor-pointer text-left transition-colors hover:bg-[var(--bg-hover)]" style="color:var(--text-primary);" @click="moveTask(activeCardMenuTask, targetCol.id)"><span class="w-2 h-2 rounded-full shrink-0" :style="{ background: targetCol.color }"></span> {{ targetCol.title }}</button>
+        <div class="h-px my-1" style="background:var(--border-base);"></div>
+        <button class="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-[7px] border-none bg-transparent text-[12.5px] cursor-pointer text-left text-red-500 transition-colors hover:bg-red-50" @click="deleteTask(activeCardMenuTask.id)">
+          <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>Delete
+        </button>
+      </div>
+    </Teleport>
     <TaskDetailModal v-model="detailOpen" :task-id="selectedTaskId" @deleted="onTaskDeleted"/>
     <AICreateTaskModal
       v-model="aiCreateOpen"
@@ -1158,6 +1167,7 @@ const columns = reactive<BoardColumn[]>([
   { id: 'done',       title: 'Done',         color: '#10b981', emptyIcon: '🎉', emptyText: 'No completed tasks yet.' },
 ].map((col) => ({ ...col, icon: col.emptyIcon ?? 'list' })))
 const activeCardMenu = ref<string | null>(null)
+const cardMenuStyle = ref<Record<string, string>>({})
 const tasksBySprintId = ref<Record<string, Task[]>>({})
 
 const columnsModel = computed<BoardColumn[]>({
@@ -1569,6 +1579,11 @@ function shouldShowGroupHeader(task: Task, colId: string) {
 
 /* ── Sprint Stats ───────────────────────────────────────────────── */
 const currentTasks = computed(() => tasksBySprintId.value[selectedSprintId.value] ?? [])
+const activeCardMenuTask = computed(() =>
+  activeCardMenu.value
+    ? currentTasks.value.find((task) => task.id === activeCardMenu.value) ?? null
+    : null
+)
 
 const {
   statusPanelOpen,
@@ -1786,8 +1801,25 @@ async function onColChange(evt: any, colId: string) {
 }
 
 /* ── Card menu ──────────────────────────────────────────────────── */
-function toggleCardMenu(id: string) {
-  activeCardMenu.value = activeCardMenu.value === id ? null : id
+function positionCardMenu(anchor: HTMLElement) {
+  const rect = anchor.getBoundingClientRect()
+  const menuWidth = 176
+  const left = Math.max(12, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 12))
+  const top = Math.min(rect.bottom + 6, window.innerHeight - 240)
+  cardMenuStyle.value = {
+    left: `${left}px`,
+    top: `${Math.max(12, top)}px`,
+  }
+}
+
+function toggleCardMenu(id: string, event: MouseEvent) {
+  if (activeCardMenu.value === id) {
+    activeCardMenu.value = null
+    return
+  }
+
+  positionCardMenu(event.currentTarget as HTMLElement)
+  activeCardMenu.value = id
 }
 async function moveTask(task: Task, status: string) {
   if (!effectiveProjectId.value) return

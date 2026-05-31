@@ -364,10 +364,20 @@
           </button>
         </div>
         <div class="board-sidebar-body flex-1 overflow-y-auto overflow-x-hidden py-2" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) transparent;">
-          <div v-for="group in taskGroups" :key="group.id" class="mb-0.5">
+          <div v-for="group in taskGroups" :key="group.id" class="mb-0.5 relative">
             <div class="board-sidebar-group-row group/sbrow flex items-center gap-1.5 px-3.5 py-2.5 cursor-pointer transition-colors hover:bg-[var(--bg-hover)]" @click="toggleSidebarGroup(group.id)">
               <span class="w-5 h-5 rounded-[6px] flex items-center justify-center text-white text-[12px] font-bold shrink-0" :style="{ background: group.color }">{{ group.expanded ? '−' : '+' }}</span>
-              <span class="flex-1 text-[12.5px] font-bold truncate" style="color:var(--text-primary);">{{ group.name }}</span>
+              <input
+                v-if="editingGroupId === group.id"
+                v-model="editGroupForm.name"
+                class="flex-1 min-w-0 h-7 px-2 rounded-md border text-[12.5px] font-bold outline-none"
+                style="background:var(--bg-surface-2);border-color:var(--border-medium);color:var(--text-primary);"
+                maxlength="120"
+                @click.stop
+                @keydown.enter.prevent="submitEditGroup"
+                @keydown.esc.prevent="cancelEditGroup"
+              />
+              <span v-else class="flex-1 text-[12.5px] font-bold truncate" style="color:var(--text-primary);">{{ group.name }}</span>
               <div class="flex shrink-0">
                 <UserProfileHover v-for="(m, mi) in group.members.slice(0, 3)" :key="mi" :user="m" placement="bottom" class="-ml-[5px] first:ml-0">
                   <div class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8.5px] font-bold border-[1.5px] border-[var(--bg-surface)] overflow-hidden" :style="{ background: m.color }" :title="m.name">
@@ -376,9 +386,51 @@
                   </div>
                 </UserProfileHover>
               </div>
-              <button class="w-[22px] h-[22px] rounded-[6px] border-none bg-transparent flex items-center justify-center cursor-pointer opacity-0 group-hover/sbrow:opacity-100 transition-all hover:bg-[var(--bg-surface-3)]" style="color:var(--text-subtle);" @click.stop>
+              <button
+                v-if="canManageTaskGroups && group.id !== '__ungrouped'"
+                class="w-[22px] h-[22px] rounded-[6px] border-none bg-transparent flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bg-surface-3)]"
+                :class="activeSidebarGroupMenu === group.id ? 'opacity-100' : 'opacity-0 group-hover/sbrow:opacity-100'"
+                style="color:var(--text-subtle);"
+                title="Group options"
+                @click.stop="toggleSidebarGroupMenu(group.id)"
+              >
                 <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
               </button>
+              <Transition name="cm-drop">
+                <div
+                  v-if="activeSidebarGroupMenu === group.id"
+                  class="absolute right-3 top-[36px] w-[136px] rounded-[10px] border p-1 z-[120]"
+                  style="background:var(--bg-surface);border-color:var(--border-medium);box-shadow:0 12px 32px rgba(0,0,0,0.18);"
+                  @click.stop
+                >
+                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-[var(--bg-hover)]" style="color:var(--text-primary);" @click="startEditGroup(group)">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    Edit
+                  </button>
+                  <button class="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg border-none bg-transparent text-left text-[12px] font-semibold cursor-pointer hover:bg-red-50" style="color:#ef4444;" :disabled="groupActionLoading" @click="confirmDeleteGroup(group)">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                    Delete
+                  </button>
+                </div>
+              </Transition>
+            </div>
+            <div v-if="editingGroupId === group.id" class="px-3.5 pb-2" @click.stop>
+              <div class="flex items-center gap-1.5 pl-[26px] py-1.5">
+                <button
+                  v-for="c in groupColorOptions"
+                  :key="c"
+                  class="rounded-full border-2 cursor-pointer transition-transform hover:scale-110"
+                  :class="editGroupForm.color === c ? 'scale-110 border-white shadow-[0_0_0_2px_#6366f1]' : 'border-transparent'"
+                  :style="{ background: c, width: '18px', height: '18px' }"
+                  @click="editGroupForm.color = c"
+                ></button>
+              </div>
+              <div class="flex justify-end gap-1.5">
+                <button class="h-7 px-2.5 rounded-md border text-[11.5px] font-semibold cursor-pointer" style="border-color:var(--border-medium);background:var(--bg-surface);color:var(--text-secondary);" @click="cancelEditGroup">Cancel</button>
+                <button class="h-7 px-3 rounded-md border-none text-white text-[11.5px] font-bold cursor-pointer bg-indigo-500 disabled:opacity-50" :disabled="groupActionLoading || !editGroupForm.name.trim()" @click="submitEditGroup">
+                  {{ groupActionLoading ? 'Saving...' : 'Save' }}
+                </button>
+              </div>
             </div>
             <Transition name="sb-tasks">
               <div v-if="group.expanded" class="pb-1">
@@ -395,11 +447,23 @@
     </Transition>
 
     <!-- BOARD COLUMNS -->
-    <div ref="boardWrapRef" class="flex items-stretch gap-3 px-3 md:px-6 py-3 md:py-5 flex-1 overflow-x-auto overflow-y-hidden" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);" @click.self="closeAllMenus">
+    <div ref="boardWrapRef" class="flex-1 overflow-x-auto overflow-y-hidden" style="scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);" @click.self="closeAllMenus">
+      <draggable
+        v-model="columnsModel"
+        item-key="id"
+        tag="div"
+        handle=".board-col-drag-handle"
+        class="flex items-stretch gap-3 px-3 md:px-6 py-3 md:py-5 min-h-full"
+        style="min-width:max-content;"
+        ghost-class="board-col-ghost"
+        chosen-class="board-col-chosen"
+        drag-class="board-col-drag"
+        :animation="200"
+        @change="onColumnChange"
+      >
+        <template #item="{ element: col }">
       <div
-        v-for="col in columns"
-        :key="col.id"
-        class="board-col flex flex-col rounded-[18px] overflow-hidden border-[1.5px] transition-all flex-none min-w-[300px] shrink-0"
+        class="board-col group/boardcol flex flex-col rounded-[18px] overflow-hidden border-[1.5px] transition-all flex-none min-w-[300px] shrink-0"
         :class="draggingOverCol === col.id ? 'border-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.18)]' : 'border-[var(--border-base)]'"
         :style="{ background: 'var(--bg-surface-2)', ...(colWidth ? { width: colWidth + 'px' } : {}) }"
       >
@@ -408,6 +472,17 @@
         <!-- Column header -->
         <div class="flex items-center justify-between px-5 py-4 pb-3 shrink-0">
           <div class="flex items-center gap-2.5">
+            <span
+              class="board-col-drag-handle flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover/boardcol:opacity-60 hover:!opacity-100 transition-opacity"
+              title="Drag to reorder status"
+              @click.stop
+            >
+              <svg width="10" height="14" viewBox="0 0 10 16" fill="currentColor" style="color:var(--text-subtle)">
+                <circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/>
+                <circle cx="2" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/>
+                <circle cx="2" cy="14" r="1.5"/><circle cx="8" cy="14" r="1.5"/>
+              </svg>
+            </span>
             <span class="w-3 h-3 rounded-full" :style="{ background: col.color }"></span>
             <template v-if="editingColId === col.id">
               <input
@@ -585,6 +660,8 @@
           Add Task
         </button>
       </div>
+        </template>
+      </draggable>
     </div>
 
     </div><!-- end wrapper -->
@@ -994,7 +1071,7 @@
 
 
     <!-- Global overlay (close menus) -->
-    <div v-if="sprintMenuOpen || activeCardMenu" class="fixed inset-0 z-[80]" @click="closeAllMenus"></div>
+    <div v-if="sprintMenuOpen || activeCardMenu || activeSidebarGroupMenu" class="fixed inset-0 z-[80]" @click="closeAllMenus"></div>
     <TaskDetailModal v-model="detailOpen" :task-id="selectedTaskId" @deleted="onTaskDeleted"/>
     <AICreateTaskModal
       v-model="aiCreateOpen"
@@ -1007,7 +1084,7 @@
 </template>
 
 <script setup lang="ts">
-import type { TaskGroup } from '@/api/tasks'
+import { deleteProjectGroup, updateProjectGroup, type TaskGroup } from '@/api/tasks'
 import { useProjectSettingsQuery } from '@/api/projects'
 import { extractApiErrorMessage } from '@/composables/useApiError'
 import { useToast } from '@/composables/useToast'
@@ -1028,11 +1105,11 @@ import {
   useUpdateProjectSprintMutation,
 } from '@/features/tasks/composables/useSprintsQuery'
 import { useProjectStore } from '@/stores/project.store'
-import { useTaskStore } from '@/stores/task.store'
+import { useTaskStore, type Column as StoreColumn } from '@/stores/task.store'
 import { useAuthStore } from '@/stores/auth.store'
 import type { SprintSummary } from '@/api/sprints'
 import { storeToRefs } from 'pinia'
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import draggable from 'vuedraggable'
 import AICreateTaskModal from '../components/AICreateTaskModal.vue'
@@ -1073,13 +1150,23 @@ interface Task {
 }
 
 /* ── Columns ─────────────────────────────────────────────────────── */
-const columns = [
+type BoardColumn = BoardStatusColumn & Pick<StoreColumn, 'icon'>
+
+const columns = reactive<BoardColumn[]>([
   { id: 'todo',       title: 'To Do',       color: '#6366f1', emptyIcon: '📋', emptyText: 'No tasks here yet. Add one!' },
   { id: 'inprogress', title: 'In Progress',  color: '#f59e0b', emptyIcon: '🚧', emptyText: 'Nothing in progress. Start a task!' },
   { id: 'done',       title: 'Done',         color: '#10b981', emptyIcon: '🎉', emptyText: 'No completed tasks yet.' },
-]
+].map((col) => ({ ...col, icon: col.emptyIcon ?? 'list' })))
 const activeCardMenu = ref<string | null>(null)
 const tasksBySprintId = ref<Record<string, Task[]>>({})
+
+const columnsModel = computed<BoardColumn[]>({
+  get: () => columns,
+  set: (val) => {
+    columns.splice(0, columns.length, ...val)
+    store.reorderColumns(val.map(({ id, title, color, icon }) => ({ id, title, color, icon })))
+  },
+})
 
 const {
   sprints,
@@ -1150,6 +1237,7 @@ const {
 })
 
 const canManageSprints = computed(() => canManageProjectMembers.value)
+const canManageTaskGroups = computed(() => canManageProjectMembers.value)
 const editingSprint = ref<SprintSummary | null>(null)
 const deleteSprintTarget = ref<SprintSummary | null>(null)
 const sprintActionLoading = ref(false)
@@ -1163,6 +1251,20 @@ const editSprintForm = ref({
 /* -- Tasks per sprint --------------------------------------------- */
 const projectGroups = ref<TaskGroup[]>([])
 const groupByGroup = ref(false)
+const activeSidebarGroupMenu = ref<string | null>(null)
+const editingGroupId = ref<string | null>(null)
+const groupActionLoading = ref(false)
+const groupColorOptions = [
+  '#6366f1',
+  '#8b5cf6',
+  '#0ea5e9',
+  '#10b981',
+  '#f59e0b',
+  '#ef4444',
+  '#ec4899',
+  '#64748b',
+]
+const editGroupForm = ref({ name: '', color: '#6366f1' })
 
 function profileForMember(member: ProjectMember): UserHoverProfile {
   return {
@@ -1364,6 +1466,7 @@ function syncBoardFromStore() {
       id: col.id,
       title: col.title,
       color: col.color,
+      icon: col.icon,
       emptyIcon: col.icon || '•',
       emptyText: `No tasks in ${col.title}. Add one!`,
     }))
@@ -1546,9 +1649,11 @@ const sidebarGroupExpanded = ref<Record<string, boolean>>({})
 
 const taskGroups = computed<SidebarGroup[]>(() => {
   const tasks = tasksBySprintId.value[selectedSprintId.value] ?? []
-  const groups = projectGroups.value.length
-    ? projectGroups.value
-    : [{ id: '__ungrouped', name: 'No group', color: '#64748b' }]
+  const hasUngroupedTasks = tasks.some((task) => !task.groupId)
+  const groups = [
+    ...projectGroups.value,
+    ...(hasUngroupedTasks ? [{ id: '__ungrouped', name: 'No group', color: '#64748b' }] : []),
+  ]
 
   return groups.map(gd => {
     const matched = gd.id === '__ungrouped'
@@ -1571,6 +1676,72 @@ function toggleSidebarGroup(id: string) {
   sidebarGroupExpanded.value[id] = !(sidebarGroupExpanded.value[id] ?? true)
 }
 
+function toggleSidebarGroupMenu(id: string) {
+  activeSidebarGroupMenu.value = activeSidebarGroupMenu.value === id ? null : id
+}
+
+function startEditGroup(group: SidebarGroup) {
+  if (!canManageTaskGroups.value || group.id === '__ungrouped') return
+  editingGroupId.value = group.id
+  editGroupForm.value = { name: group.name, color: group.color }
+  activeSidebarGroupMenu.value = null
+}
+
+function cancelEditGroup() {
+  editingGroupId.value = null
+  editGroupForm.value = { name: '', color: '#6366f1' }
+}
+
+async function submitEditGroup() {
+  if (!effectiveProjectId.value || !editingGroupId.value) return
+  if (!canManageTaskGroups.value) {
+    toast.error('Only project owner or admin can edit groups')
+    return
+  }
+
+  const name = editGroupForm.value.name.trim()
+  if (!name) return
+
+  groupActionLoading.value = true
+  try {
+    await updateProjectGroup(effectiveProjectId.value, editingGroupId.value, {
+      name,
+      color: editGroupForm.value.color,
+    })
+    await syncProjectBoard(effectiveProjectId.value)
+    cancelEditGroup()
+    toast.success('Group updated')
+  } catch (error) {
+    toast.error(extractApiErrorMessage(error, 'Cannot update group'))
+  } finally {
+    groupActionLoading.value = false
+  }
+}
+
+async function confirmDeleteGroup(group: SidebarGroup) {
+  if (!effectiveProjectId.value || group.id === '__ungrouped') return
+  if (!canManageTaskGroups.value) {
+    toast.error('Only project owner or admin can delete groups')
+    return
+  }
+
+  activeSidebarGroupMenu.value = null
+  const ok = window.confirm(`Delete group "${group.name}"? Tasks in this group will move to No group.`)
+  if (!ok) return
+
+  groupActionLoading.value = true
+  try {
+    await deleteProjectGroup(effectiveProjectId.value, group.id)
+    if (editingGroupId.value === group.id) cancelEditGroup()
+    await syncProjectBoard(effectiveProjectId.value)
+    toast.success('Group deleted')
+  } catch (error) {
+    toast.error(extractApiErrorMessage(error, 'Cannot delete group'))
+  } finally {
+    groupActionLoading.value = false
+  }
+}
+
 function statusColor(status: string): string {
   return columns.find((col) => col.id === status)?.color ?? '#94a3b8'
 }
@@ -1585,6 +1756,18 @@ const draggingOverCol = ref<string | null>(null)
 
 function onDragStart() { isDragging.value = true }
 function onDragEnd()   { isDragging.value = false; draggingOverCol.value = null }
+
+async function onColumnChange(evt: { moved?: { element: BoardColumn; newIndex: number } }) {
+  const moved = evt.moved
+  if (!moved || !effectiveProjectId.value) return
+
+  try {
+    await store.updateStatusPosition(effectiveProjectId.value, moved.element.id, moved.newIndex + 1)
+  } catch (_error) {
+    toast.error('Cannot update status order')
+    await syncProjectBoard(effectiveProjectId.value)
+  }
+}
 
 /**
  * Called by vuedraggable when an item is added to this column via drag.
@@ -1788,7 +1971,12 @@ function formatDue(due: string): string {
   if (diff === -1) return 'Yesterday'
   return diff < 0 ? `${Math.abs(diff)}d ago` : `${diff}d left`
 }
-function closeAllMenus() { sprintMenuOpen.value = false; activeCardMenu.value = null; openColMenuId.value = null }
+function closeAllMenus() {
+  sprintMenuOpen.value = false
+  activeCardMenu.value = null
+  openColMenuId.value = null
+  activeSidebarGroupMenu.value = null
+}
 
 /* ── Column context menu ──────────────────────────────────────── */
 /* ── Column inline edit ───────────────────────────────────────── */
@@ -1867,6 +2055,22 @@ onUnmounted(() => {
 .sprint-inp:focus { border-color: #6366f1 !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
 
 /* ── vuedraggable drag states (:deep needed) ── */
+:deep(.board-col-ghost) {
+  opacity: 0.42;
+  border: 2px dashed #6366f1 !important;
+  background: rgba(99,102,241,0.06) !important;
+}
+
+:deep(.board-col-chosen) {
+  box-shadow: 0 18px 44px rgba(99,102,241,0.22) !important;
+  transform: scale(1.01);
+}
+
+:deep(.board-col-drag) {
+  opacity: 0.9;
+  cursor: grabbing !important;
+}
+
 :deep(.card-ghost) {
   opacity: 0.35;
   background: var(--bg-surface-3) !important;

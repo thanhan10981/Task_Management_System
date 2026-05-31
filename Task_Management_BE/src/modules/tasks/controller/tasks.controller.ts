@@ -25,6 +25,7 @@ import {
   CreateTaskGroupDto,
   CreateTaskDto,
   TaskQueryDto,
+  UpdateTaskGroupDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
 import { GenerateTaskDescriptionDto } from '../dto/ai-task.dto';
@@ -131,6 +132,34 @@ export class TasksController {
       projectId,
       createTaskGroupDto,
     );
+  }
+
+  @Patch('projects/:projectId/groups/:groupId')
+  @ApiOperation({ summary: 'Update task group in project' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task group updated successfully' })
+  updateGroup(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+    @Body() updateTaskGroupDto: UpdateTaskGroupDto,
+  ) {
+    return this.taskService.updateProjectGroup(
+      req.user.id,
+      projectId,
+      groupId,
+      updateTaskGroupDto,
+    );
+  }
+
+  @Delete('projects/:projectId/groups/:groupId')
+  @ApiOperation({ summary: 'Delete task group in project' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Task group deleted successfully' })
+  deleteGroup(
+    @Request() req,
+    @Param('projectId', new ParseUUIDPipe()) projectId: string,
+    @Param('groupId', new ParseUUIDPipe()) groupId: string,
+  ) {
+    return this.taskService.deleteProjectGroup(req.user.id, projectId, groupId);
   }
 
   @Get('projects/:projectId/statuses')

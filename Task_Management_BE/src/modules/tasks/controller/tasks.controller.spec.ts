@@ -15,6 +15,8 @@ describe('TasksController', () => {
       findByParentTask: jest.fn(),
       listProjectGroups: jest.fn(),
       createProjectGroup: jest.fn(),
+      updateProjectGroup: jest.fn(),
+      deleteProjectGroup: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
       restore: jest.fn(),
@@ -63,6 +65,8 @@ describe('TasksController', () => {
   it('forwards group, status, and assignee calls', () => {
     controller.listGroups(req, 'project-1');
     controller.createGroup(req, 'project-1', { name: 'API' } as any);
+    controller.updateGroup(req, 'project-1', 'group-1', { name: 'Web' } as any);
+    controller.deleteGroup(req, 'project-1', 'group-1');
     controller.listStatuses(req, 'project-1');
     controller.createStatus(req, 'project-1', { name: 'QA' } as any);
     controller.updateStatus(req, 'project-1', 'status-1', { name: 'Done' } as any);
@@ -73,6 +77,8 @@ describe('TasksController', () => {
 
     expect(taskService.listProjectGroups).toHaveBeenCalledWith('user-1', 'project-1');
     expect(taskService.createProjectGroup).toHaveBeenCalledWith('user-1', 'project-1', { name: 'API' });
+    expect(taskService.updateProjectGroup).toHaveBeenCalledWith('user-1', 'project-1', 'group-1', { name: 'Web' });
+    expect(taskService.deleteProjectGroup).toHaveBeenCalledWith('user-1', 'project-1', 'group-1');
     expect(statusService.listStatuses).toHaveBeenCalledWith('user-1', 'project-1');
     expect(statusService.createStatus).toHaveBeenCalledWith('user-1', 'project-1', { name: 'QA' });
     expect(statusService.updateStatus).toHaveBeenCalledWith('user-1', 'project-1', 'status-1', { name: 'Done' });

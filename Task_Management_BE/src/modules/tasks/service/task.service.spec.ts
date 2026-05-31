@@ -44,6 +44,8 @@ describe('TaskService', () => {
       countTaskHistory: jest.fn(),
       listProjectGroups: jest.fn(),
       createTaskGroup: jest.fn(),
+      updateTaskGroup: jest.fn(),
+      deleteTaskGroup: jest.fn(),
       listAssignees: jest.fn(),
     };
     access = {
@@ -148,5 +150,19 @@ describe('TaskService', () => {
     await expect(service.listProjectGroups('user-1', 'project-1')).resolves.toEqual([
       { id: 'g1', name: 'API', color: '#fff', position: 1, projectId: 'project-1' },
     ]);
+  });
+
+  it('updates and deletes project groups', async () => {
+    repository.findGroupById.mockResolvedValue({ id: 'g1', name: 'API', color: '#fff', projectId: 'project-1' });
+    repository.updateTaskGroup.mockResolvedValue({ id: 'g1', name: 'Web', color: '#6366f1', projectId: 'project-1' });
+
+    await expect(
+      service.updateProjectGroup('user-1', 'project-1', 'g1', { name: ' Web ', color: '#6366f1' }),
+    ).resolves.toMatchObject({ name: 'Web' });
+    expect(access.ensureProjectAdminOrOwner).toHaveBeenCalledWith('user-1', 'project-1');
+    expect(repository.updateTaskGroup).toHaveBeenCalledWith('g1', { name: 'Web', color: '#6366f1' });
+
+    await expect(service.deleteProjectGroup('user-1', 'project-1', 'g1')).resolves.toEqual({ success: true });
+    expect(repository.deleteTaskGroup).toHaveBeenCalledWith('g1');
   });
 });

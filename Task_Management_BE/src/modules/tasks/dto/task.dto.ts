@@ -229,6 +229,20 @@ export class CreateTaskGroupDto {
   color?: string;
 }
 
+export class UpdateTaskGroupDto {
+  @ApiPropertyOptional({ description: 'Task group name', example: 'Development' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120, { message: 'Group name must be at most 120 characters' })
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Task group color', example: '#6366f1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20, { message: 'Color must be at most 20 characters' })
+  color?: string;
+}
+
 export class AssignTaskUserDto {
   @ApiProperty({ description: 'User id to assign', example: '0b8390cb-83ce-4f67-a843-b422f8bc7087' })
   @IsNotEmpty({ message: 'User id is required' })

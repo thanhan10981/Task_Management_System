@@ -1,4 +1,4 @@
-import { get, post } from './client'
+import { del, get, patch, post } from './client'
 import type { TaskSearchApiResponse, TaskSearchApiTask } from '@/features/tasks/types/task-search.types'
 
 export interface TaskGroup {
@@ -70,6 +70,25 @@ export async function createProjectGroup(
   const response = await post<TaskGroup | ApiEnvelope<TaskGroup>>(
     `/tasks/projects/${projectId}/groups`,
     data
+  )
+  return unwrapApiPayload(response)
+}
+
+export async function updateProjectGroup(
+  projectId: string,
+  groupId: string,
+  data: { name?: string; color?: string }
+): Promise<TaskGroup> {
+  const response = await patch<TaskGroup | ApiEnvelope<TaskGroup>>(
+    `/tasks/projects/${projectId}/groups/${groupId}`,
+    data
+  )
+  return unwrapApiPayload(response)
+}
+
+export async function deleteProjectGroup(projectId: string, groupId: string): Promise<{ success: boolean }> {
+  const response = await del<{ success: boolean } | ApiEnvelope<{ success: boolean }>>(
+    `/tasks/projects/${projectId}/groups/${groupId}`
   )
   return unwrapApiPayload(response)
 }

@@ -113,6 +113,14 @@ export class TasksRepository {
     return this.prisma.taskGroup.create({ data });
   }
 
+  updateTaskGroup(id: string, data: Prisma.TaskGroupUpdateInput) {
+    return this.prisma.taskGroup.update({ where: { id }, data });
+  }
+
+  deleteTaskGroup(id: string) {
+    return this.prisma.taskGroup.delete({ where: { id } });
+  }
+
   createTask(data: Prisma.TaskCreateInput, tx?: TxClient) {
     const client = tx ?? this.prisma;
     return client.task.create({

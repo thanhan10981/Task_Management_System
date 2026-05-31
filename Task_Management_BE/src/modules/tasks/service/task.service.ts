@@ -16,6 +16,7 @@ import {
   CreateTaskGroupDto,
   CreateTaskDto,
   TaskQueryDto,
+  UpdateTaskGroupDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
 import {
@@ -788,6 +789,59 @@ export class TaskService {
 
       throw error;
     }
+  }
+
+  async updateProjectGroup(
+    userId: string,
+    projectId: string,
+    groupId: string,
+    dto: UpdateTaskGroupDto,
+  ) {
+    await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
+
+    const group = await this.tasksRepository.findGroupById(groupId);
+    if (!group || group.projectId !== projectId) {
+      throw new NotFoundException('Task group not found in project');
+    }
+
+    const data: Prisma.TaskGroupUpdateInput = {};
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
+      if (!name) {
+        throw new ConflictException('Group name is required');
+      }
+      data.name = name;
+    }
+    if (dto.color !== undefined) {
+      data.color = dto.color;
+    }
+
+    try {
+      return await this.tasksRepository.updateTaskGroup(groupId, data);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Group name or position already exists in this project',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async deleteProjectGroup(userId: string, projectId: string, groupId: string) {
+    await this.projectAccessService.ensureProjectAdminOrOwner(userId, projectId);
+
+    const group = await this.tasksRepository.findGroupById(groupId);
+    if (!group || group.projectId !== projectId) {
+      throw new NotFoundException('Task group not found in project');
+    }
+
+    await this.tasksRepository.deleteTaskGroup(groupId);
+    return { success: true };
   }
 
   private async recordHistoryAndActivity(

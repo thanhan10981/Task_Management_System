@@ -344,6 +344,72 @@
 
     <!-- BOARD + SIDEBAR WRAPPER -->
     <div class="flex flex-1 overflow-hidden relative">
+
+    <!-- ═══ BOARD LOADING OVERLAY ═══ -->
+    <Transition name="board-loading">
+      <div
+        v-if="boardLoading"
+        class="absolute inset-0 z-[500] flex flex-col overflow-hidden"
+        style="background: var(--bg-app);"
+      >
+        <!-- Shimmer skeleton columns -->
+        <div class="flex items-stretch gap-3 px-3 md:px-6 py-3 md:py-5 w-full h-full" style="min-width:max-content;">
+          <div
+            v-for="skCol in 3"
+            :key="skCol"
+            class="board-sk-col flex flex-col rounded-[18px] overflow-hidden border-[1.5px] flex-none"
+            :style="{ animationDelay: (skCol - 1) * 90 + 'ms', minWidth: '300px', width: '340px', borderColor: 'var(--border-base)', background: 'var(--bg-surface-2)' }"
+          >
+            <!-- accent bar -->
+            <div class="h-[4px] rounded-t-[18px] shrink-0 sk-shimmer"></div>
+            <!-- col header -->
+            <div class="flex items-center justify-between px-5 py-4 pb-3 shrink-0">
+              <div class="flex items-center gap-2.5">
+                <div class="w-3 h-3 rounded-full sk-shimmer"></div>
+                <div class="h-4 rounded-lg sk-shimmer" style="width:80px;"></div>
+                <div class="h-5 w-7 rounded-full sk-shimmer"></div>
+              </div>
+              <div class="flex items-center gap-1">
+                <div class="w-7 h-7 rounded-[7px] sk-shimmer"></div>
+                <div class="w-7 h-7 rounded-[7px] sk-shimmer"></div>
+              </div>
+            </div>
+            <!-- skeleton cards -->
+            <div class="flex-1 overflow-hidden px-2.5 flex flex-col gap-2.5 py-1 pb-2">
+              <div
+                v-for="skCard in (skCol === 2 ? 4 : skCol === 1 ? 3 : 2)"
+                :key="skCard"
+                class="board-sk-card rounded-[14px] p-3.5 border"
+                :style="{ animationDelay: ((skCol - 1) * 90 + skCard * 65) + 'ms', borderColor: 'var(--border-soft)', background: 'var(--bg-surface)' }"
+              >
+                <div class="flex items-center justify-between mb-3">
+                  <div class="h-4 w-14 rounded-full sk-shimmer"></div>
+                  <div class="w-6 h-6 rounded-[7px] sk-shimmer"></div>
+                </div>
+                <div class="h-3.5 rounded-lg sk-shimmer mb-1.5" :style="{ width: [85, 70, 92, 60, 78][skCard % 5] + '%' }"></div>
+                <div v-if="skCard % 3 !== 0" class="h-3 rounded-lg sk-shimmer mb-3" :style="{ width: [60, 45, 75, 55][skCard % 4] + '%' }"></div>
+                <div class="flex items-center justify-between mt-2">
+                  <div class="flex items-center gap-1">
+                    <div class="w-5 h-5 rounded-full sk-shimmer"></div>
+                    <div v-if="skCard % 2 === 0" class="w-5 h-5 rounded-full sk-shimmer" style="margin-left:-4px"></div>
+                  </div>
+                  <div class="h-3 w-12 rounded-full sk-shimmer"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Centered spinner badge -->
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div class="board-loading-badge flex flex-col items-center gap-3">
+            <div class="board-loader-ring"></div>
+            <span class="text-[12px] font-semibold tracking-wide" style="color:var(--text-muted);">Loading board...</span>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- LEFT SIDEBAR BACKDROP (mobile) -->
     <Transition name="sidebar-backdrop">
       <div v-if="sidebarOpen && isMobile" class="fixed left-0 right-0 top-[81px] bottom-0 z-[199] bg-[rgba(15,23,42,0.5)] backdrop-blur-sm" @click="sidebarOpen = false"></div>
@@ -1578,7 +1644,11 @@ function syncBoardFromStore() {
   }
 }
 
-async function syncProjectBoard(projectId: string | null) {
+/* ── Board initial loading ──────────────────────────────────────── */
+const boardLoading = ref(false)
+let _boardInitialized = false
+
+async function syncProjectBoard(projectId: string | null, showLoader = false) {
   if (!projectId) {
     store.resetProjectBoard()
     remoteSprintCache.value = []
@@ -1587,20 +1657,27 @@ async function syncProjectBoard(projectId: string | null) {
     return
   }
 
-  await Promise.all([
-    store.loadProjectBoard(projectId),
-    store.loadProjectTrash(projectId),
-    loadProjectSprints(projectId),
-    fetchProjectGroupsQuery(projectId).then((groups) => { projectGroups.value = groups }),
-  ])
-  syncBoardFromStore()
+  if (showLoader) boardLoading.value = true
+  try {
+    await Promise.all([
+      store.loadProjectBoard(projectId),
+      store.loadProjectTrash(projectId),
+      loadProjectSprints(projectId),
+      fetchProjectGroupsQuery(projectId).then((groups) => { projectGroups.value = groups }),
+    ])
+    syncBoardFromStore()
+  } finally {
+    if (showLoader) boardLoading.value = false
+  }
 }
 
 watch(
   routeProjectId,
   async (projectId) => {
+    const isFirst = !_boardInitialized
+    _boardInitialized = true
     try {
-      await syncProjectBoard(projectId)
+      await syncProjectBoard(projectId, isFirst)
     } catch {
       toast.error('Cannot load board data')
     }
@@ -2392,6 +2469,72 @@ onUnmounted(() => {
 @keyframes cmDropIn  { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes cmDropOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-4px) scale(0.96); } }
 
+/* ══════════════ BOARD LOADING OVERLAY ══════════════ */
+
+/* Overlay fade transition */
+.board-loading-enter-active { transition: opacity 0.28s ease; }
+.board-loading-leave-active { transition: opacity 0.38s ease; }
+.board-loading-enter-from,
+.board-loading-leave-to { opacity: 0; }
+
+/* Shimmer sweep animation */
+@keyframes shimmer {
+  0%   { background-position: -700px 0; }
+  100% { background-position: 700px 0; }
+}
+.sk-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface-3, #e2e8f0) 25%,
+    var(--bg-hover, #f1f5f9) 50%,
+    var(--bg-surface-3, #e2e8f0) 75%
+  );
+  background-size: 700px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+/* Skeleton column slide-up entrance */
+@keyframes skColIn {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.board-sk-col {
+  animation: skColIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Skeleton card pop-in */
+@keyframes skCardIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.board-sk-card {
+  animation: skCardIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Spinner ring */
+@keyframes spinRing {
+  to { transform: rotate(360deg); }
+}
+.board-loader-ring {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: #6366f1;
+  border-right-color: #8b5cf6;
+  animation: spinRing 0.75s linear infinite;
+  filter: drop-shadow(0 0 8px rgba(99,102,241,0.4));
+}
+
+/* Badge container */
+.board-loading-badge {
+  padding: 18px 28px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-base);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.16), 0 4px 16px rgba(99,102,241,0.1);
+  backdrop-filter: blur(12px);
+}
 </style>
 
 

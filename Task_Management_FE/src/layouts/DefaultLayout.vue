@@ -305,7 +305,18 @@
                 </div>
                 <div class="h-px my-1" style="background: var(--divider);" />
                 <button
-                  class="flex items-center gap-2 w-full px-3 py-2 rounded-[10px] border-none bg-none text-[13px] font-semibold text-red-500 cursor-pointer font-[inherit] transition-colors duration-150 hover:bg-red-50"
+                  class="user-menu-item flex items-center gap-2 w-full px-3 py-2 rounded-[10px] border-none bg-none text-[13px] font-semibold cursor-pointer font-[inherit] transition-colors duration-150"
+                  style="background: none; color: var(--text-secondary);"
+                  @click="openFeedbackModal"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                    <path d="M8 9h8M8 13h5" />
+                  </svg>
+                  Feedback
+                </button>
+                <button
+                  class="user-menu-item user-menu-item--danger flex items-center gap-2 w-full px-3 py-2 rounded-[10px] border-none bg-none text-[13px] font-semibold text-red-500 cursor-pointer font-[inherit] transition-colors duration-150"
                   style="background: none;"
                   @click="handleLogout"
                 >
@@ -354,19 +365,6 @@
     </nav>
 
     <!-- ══ CREATE PROJECT MODAL ═══════════════════════════════ -->
-    <button
-      type="button"
-      class="feedback-fab fixed right-4 bottom-20 md:right-6 md:bottom-6 z-[260] inline-flex items-center justify-center gap-2 rounded-2xl border-none px-4 h-12 text-[13px] font-bold text-white cursor-pointer transition-all duration-200 shadow-lg"
-      aria-label="Send feedback"
-      @click="openFeedbackModal"
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-        <path d="M8 9h8M8 13h5" />
-      </svg>
-      <span class="hidden sm:inline">Feedback</span>
-    </button>
-
     <Teleport to="body">
       <Transition name="dropdown-fade">
         <div
@@ -383,7 +381,7 @@
             <div class="flex items-start justify-between gap-3 mb-4">
               <div>
                 <h3 class="text-lg font-bold m-0" style="color: var(--text-heading);">Send feedback</h3>
-                <p class="text-[12.5px] m-0 mt-1" style="color: var(--text-muted);">{{ authStore.user?.email }}</p>
+                <p class="text-[12.5px] m-0 mt-1" style="color: var(--text-muted);">Report a UI issue, bug, or feature idea.</p>
               </div>
               <button
                 type="button"
@@ -1338,14 +1336,6 @@ const navItems: NavItem[] = [
   box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
 }
 
-.feedback-fab {
-  background: linear-gradient(135deg, #4f46e5, #06b6d4);
-  box-shadow: 0 12px 30px rgba(79,70,229,0.32);
-}
-.feedback-fab:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 36px rgba(79,70,229,0.38);
-}
 .feedback-type-btn {
   color: var(--text-muted);
   background: transparent;
@@ -1358,6 +1348,14 @@ const navItems: NavItem[] = [
   color: #ffffff;
   background: linear-gradient(135deg, #4f46e5, #06b6d4);
   box-shadow: 0 6px 16px rgba(79,70,229,0.22);
+}
+.user-menu-item:hover {
+  background: var(--bg-active) !important;
+  color: #4f46e5 !important;
+}
+.user-menu-item--danger:hover {
+  background: rgba(239,68,68,0.1) !important;
+  color: #ef4444 !important;
 }
 
 /* 6. @keyframes — not possible in Tailwind */

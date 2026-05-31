@@ -1,12 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { buildMailFrom } from '../../../common/helpers/mail-from.helper';
 import { MailJobQueueService } from '../../../common/mail/services/mail-job-queue.service';
 import { feedbackTemplate } from '../../../common/mail/templates/feedback.template';
 import { AuthenticatedUser } from '../../../common/types/authenticated-user.type';
 import { CreateFeedbackDto } from '../dto/create-feedback.dto';
-
-const FEEDBACK_RECIPIENT = 'voan10981@gmail.com';
 
 @Injectable()
 export class FeedbackService {
@@ -16,13 +14,18 @@ export class FeedbackService {
   ) {}
 
   async submitFeedback(user: AuthenticatedUser, dto: CreateFeedbackDto) {
+    const recipient = this.configService.get<string>('FEEDBACK_RECIPIENT_EMAIL')?.trim();
+    if (!recipient) {
+      throw new InternalServerErrorException('Feedback recipient email is not configured');
+    }
+
     const mail = feedbackTemplate({
       ...dto,
       user,
     });
 
     await this.mailJobQueueService.enqueue({
-      to: FEEDBACK_RECIPIENT,
+      to: recipient,
       from: buildMailFrom(
         this.configService.get<string>('MAIL_PUBLIC_FROM_NAME'),
         this.configService.get<string>('MAIL_PUBLIC_FROM_ADDRESS'),

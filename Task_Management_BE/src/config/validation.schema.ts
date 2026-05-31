@@ -21,6 +21,7 @@ export interface EnvVariables {
   SMTP_FROM?: string;
   MAIL_PUBLIC_FROM_NAME?: string;
   MAIL_PUBLIC_FROM_ADDRESS?: string;
+  FEEDBACK_RECIPIENT_EMAIL?: string;
   REMINDER_THRESHOLDS_MINUTES?: string;
   RESET_PASSWORD_CODE_EXPIRES_MINUTES?: number;
   GEMINI_API_KEY?: string;
@@ -178,6 +179,8 @@ export function validate(config: RawConfig): EnvVariables {
     SMTP_FROM: smtpFrom,
     MAIL_PUBLIC_FROM_NAME: mailPublicFromName,
     MAIL_PUBLIC_FROM_ADDRESS: mailPublicFromAddress,
+    FEEDBACK_RECIPIENT_EMAIL:
+      readString(config, 'FEEDBACK_RECIPIENT_EMAIL') || undefined,
     REMINDER_THRESHOLDS_MINUTES:
       readString(config, 'REMINDER_THRESHOLDS_MINUTES') || undefined,
     RESET_PASSWORD_CODE_EXPIRES_MINUTES:

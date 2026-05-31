@@ -45,6 +45,10 @@ export default () => ({
     apiKey: process?.env?.RESEND_API_KEY,
   },
 
+  feedback: {
+    recipientEmail: process?.env?.FEEDBACK_RECIPIENT_EMAIL,
+  },
+
   gemini: {
     apiKey: process?.env?.GEMINI_API_KEY,
     fallbackModel: process?.env?.GEMINI_FALLBACK_MODEL,

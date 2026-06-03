@@ -352,7 +352,7 @@
 
                         <div v-if="getCommentAttachments(entry.id).length > 0" class="td-comment-media-grid mt-2">
                           <div v-for="att in getCommentAttachments(entry.id)" :key="att.id" class="td-comment-media-item" @click="openAttachmentPreview(att)">
-                            <div v-if="att.type === 'image'" class="td-comment-media-frame">
+                            <div v-if="isAttachmentImage(att)" class="td-comment-media-frame">
                               <div v-if="isCommentImageLoading(att.id)" class="td-comment-media-loading">
                                 <span class="td-comment-spinner" aria-label="Loading image" />
                               </div>
@@ -413,7 +413,7 @@
                               
                               <div v-if="getCommentAttachments(reply.id).length > 0" class="td-comment-media-grid mt-2">
                                 <div v-for="att in getCommentAttachments(reply.id)" :key="att.id" class="td-comment-media-item" @click="openAttachmentPreview(att)">
-                                  <div v-if="att.type === 'image'" class="td-comment-media-frame">
+                                  <div v-if="isAttachmentImage(att)" class="td-comment-media-frame">
                                     <div v-if="isCommentImageLoading(att.id)" class="td-comment-media-loading">
                                       <span class="td-comment-spinner" aria-label="Loading image" />
                                     </div>
@@ -525,7 +525,7 @@
                 <div v-if="taskAttachments.length > 0" class="td-attach-grid mt-2">
                   <div v-for="att in taskAttachments" :key="att.id" class="td-attach-item group">
                     <button class="td-attach-preview-btn" type="button" @click="openAttachmentPreview(att)">
-                    <img v-if="att.type === 'image'" :src="att.url" :alt="att.name" class="td-attach-img" />
+                    <img v-if="isAttachmentImage(att)" :src="att.url" :alt="att.name" class="td-attach-img" />
                     <div v-else class="td-attach-file">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted)"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                       <span class="truncate w-full text-center">{{ att.name }}</span>
@@ -557,7 +557,7 @@
                       </div>
                       <div class="td-preview-body">
                         <img
-                          v-if="previewAttachment.type === 'image'"
+                          v-if="isAttachmentImage(previewAttachment)"
                           :src="previewUrl || previewAttachment.url"
                           :alt="previewAttachment.name"
                           class="td-preview-image"
@@ -861,7 +861,7 @@
 </template>
 
 <script setup lang="ts">
-import { getFilePreviewUrl } from '@/api/cloudinary'
+import { getFilePreviewUrl, type CloudinaryUploadResult } from '@/api/cloudinary'
 import { listProjectSprints, type SprintSummary } from '@/api/sprints'
 import { useToast } from '@/composables/useToast'
 import UserProfileHover, { type UserHoverProfile } from '@/components/common/UserProfileHover.vue'
@@ -1073,7 +1073,7 @@ watch(
   () =>
     store.attachments
       .filter(
-        (attachment) => attachment.commentId && attachment.type === 'image' && attachment.fileId
+        (attachment) => attachment.commentId && isAttachmentImage(attachment) && attachment.fileId
       )
       .map((attachment) => attachment.fileId as string),
   (fileIds) => {
@@ -1692,7 +1692,7 @@ async function submitComment() {
             fileId: result.id ?? null,
             name: result.originalFilename || file.name,
             url: result.secureUrl,
-            type: result.resourceType === 'image' ? 'image' : 'file',
+            type: isUploadResultImage(result, result.originalFilename || file.name) ? 'image' : 'file',
             format: result.format,
             resourceType: result.resourceType,
             size: formatFileSize(result.bytes || file.size),
@@ -1742,7 +1742,7 @@ async function submitReply(commentId: string) {
             fileId: result.id ?? null,
             name: result.originalFilename || file.name,
             url: result.secureUrl,
-            type: result.resourceType === 'image' ? 'image' : 'file',
+            type: isUploadResultImage(result, result.originalFilename || file.name) ? 'image' : 'file',
             format: result.format,
             resourceType: result.resourceType,
             size: formatFileSize(result.bytes || file.size),
@@ -1785,6 +1785,26 @@ function getCommentAttachments(commentId: string) {
 
 function getCommentImageUrl(attachment: Attachment) {
   return attachment.fileId ? commentImagePreviewUrls.value[attachment.fileId] : attachment.url
+}
+
+function isAttachmentImage(attachment: Attachment | null) {
+  if (!attachment) return false
+
+  const format = inferAttachmentFormat(
+    attachment.format,
+    attachment.name,
+    attachment.url
+  )
+  if (format === 'pdf') return false
+
+  return attachment.type === 'image' || attachment.resourceType?.toLowerCase() === 'image'
+}
+
+function isUploadResultImage(result: CloudinaryUploadResult, fileName?: string | null) {
+  const format = inferAttachmentFormat(result.format, result.originalFilename || fileName, result.secureUrl)
+  if (format === 'pdf') return false
+
+  return result.resourceType?.toLowerCase() === 'image'
 }
 
 // ── File upload ───────────────────────────────────────────────────────────────
@@ -1831,7 +1851,7 @@ async function onFileUpload(e: Event) {
         fileId: result.id ?? null,
         name: result.originalFilename || file.name,
         url: result.secureUrl,
-        type: result.resourceType === 'image' ? 'image' : 'file',
+        type: isUploadResultImage(result, result.originalFilename || file.name) ? 'image' : 'file',
         format: result.format,
         resourceType: result.resourceType,
         size: formatFileSize(result.bytes || file.size),
@@ -1882,7 +1902,7 @@ async function openAttachmentPreview(attachment: Attachment) {
   if (attachment.fileId) {
     try {
       previewUrl.value =
-        attachment.type === 'image' && commentImagePreviewUrls.value[attachment.fileId]
+        isAttachmentImage(attachment) && commentImagePreviewUrls.value[attachment.fileId]
           ? commentImagePreviewUrls.value[attachment.fileId]
           : await getFilePreviewUrl(attachment.fileId)
     } catch {
@@ -1897,8 +1917,23 @@ function closeAttachmentPreview() {
 }
 
 function canInlinePreview(attachment: Attachment) {
-  const format = attachment.format?.toLowerCase()
+  const format = inferAttachmentFormat(attachment.format, attachment.name, attachment.url)
   return ['pdf', 'txt', 'json', 'csv'].includes(format ?? '')
+}
+
+function inferAttachmentFormat(
+  format?: string | null,
+  fileName?: string | null,
+  url?: string | null
+) {
+  const directFormat = format?.trim().toLowerCase()
+  if (directFormat) return directFormat
+
+  const source = fileName || url || ''
+  const cleanSource = source.split('?')[0] ?? source
+  const lastSegment = cleanSource.split('/').pop() ?? cleanSource
+  const extension = lastSegment.includes('.') ? lastSegment.split('.').pop() : ''
+  return extension?.trim().toLowerCase() || ''
 }
 
 function isCommentImageLoading(attachmentId: string) {

@@ -566,7 +566,7 @@ async function handleUploaded(results: CloudinaryUploadResult[]) {
 function triggerUploader() { uploaderRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
 
 function isImageFile(file: CloudinaryFile) {
-  const format = (file.format || '').toLowerCase()
+  const format = inferFileFormat(file.format, file.fileName, file.publicId, file.secureUrl)
   const resourceType = (file.resourceType || '').toLowerCase()
   if (PDF_FORMATS.has(format)) return false
   return resourceType === 'image' || IMAGE_FORMATS.has(format)
@@ -587,13 +587,24 @@ function closeImagePreview() {
 
 function openFile(file: { id: string | null; format?: string | null; resourceType?: string | null; fileName?: string | null; publicId?: string | null; secureUrl: string }) {
   if (!file.id) { window.open(file.secureUrl, '_blank', 'noopener,noreferrer'); return }
-  const normalizedFormat = (file.format ?? '').toLowerCase()
+  const normalizedFormat = inferFileFormat(file.format, file.fileName, file.publicId, file.secureUrl)
   const normalizedResourceType = (file.resourceType ?? '').toLowerCase()
   const previewableVideoFormats = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi'])
   const mode = normalizedFormat === 'pdf' || normalizedResourceType === 'image' || normalizedResourceType === 'video' || previewableVideoFormats.has(normalizedFormat) ? 'preview' : 'download'
   const resolvedRoute = router.resolve({ name: 'file-open', params: { id: file.id }, query: { mode } })
   const openedWindow = window.open(resolvedRoute.href, '_blank', 'noopener,noreferrer')
   if (!openedWindow) toast.error('Browser blocked popup. Please allow popups and try again.')
+}
+
+function inferFileFormat(format?: string | null, fileNameValue?: string | null, publicId?: string | null, url?: string | null) {
+  const directFormat = format?.trim().toLowerCase()
+  if (directFormat) return directFormat
+
+  const source = fileNameValue || publicId || url || ''
+  const cleanSource = source.split('?')[0] ?? source
+  const lastSegment = cleanSource.split('/').pop() ?? cleanSource
+  const extension = lastSegment.includes('.') ? lastSegment.split('.').pop() : ''
+  return extension?.trim().toLowerCase() || ''
 }
 
 function requestDelete(file: CloudinaryFile) {

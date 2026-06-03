@@ -831,7 +831,9 @@ export const useTaskStore = defineStore('tasks', () => {
         taskId,
         name: file.fileName || file.publicId.split('/').pop() || 'file',
         url: file.secureUrl,
-        type: file.resourceType === 'image' ? ('image' as const) : ('file' as const),
+        type: isImageAttachment(file.resourceType, file.format, file.fileName, file.publicId)
+          ? ('image' as const)
+          : ('file' as const),
         format: file.format,
         resourceType: file.resourceType,
         size: formatBytes(Number(file.bytes) || 0),
@@ -845,6 +847,33 @@ export const useTaskStore = defineStore('tasks', () => {
     if (!bytes) return '0 KB'
     if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  function isImageAttachment(
+    resourceType?: string | null,
+    format?: string | null,
+    fileName?: string | null,
+    publicId?: string | null
+  ) {
+    const normalizedFormat = inferFileFormat(format, fileName, publicId)
+    if (normalizedFormat === 'pdf') return false
+
+    return resourceType?.toLowerCase() === 'image'
+  }
+
+  function inferFileFormat(
+    format?: string | null,
+    fileName?: string | null,
+    publicId?: string | null
+  ) {
+    const directFormat = format?.trim().toLowerCase()
+    if (directFormat) return directFormat
+
+    const source = fileName || publicId || ''
+    const cleanSource = source.split('?')[0] ?? source
+    const lastSegment = cleanSource.split('/').pop() ?? cleanSource
+    const extension = lastSegment.includes('.') ? lastSegment.split('.').pop() : ''
+    return extension?.trim().toLowerCase() || ''
   }
 
   function firstOpenStatusId() {

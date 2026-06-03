@@ -422,6 +422,7 @@ const FOLDER_REFRESH_DELAY_MS = 350
 const DOWNLOAD_EVENT_KEY = 'tms:file-download-event'
 
 const IMAGE_FORMATS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'])
+const PDF_FORMATS = new Set(['pdf'])
 
 const currentFolder = ref(DEFAULT_FOLDER)
 const openMenuId = ref<string | null>(null)
@@ -567,6 +568,7 @@ function triggerUploader() { uploaderRef.value?.scrollIntoView({ behavior: 'smoo
 function isImageFile(file: CloudinaryFile) {
   const format = (file.format || '').toLowerCase()
   const resourceType = (file.resourceType || '').toLowerCase()
+  if (PDF_FORMATS.has(format)) return false
   return resourceType === 'image' || IMAGE_FORMATS.has(format)
 }
 
@@ -588,7 +590,7 @@ function openFile(file: { id: string | null; format?: string | null; resourceTyp
   const normalizedFormat = (file.format ?? '').toLowerCase()
   const normalizedResourceType = (file.resourceType ?? '').toLowerCase()
   const previewableVideoFormats = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi'])
-  const mode = normalizedResourceType === 'image' || normalizedResourceType === 'video' || previewableVideoFormats.has(normalizedFormat) ? 'preview' : 'download'
+  const mode = normalizedFormat === 'pdf' || normalizedResourceType === 'image' || normalizedResourceType === 'video' || previewableVideoFormats.has(normalizedFormat) ? 'preview' : 'download'
   const resolvedRoute = router.resolve({ name: 'file-open', params: { id: file.id }, query: { mode } })
   const openedWindow = window.open(resolvedRoute.href, '_blank', 'noopener,noreferrer')
   if (!openedWindow) toast.error('Browser blocked popup. Please allow popups and try again.')

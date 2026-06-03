@@ -226,17 +226,21 @@ export class CloudinaryFileManagerService {
     fileName?: string | null,
     fileType?: string | null,
   ): AllowedResourceType {
+    const extension = this.extractFileExtension(fileType) ?? this.extractFileExtension(fileName);
+    if (extension === 'pdf') {
+      return 'raw';
+    }
+
     const normalizedCategory = (fileCategory ?? '').trim().toLowerCase();
     if (normalizedCategory === 'image' || normalizedCategory === 'video' || normalizedCategory === 'raw') {
       return normalizedCategory;
     }
 
-    const extension = this.extractFileExtension(fileType) ?? this.extractFileExtension(fileName);
     if (!extension) {
       return 'raw';
     }
 
-    if (extension === 'pdf' || IMAGE_EXTENSIONS.has(extension)) {
+    if (IMAGE_EXTENSIONS.has(extension)) {
       return 'image';
     }
 
@@ -321,7 +325,7 @@ export class CloudinaryFileManagerService {
     if (isPdf) {
       return {
         canPreview: true,
-        resourceType: 'image',
+        resourceType: normalizedCategory === 'image' ? 'image' : 'raw',
         format: 'pdf',
       };
     }

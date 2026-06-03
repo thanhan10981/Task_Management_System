@@ -131,6 +131,7 @@ export class CloudinaryAccessHelper {
         resource_type: params.resourceType,
         type: 'authenticated',
         sign_url: true,
+        format: params.format,
       });
     }
 
@@ -214,8 +215,8 @@ export class CloudinaryAccessHelper {
     const isPdf = normalizedName.endsWith('.pdf') || normalizedMime === 'application/pdf';
     if (isPdf) {
       return {
-        resourceType: 'image',
-        enforcedFormat: 'pdf',
+        resourceType: 'raw',
+        enforcedFormat: undefined,
       };
     }
 

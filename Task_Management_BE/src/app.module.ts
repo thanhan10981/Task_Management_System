@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
+import { HealthController } from './health.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './config/database/database.module';
 import { RedisModule } from './config/redis/redis.module';
@@ -46,7 +47,7 @@ import { validate } from './config/validation.schema';
     TaskAnalyticsModule,
     FeedbackModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, HealthController],
   providers: [
     AppService,
     LoggingInterceptor,

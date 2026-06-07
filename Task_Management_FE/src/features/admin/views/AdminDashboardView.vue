@@ -111,7 +111,7 @@
 
 <script setup lang="ts">
 import { Chart, registerables } from 'chart.js'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { getAdminStats, type AdminStats } from '@/api/admin'
 
 Chart.register(...registerables)

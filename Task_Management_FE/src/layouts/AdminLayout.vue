@@ -122,8 +122,9 @@ async function logout() {
 <style scoped>
 /* ─── Shell ─────────────────────────────────────────── */
 .admin-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
+  overflow: hidden;
   background: #f1f5f9;
   color: #172033;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -132,15 +133,16 @@ async function logout() {
 /* ─── Sidebar ────────────────────────────────────────── */
 .admin-sidebar {
   width: 260px;
+  height: 100vh;
   flex-shrink: 0;
   background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
   color: #e2e8f0;
   display: flex;
   flex-direction: column;
   padding: 20px 14px;
-  gap: 4px;
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
   z-index: 90;
+  overflow-y: auto;
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -170,8 +172,10 @@ async function logout() {
 /* ─── Nav ────────────────────────────────────────────── */
 .admin-nav {
   flex: 1;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 3px;
+  overflow-y: auto;
 }
 .admin-nav-link {
   min-height: 44px;
@@ -254,7 +258,7 @@ async function logout() {
 .admin-logout-btn svg { width: 15px; height: 15px; }
 
 /* ─── Main area ──────────────────────────────────────── */
-.admin-main { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.admin-main { min-width: 0; flex: 1; display: flex; flex-direction: column; height: 100vh; overflow-y: auto; }
 
 /* ─── Header ─────────────────────────────────────────── */
 .admin-header {
@@ -335,7 +339,7 @@ async function logout() {
 .admin-menu-btn svg { width: 20px; height: 20px; }
 
 /* ─── Content ────────────────────────────────────────── */
-.admin-content { padding: 28px; flex: 1; }
+.admin-content { padding: 28px; flex: 1; min-height: 0; }
 
 /* ─── Page transition ────────────────────────────────── */
 .page-fade-enter-active, .page-fade-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
@@ -354,11 +358,14 @@ async function logout() {
 
 /* ─── Responsive ─────────────────────────────────────── */
 @media (max-width: 768px) {
+  .admin-shell { height: auto; min-height: 100vh; overflow: visible; }
   .admin-sidebar {
     position: fixed;
     inset: 0 auto 0 0;
+    height: 100vh;
     transform: translateX(-100%);
   }
+  .admin-main { height: auto; min-height: 100vh; overflow-y: visible; }
   .admin-sidebar--open { transform: translateX(0); }
   .admin-backdrop { display: block; }
   .admin-menu-btn { display: inline-flex; }

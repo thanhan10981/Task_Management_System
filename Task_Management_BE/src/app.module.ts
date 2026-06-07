@@ -20,7 +20,9 @@ import { CommentsModule } from './modules/comments/comments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { TaskAnalyticsModule } from './modules/task-analytics/task-analytics.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 import configuration from './config/configuration';
 import { validate } from './config/validation.schema';
@@ -46,6 +48,7 @@ import { validate } from './config/validation.schema';
     NotificationsModule,
     TaskAnalyticsModule,
     FeedbackModule,
+    AdminModule,
   ],
   controllers: [AppController, HealthController],
   providers: [
@@ -55,6 +58,10 @@ import { validate } from './config/validation.schema';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })

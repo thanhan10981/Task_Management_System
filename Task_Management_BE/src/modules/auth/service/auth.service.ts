@@ -111,6 +111,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('This account has been disabled');
+    }
+
     const isPasswordValid = await bcrypt.compare(
       loginDto.password,
       user.passwordHash,
@@ -134,6 +138,10 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('This account has been disabled');
     }
 
     const { passwordHash: _, ...userWithoutPassword } = user;
@@ -188,6 +196,10 @@ export class AuthService {
         firebaseUser.name || email,
         firebaseUser.picture,
       ));
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('This account has been disabled');
+    }
 
     const { passwordHash: _, ...userWithoutPassword } = user;
     return this.generateTokens(userWithoutPassword);

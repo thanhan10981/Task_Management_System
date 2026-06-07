@@ -8,6 +8,8 @@ export interface User {
   jobTitle?: string
   phone?: string
   bio?: string
+  role?: 'USER' | 'ADMIN'
+  isActive?: boolean
   createdAt: string
   updatedAt: string
 }

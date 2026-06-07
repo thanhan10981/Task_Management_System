@@ -46,7 +46,8 @@ apiClient.interceptors.response.use(
       authStore.logout()
 
       const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
-      window.location.href = `/auth/login?redirect=${encodeURIComponent(redirectPath)}`
+      const loginPath = currentPath.startsWith('/admin') ? '/admin/login' : '/auth/login'
+      window.location.href = `${loginPath}?redirect=${encodeURIComponent(redirectPath)}`
     }
 
     return Promise.reject(error)

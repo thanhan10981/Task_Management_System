@@ -58,6 +58,13 @@ enum SprintStatus {
   @@map("sprint_status")
 }
 
+enum UserRole {
+  USER
+  ADMIN
+
+  @@map("user_role")
+}
+
 // ============================================
 // Models
 // ============================================
@@ -72,6 +79,8 @@ model User {
   jobTitle     String?  @db.VarChar(120)
   phone        String?  @db.VarChar(30)
   bio          String?  @db.Text
+  role         UserRole @default(USER)
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)
 

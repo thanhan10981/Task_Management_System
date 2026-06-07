@@ -49,6 +49,53 @@ async function restoreAuthFromCookie(authStore: ReturnType<typeof useAuthStore>)
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/admin/login',
+    name: 'admin-login',
+    component: () => import('@/features/admin/views/AdminLoginView.vue'),
+    meta: { title: 'Admin Login', adminGuest: true },
+  },
+  {
+    path: '/admin',
+    component: () => import('@/layouts/AdminLayout.vue'),
+    meta: { requiresAdmin: true },
+    children: [
+      {
+        path: '',
+        redirect: { name: 'admin-dashboard' },
+      },
+      {
+        path: 'dashboard',
+        name: 'admin-dashboard',
+        component: () => import('@/features/admin/views/AdminDashboardView.vue'),
+        meta: { title: 'Admin Dashboard', requiresAdmin: true },
+      },
+      {
+        path: 'users',
+        name: 'admin-users',
+        component: () => import('@/features/admin/views/AdminUsersView.vue'),
+        meta: { title: 'Admin Users', requiresAdmin: true },
+      },
+      {
+        path: 'projects',
+        name: 'admin-projects',
+        component: () => import('@/features/admin/views/AdminProjectsView.vue'),
+        meta: { title: 'Admin Projects', requiresAdmin: true },
+      },
+      {
+        path: 'tasks',
+        name: 'admin-tasks',
+        component: () => import('@/features/admin/views/AdminTasksView.vue'),
+        meta: { title: 'Admin Tasks', requiresAdmin: true },
+      },
+      {
+        path: 'members',
+        name: 'admin-members',
+        component: () => import('@/features/admin/views/AdminMembersView.vue'),
+        meta: { title: 'Admin Members', requiresAdmin: true },
+      },
+    ],
+  },
+  {
     path: '/',
     component: () => import('@/layouts/DefaultLayout.vue'),
     meta: { requiresAuth: true },
@@ -230,6 +277,34 @@ router.beforeEach(async (to) => {
   const authStore = useAuthStore()
   const pageTitle = to.meta.title as string | undefined
   document.title = pageTitle ? `${pageTitle} | OCTOM` : 'OCTOM'
+  const isAdminRoute = to.path.startsWith('/admin')
+
+  if ((to.meta.requiresAdmin || to.meta.adminGuest) && !authStore.isAuthenticated) {
+    await restoreAuthFromCookie(authStore)
+  }
+
+  if (to.meta.requiresAdmin) {
+    if (!authStore.isAuthenticated) {
+      return {
+        name: 'admin-login',
+        query: { redirect: to.fullPath },
+      }
+    }
+
+    if (authStore.user?.role !== 'ADMIN') {
+      return {
+        name: 'admin-login',
+        query: {
+          redirect: to.fullPath,
+          reason: 'This account does not have admin permission.',
+        },
+      }
+    }
+  }
+
+  if (to.meta.adminGuest && authStore.user?.role === 'ADMIN') {
+    return { name: 'admin-dashboard' }
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     const restored = await restoreAuthFromCookie(authStore)
@@ -249,7 +324,7 @@ router.beforeEach(async (to) => {
     return { name: 'dashboard' }
   }
 
-  if (authStore.isAuthenticated) {
+  if (authStore.isAuthenticated && !isAdminRoute) {
     const projectStore = useProjectStore()
     await projectStore.initializeAfterAuth()
 

@@ -78,7 +78,7 @@
           <Transition name="dropdown-fade">
             <div
               v-if="shouldShowSearchMenu"
-              class="absolute top-[calc(100%+8px)] left-0 right-0 rounded-2xl border p-2 z-[300] max-h-[60vh] md:max-h-[360px] overflow-y-auto"
+              class="search-results-menu rounded-2xl border p-2 z-[300] overflow-y-auto"
               style="background: var(--dropdown-bg); border-color: var(--border-base); box-shadow: var(--shadow-lg);"
               @click.stop
             >
@@ -101,7 +101,7 @@
                 <button
                   v-for="task in searchResults"
                   :key="task.taskId"
-                  class="w-full text-left px-3 py-2 rounded-[10px] border-none cursor-pointer transition-colors"
+                  class="search-result-item w-full text-left px-3 py-2 rounded-[10px] border-none cursor-pointer transition-colors"
                   style="background: transparent;"
                   @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--bg-active)'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
@@ -109,7 +109,7 @@
                 >
                   <div class="flex items-start gap-2.5">
                     <div class="min-w-0 flex-1">
-                      <p class="text-[12.5px] font-semibold m-0 truncate" style="color: var(--text-heading);">
+                      <p class="search-result-title text-[12.5px] font-semibold m-0 truncate" style="color: var(--text-heading);">
                         {{ task.title }}
                       </p>
                       <div class="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
@@ -356,10 +356,20 @@
           isActive(item) ? 'bottom-nav-item--active' : '',
           isProjectNavLocked(item) ? 'bottom-nav-item--locked' : '',
         ]"
+        :aria-label="navTooltip(item)"
+        :title="navTooltip(item)"
         active-class=""
         @click="handleNavClick(item, $event)"
       >
-        <span class="nav-icon relative flex items-center justify-center" v-html="item.icon" />
+        <span class="nav-icon relative flex items-center justify-center">
+          <span v-html="item.icon" />
+          <span v-if="isProjectNavLocked(item)" class="bottom-nav-lock-dot" aria-hidden="true">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+          </span>
+        </span>
         <span>{{ item.label }}</span>
       </RouterLink>
     </nav>
@@ -1104,6 +1114,11 @@ function removeMember(userId: string) {
 
 async function submitCreateProject() {
   if (!createProjectForm.name) return
+  if (createProjectForm.name.length < 2) {
+    createProjectError.value = 'Project name must be at least 2 characters.'
+    return
+  }
+
   creatingProject.value = true
   createProjectError.value = ''
   try {
@@ -1127,6 +1142,10 @@ function extractErrorMessage(error: unknown, fallback = 'Failed to create projec
   if (typeof error === 'object' && error && 'response' in error) {
     const payload = (error as { response?: { data?: unknown } }).response?.data
     if (payload && typeof payload === 'object') {
+      const errors = (payload as { errors?: Record<string, unknown> }).errors
+      const firstError = getFirstValidationError(errors)
+      if (firstError) return firstError
+
       const message = (payload as { message?: unknown }).message
       if (typeof message === 'string') return message
       const nested = (payload as { data?: { message?: unknown } }).data?.message
@@ -1135,6 +1154,23 @@ function extractErrorMessage(error: unknown, fallback = 'Failed to create projec
   }
   if (error instanceof Error && error.message) return error.message
   return fallback
+}
+
+function getFirstValidationError(errors: Record<string, unknown> | undefined) {
+  if (!errors) return ''
+
+  for (const value of Object.values(errors)) {
+    if (Array.isArray(value)) {
+      const first = value.find((item): item is string => typeof item === 'string' && item.length > 0)
+      if (first) return first
+    }
+
+    if (typeof value === 'string' && value.length > 0) {
+      return value
+    }
+  }
+
+  return ''
 }
 
 function isActive(item: { routeName: string }) {
@@ -1329,6 +1365,43 @@ const navItems: NavItem[] = [
   background: var(--search-focus-bg) !important;
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
 }
+.search-results-menu {
+  position: fixed;
+  top: 56px;
+  left: 12px;
+  right: 12px;
+  max-height: calc(100dvh - 128px);
+}
+.search-result-item {
+  min-height: 64px;
+}
+.search-result-title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+@media (min-width: 768px) {
+  .search-results-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    max-height: 360px;
+  }
+  .search-result-item {
+    min-height: 0;
+  }
+  .search-result-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+}
 
 /* 5. Field input focus */
 .field-input:focus {
@@ -1382,7 +1455,28 @@ const navItems: NavItem[] = [
 .bottom-nav-item { color: var(--text-subtle); }
 .bottom-nav-item :deep(svg) { width: 20px; height: 20px; }
 .bottom-nav-item--locked {
-  opacity: 0.55;
+  color: var(--text-muted);
+  opacity: 0.74;
+}
+.bottom-nav-lock-dot {
+  position: absolute;
+  right: -7px;
+  top: -5px;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  color: #6366f1;
+  border: 1px solid var(--border-base);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.16);
+}
+.bottom-nav-lock-dot svg {
+  display: block;
+  width: 9px !important;
+  height: 9px !important;
 }
 .bottom-nav-item--locked::after {
   content: 'Select project';

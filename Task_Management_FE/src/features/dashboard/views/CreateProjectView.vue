@@ -138,6 +138,10 @@ const form = reactive({
 
 async function submit() {
   if (!form.name) return
+  if (form.name.trim().length < 2) {
+    errorMessage.value = 'Project name must be at least 2 characters.'
+    return
+  }
 
   loading.value = true
   errorMessage.value = ''
@@ -165,6 +169,10 @@ function extractErrorMessage(error: unknown) {
   if (typeof error === 'object' && error && 'response' in error) {
     const payload = (error as { response?: { data?: unknown } }).response?.data
     if (payload && typeof payload === 'object') {
+      const errors = (payload as { errors?: Record<string, unknown> }).errors
+      const firstError = getFirstValidationError(errors)
+      if (firstError) return firstError
+
       const message = (payload as { message?: unknown }).message
       if (typeof message === 'string') return message
       const nested = (payload as { data?: { message?: unknown } }).data?.message
@@ -173,6 +181,23 @@ function extractErrorMessage(error: unknown) {
   }
   if (error instanceof Error && error.message) return error.message
   return 'Failed to create project'
+}
+
+function getFirstValidationError(errors: Record<string, unknown> | undefined) {
+  if (!errors) return ''
+
+  for (const value of Object.values(errors)) {
+    if (Array.isArray(value)) {
+      const first = value.find((item): item is string => typeof item === 'string' && item.length > 0)
+      if (first) return first
+    }
+
+    if (typeof value === 'string' && value.length > 0) {
+      return value
+    }
+  }
+
+  return ''
 }
 </script>
 
